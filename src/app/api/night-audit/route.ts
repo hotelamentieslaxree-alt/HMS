@@ -1,11 +1,14 @@
-// /api/night-audit — list past audits + POST run audit
+// /api/night-audit — preview + run audit
+// Fixed (C5): the entire audit runs inside a single $transaction so any
+// failure rolls back all charge postings / status changes. Idempotency
+// guard prevents double-audit for the same business date.
 import { db } from "@/lib/db";
-import { ok, fail, PROPERTY_ID, broadcast, logAudit } from "@/lib/hms";
+import { ok, fail, PROPERTY_ID, broadcast, logAudit, withHandler, roundMoney } from "@/lib/hms";
 import { startOfDay, format } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const audits = await db.nightAuditLog.findMany({
     where: { propertyId },
@@ -14,7 +17,6 @@ export async function GET() {
   });
   const property = await db.property.findUnique({ where: { id: propertyId } });
 
-  // Pre-audit preview: what will happen
   const today = startOfDay(new Date());
   const inHouseCount = await db.reservation.count({ where: { propertyId, status: "checked_in" } });
   const arrivalsTomorrow = await db.reservation.count({
@@ -31,8 +33,15 @@ export async function GET() {
     include: { reservation: true },
   });
 
+  // Check if audit already ran for current business date (idempotency preview)
+  const businessDate = property?.businessDate ? startOfDay(property.businessDate) : today;
+  const alreadyAuditedToday = await db.nightAuditLog.findFirst({
+    where: { propertyId, businessDate, status: "completed" },
+  });
+
   return ok({
     businessDate: property?.businessDate,
+    alreadyAuditedToday: !!alreadyAuditedToday,
     audits: audits.map((a) => ({
       id: a.id, businessDate: a.businessDate, status: a.status,
       startedAt: a.startedAt, completedAt: a.completedAt,
@@ -45,37 +54,47 @@ export async function GET() {
       tentativeConfirming,
       expectedNoShows,
       foliosToPostCount: foliosToPost.length,
-      estimatedRevenue: foliosToPost.reduce((s, f) => s + (f.reservation?.ratePerNight ?? 0), 0),
+      estimatedRevenue: roundMoney(foliosToPost.reduce((s, f) => s + (f.reservation?.ratePerNight ?? 0), 0)),
     },
   });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const property = await db.property.findUnique({ where: { id: propertyId } });
   if (!property) return fail("Property not found", "NOT_FOUND", 404);
 
   const businessDate = startOfDay(property.businessDate);
-  const auditLog = await db.nightAuditLog.create({
-    data: { propertyId, businessDate, status: "running", startedBy: "system" },
+
+  // Idempotency: don't run twice for the same business date (C5 fix)
+  const existing = await db.nightAuditLog.findFirst({
+    where: { propertyId, businessDate, status: "completed" },
   });
+  if (existing) {
+    return fail(`Night audit already completed for ${format(businessDate, "dd MMM yyyy")}`, "ALREADY_AUDITED", 409);
+  }
 
-  let postingsCount = 0;
-  let revenuePosted = 0;
-  const notes: string[] = [];
+  // Run the entire audit inside a single transaction.
+  const result = await db.$transaction(async (tx) => {
+    const auditLog = await tx.nightAuditLog.create({
+      data: { propertyId, businessDate, status: "running", startedBy: "system" },
+    });
 
-  try {
+    let postingsCount = 0;
+    let revenuePosted = 0;
+    const notes: string[] = [];
+
     // Step 1: Post room charges to all in-house folios
-    const inHouseReservations = await db.reservation.findMany({
+    const inHouseReservations = await tx.reservation.findMany({
       where: { propertyId, status: "checked_in" },
       include: { folios: true, category: true, ratePlan: true },
     });
     for (const r of inHouseReservations) {
       const folio = r.folios.find((f) => f.status === "open") ?? r.folios[0];
       if (!folio) continue;
-      const rate = r.ratePerNight;
-      const tax = Math.round(rate * 0.12);
-      await db.folioLine.create({
+      const rate = roundMoney(r.ratePerNight);
+      const tax = roundMoney(rate * 0.12);
+      await tx.folioLine.create({
         data: {
           folioId: folio.id, transactionType: "charge",
           description: `Room charge — ${r.category.name} (Night audit ${format(businessDate, "dd MMM")})`,
@@ -83,11 +102,11 @@ export async function POST(req: Request) {
           departmentCode: "ROOM", referenceType: "room_rate", postedBy: "night_audit",
         },
       });
-      await db.folio.update({
+      await tx.folio.update({
         where: { id: folio.id },
         data: {
           subtotal: { increment: rate }, taxAmount: { increment: tax },
-          totalAmount: { increment: rate + tax }, balance: { increment: rate + tax },
+          totalAmount: { increment: roundMoney(rate + tax) }, balance: { increment: roundMoney(rate + tax) },
         },
       });
       postingsCount++;
@@ -95,12 +114,12 @@ export async function POST(req: Request) {
     }
     notes.push(`Posted room charges to ${inHouseReservations.length} in-house folios`);
 
-    // Step 2: Mark no-shows (confirmed reservations with check-in date <= business date, not checked in)
-    const noShows = await db.reservation.findMany({
+    // Step 2: Mark no-shows
+    const noShows = await tx.reservation.findMany({
       where: { propertyId, status: "confirmed", checkInDate: { lte: businessDate } },
     });
     for (const r of noShows) {
-      await db.reservation.update({
+      await tx.reservation.update({
         where: { id: r.id },
         data: { status: "no_show", cancellationReason: "No-show — auto-marked by night audit", cancelledAt: new Date(), cancelledBy: "night_audit" },
       });
@@ -110,20 +129,20 @@ export async function POST(req: Request) {
 
     // Step 3: Convert tentative reservations arriving tomorrow to confirmed
     const tomorrow = new Date(businessDate); tomorrow.setDate(tomorrow.getDate() + 1);
-    const tentative = await db.reservation.findMany({
+    const tentative = await tx.reservation.findMany({
       where: { propertyId, status: "tentative", checkInDate: { gte: businessDate, lte: tomorrow } },
     });
     for (const r of tentative) {
-      await db.reservation.update({ where: { id: r.id }, data: { status: "confirmed" } });
+      await tx.reservation.update({ where: { id: r.id }, data: { status: "confirmed" } });
     }
     notes.push(`Confirmed ${tentative.length} tentative reservations`);
 
     // Step 4: Roll business date forward
     const nextDay = new Date(businessDate); nextDay.setDate(nextDay.getDate() + 1);
-    await db.property.update({ where: { id: propertyId }, data: { businessDate: nextDay } });
+    await tx.property.update({ where: { id: propertyId }, data: { businessDate: nextDay } });
 
     // Step 5: Complete the audit log
-    const completed = await db.nightAuditLog.update({
+    const completed = await tx.nightAuditLog.update({
       where: { id: auditLog.id },
       data: {
         status: "completed", completedAt: new Date(),
@@ -132,17 +151,7 @@ export async function POST(req: Request) {
       },
     });
 
-    await logAudit({
-      propertyId, action: "NIGHT_AUDIT_COMPLETED", entityType: "night_audit", entityId: auditLog.id,
-      newValue: { postingsCount, revenuePosted, noShows: noShows.length }, userRole: "fom",
-    });
-
-    await broadcast("notification.system", {
-      type: "success", title: "Night audit completed",
-      message: `${format(businessDate, "dd MMM yyyy")} — ${postingsCount} postings, ₹${Math.round(revenuePosted).toLocaleString("en-IN")} posted. Business date advanced.`,
-    }, propertyId);
-
-    return ok({
+    return {
       audit: completed,
       summary: {
         businessDateClosed: businessDate,
@@ -153,12 +162,23 @@ export async function POST(req: Request) {
         tentativeConfirmed: tentative.length,
         notes,
       },
-    });
-  } catch (e: any) {
-    await db.nightAuditLog.update({
-      where: { id: auditLog.id },
-      data: { status: "failed", completedAt: new Date(), notes: `Failed: ${e.message}` },
-    });
-    return fail(`Night audit failed: ${e.message}`, "AUDIT_FAILED", 500);
-  }
-}
+    };
+  });
+
+  await logAudit({
+    propertyId, action: "NIGHT_AUDIT_COMPLETED", entityType: "night_audit", entityId: result.audit.id,
+    newValue: {
+      postingsCount: result.summary.postingsCount,
+      revenuePosted: result.summary.revenuePosted,
+      noShows: result.summary.noShowsMarked,
+    },
+    userRole: "fom",
+  });
+
+  await broadcast("notification.system", {
+    type: "success", title: "Night audit completed",
+    message: `${format(businessDate, "dd MMM yyyy")} — ${result.summary.postingsCount} postings, ₹${result.summary.revenuePosted.toLocaleString("en-IN")} posted. Business date advanced.`,
+  }, propertyId);
+
+  return ok(result);
+});

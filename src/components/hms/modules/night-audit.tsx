@@ -31,11 +31,16 @@ export function NightAuditModule() {
   if (loading || !data) return <Skeleton className="h-96" />;
 
   const run = async () => {
-    if (!confirm("Run night audit? This will post charges, mark no-shows, and roll the business date forward. This action is recorded in the audit log.")) return;
+    if (data?.alreadyAuditedToday) {
+      if (!confirm(`An audit has already been completed for ${fmtDate(data.businessDate)}. Run anyway? (This may double-post charges.)`)) return;
+    } else {
+      if (!confirm("Run night audit? This will post charges, mark no-shows, and roll the business date forward. This action is recorded in the audit log.")) return;
+    }
     setRunning(true);
     try {
       const r = await apiPost("/api/night-audit");
-      toast.success(`Night audit completed · ${r.data.summary.postingsCount} postings · ${fmtINR(r.data.summary.revenuePosted)}`);
+      // C2 fix: r.summary, not r.data.summary.
+      toast.success(`Night audit completed · ${r.summary.postingsCount} postings · ${fmtINR(r.summary.revenuePosted)}`);
       triggerRefresh();
       reload();
     } catch (e: any) {
@@ -49,6 +54,16 @@ export function NightAuditModule() {
 
   return (
     <div className="space-y-4">
+      {/* Already-audited warning (idempotency guard) */}
+      {data.alreadyAuditedToday && (
+        <div className="rounded-xl border border-[#D97706]/40 bg-[#D97706]/10 p-3 flex items-start gap-2.5">
+          <AlertTriangle className="h-4 w-4 text-[#D97706] mt-0.5 shrink-0" />
+          <div className="text-xs">
+            <p className="font-semibold text-[#D97706]">Night audit already completed for this business date.</p>
+            <p className="text-muted-foreground mt-0.5">Running again may double-post room charges. The server also enforces this guard and will reject duplicate audits for the same date.</p>
+          </div>
+        </div>
+      )}
       {/* Current business date banner */}
       <Card className="border-navy/20 bg-gradient-to-r from-navy to-[#2E5FA3] text-white">
         <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">

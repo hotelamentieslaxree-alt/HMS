@@ -1,11 +1,11 @@
 // GET /api/dashboard — live KPIs + room status grid + arrivals/departures + activity feed
 import { db } from "@/lib/db";
-import { ok, calcKPIs, PROPERTY_ID } from "@/lib/hms";
+import { ok, calcKPIs, PROPERTY_ID, withHandler } from "@/lib/hms";
 import { startOfDay, addDays, format } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const property = await db.property.findUnique({ where: { id: propertyId } });
   if (!property) return ok({});
@@ -210,7 +210,7 @@ export async function GET() {
     })),
     notifications,
   });
-}
+});
 
 function endOfDay(d: Date) {
   const n = new Date(d);

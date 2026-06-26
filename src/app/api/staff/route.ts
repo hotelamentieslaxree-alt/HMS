@@ -1,10 +1,10 @@
 // GET /api/staff — list staff with departments
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const users = await db.user.findMany({
     where: { propertyId },
@@ -26,4 +26,4 @@ export async function GET() {
     isActive: u.isActive,
     avatarUrl: u.avatarUrl,
   })));
-}
+});

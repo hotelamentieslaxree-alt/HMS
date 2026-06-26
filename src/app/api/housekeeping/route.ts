@@ -1,10 +1,10 @@
 // /api/housekeeping — task list + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, broadcast, PROPERTY_ID } from "@/lib/hms";
+import { ok, fail, parseBody, broadcast, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
@@ -50,9 +50,9 @@ export async function GET(req: Request) {
       inspector: t.inspector ? { id: t.inspector.id, name: `${t.inspector.firstName} ${t.inspector.lastName}` } : null,
     })),
   });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const body = await parseBody(req);
   const { roomId, taskType = "checkout_cleaning", priority = "normal", assignedToId, notes } = body;
@@ -80,4 +80,4 @@ export async function POST(req: Request) {
   }, propertyId);
 
   return ok(task);
-}
+});

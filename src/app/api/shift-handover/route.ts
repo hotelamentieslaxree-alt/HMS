@@ -1,10 +1,10 @@
 // GET /api/shift-handover
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const handovers = await db.shiftHandover.findMany({
     where: { propertyId },
@@ -16,4 +16,4 @@ export async function GET() {
     id: h.id, fromUser: h.fromUser, toUser: h.toUser, shift: h.shift,
     notes: h.notes, openIssues: h.openIssues, createdAt: h.createdAt,
   })));
-}
+});

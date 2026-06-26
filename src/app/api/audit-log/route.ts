@@ -1,10 +1,10 @@
 // GET /api/audit-log — recent audit events
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const url = new URL(req.url);
   const limit = parseInt(url.searchParams.get("limit") || "40");
@@ -23,4 +23,4 @@ export async function GET(req: Request) {
     newValue: l.newValue ? JSON.parse(l.newValue) : null,
     ipAddress: l.ipAddress, occurredAt: l.occurredAt,
   })));
-}
+});

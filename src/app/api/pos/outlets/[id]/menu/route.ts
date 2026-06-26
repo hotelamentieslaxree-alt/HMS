@@ -1,12 +1,15 @@
-// GET /api/pos/outlets/[id]/menu — full menu for an outlet
+// GET /api/pos/outlets/[id]/menu — full menu for an outlet (with tables for POS UI)
 import { db } from "@/lib/db";
-import { ok, fail } from "@/lib/hms";
+import { ok, fail, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withHandler(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
-  const outlet = await db.outlet.findUnique({ where: { id } });
+  const outlet = await db.outlet.findUnique({
+    where: { id },
+    include: { tables: { orderBy: { tableNumber: "asc" } } },
+  });
   if (!outlet) return fail("Outlet not found", "NOT_FOUND", 404);
 
   const categories = await db.menuCategory.findMany({
@@ -16,7 +19,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   return ok({
-    outlet: { id: outlet.id, name: outlet.name, code: outlet.code, type: outlet.type },
+    outlet: { id: outlet.id, name: outlet.name, code: outlet.code, type: outlet.type, tableCount: outlet.tableCount },
+    tables: outlet.tables.map((t) => ({
+      id: t.id,
+      number: t.tableNumber,
+      capacity: t.capacity,
+      status: t.status,
+      section: t.section,
+    })),
     categories: categories.map((c) => ({
       id: c.id, name: c.name, sortOrder: c.sortOrder,
       items: c.items.map((it) => ({
@@ -28,4 +38,4 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       })),
     })),
   });
-}
+});

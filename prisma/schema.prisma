@@ -392,6 +392,8 @@ model LostFound {
   claimedAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([propertyId, status])
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -536,6 +538,9 @@ model MaintenanceTicket {
   completedAt DateTime?
 
   room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, status])
+  @@index([roomId])
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -572,6 +577,9 @@ model Notification {
   message    String
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
+
+  @@index([propertyId, isRead])
+  @@index([userId, isRead])
 }
 
 model ShiftHandover {
@@ -599,4 +607,7 @@ model NightAuditLog {
   revenuePosted Float    @default(0)
   noShowsCount  Int      @default(0)
   notes         String?
+
+  @@index([propertyId, businessDate])
+  @@index([propertyId, status])
 }

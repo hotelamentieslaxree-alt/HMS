@@ -1,11 +1,11 @@
 // /api/reservations — list (with filters) + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, PROPERTY_ID, broadcast, logAudit } from "@/lib/hms";
+import { ok, fail, parseBody, PROPERTY_ID, broadcast, logAudit, withHandler, nextNumber, roundMoney } from "@/lib/hms";
 import { startOfDay, addDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const url = new URL(req.url);
   const status = url.searchParams.get("status") || undefined;
@@ -96,9 +96,9 @@ export async function GET(req: Request) {
   });
 
   return ok(data, { count: data.length });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const body = await parseBody(req);
   const {
@@ -116,11 +116,18 @@ export async function POST(req: Request) {
   if (!cat) return fail("Invalid room category", "NOT_FOUND", 404);
 
   const rp = ratePlanId ? await db.ratePlan.findUnique({ where: { id: ratePlanId } }) : null;
-  const rate = ratePerNight ?? cat.baseRate + (rp?.markupPercent ?? 0);
+  const rate = roundMoney(ratePerNight ?? cat.baseRate + (rp?.markupPercent ?? 0));
   const nights = Math.max(1, Math.round((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / 86400000));
 
-  const count = await db.reservation.count();
-  const confirmationNumber = `AUR-${1500 + count}`;
+  if (new Date(checkOutDate) <= new Date(checkInDate)) {
+    return fail("Check-out date must be after check-in date", "VALIDATION");
+  }
+
+  // Atomic confirmation number generation (C4 fix): max+1 instead of count+offset
+  const confirmationNumber = (await nextNumber("reservation", "confirmationNumber", {
+    prefix: "AUR",
+    base: 1500,
+  })) as string;
 
   const reservation = await db.reservation.create({
     data: {
@@ -145,11 +152,15 @@ export async function POST(req: Request) {
     include: { primaryGuest: true, category: true, ratePlan: true },
   });
 
-  // Create initial folio
+  // Create initial folio with atomic folio number
+  const folioNumber = (await nextNumber("folio", "folioNumber", {
+    prefix: `F-${confirmationNumber}`,
+    base: 0,
+  })) as string;
   await db.folio.create({
     data: {
       reservationId: reservation.id,
-      folioNumber: `F-${confirmationNumber}`,
+      folioNumber,
       folioType: "room",
       status: "open",
     },
@@ -167,7 +178,7 @@ export async function POST(req: Request) {
   }, propertyId);
 
   return ok(reservation, { confirmationNumber });
-}
+});
 
 function endOfDay(d: Date) {
   const n = new Date(d);

@@ -1,10 +1,10 @@
 // /api/maintenance — list + create tickets
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, PROPERTY_ID } from "@/lib/hms";
+import { ok, fail, parseBody, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const tickets = await db.maintenanceTicket.findMany({
     where: { propertyId },
@@ -25,9 +25,9 @@ export async function GET() {
       room: t.room ? { id: t.room.id, number: t.room.roomNumber, floor: t.room.floor } : null,
     })),
   });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const body = await parseBody(req);
   const { title, description, priority = "normal", category, roomId } = body;
@@ -37,4 +37,4 @@ export async function POST(req: Request) {
     include: { room: true },
   });
   return ok(ticket);
-}
+});

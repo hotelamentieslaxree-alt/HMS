@@ -1,10 +1,10 @@
 // GET /api/pos/outlets — list all outlets with tables + stats
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const outlets = await db.outlet.findMany({
     where: { propertyId },
@@ -36,4 +36,4 @@ export async function GET() {
     });
   }
   return ok(result);
-}
+});

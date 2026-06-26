@@ -1,10 +1,10 @@
 // GET /api/housekeeping/room-board — live room status grid (alias of /api/rooms)
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const rooms = await db.room.findMany({
     where: { propertyId },
@@ -22,4 +22,4 @@ export async function GET() {
       category: r.category.name,
     })),
   });
-}
+});

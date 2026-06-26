@@ -1,10 +1,10 @@
 // /api/guests/[id] — detail with stay history
 import { db } from "@/lib/db";
-import { ok, fail } from "@/lib/hms";
+import { ok, fail, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withHandler(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const guest = await db.guest.findUnique({
     where: { id },
@@ -38,4 +38,4 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       };
     }),
   });
-}
+});

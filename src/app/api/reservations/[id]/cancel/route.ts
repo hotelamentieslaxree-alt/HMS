@@ -1,10 +1,10 @@
 // POST /api/reservations/[id]/cancel
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, logAudit, broadcast, PROPERTY_ID } from "@/lib/hms";
+import { ok, fail, parseBody, logAudit, broadcast, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withHandler(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const propertyId = await PROPERTY_ID();
   const body = await parseBody(req);
@@ -35,4 +35,4 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }, propertyId);
 
   return ok(updated);
-}
+});

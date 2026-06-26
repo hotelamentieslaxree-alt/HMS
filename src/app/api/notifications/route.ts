@@ -1,10 +1,10 @@
 // /api/notifications — list + mark read
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, PROPERTY_ID } from "@/lib/hms";
+import { ok, fail, parseBody, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const notifications = await db.notification.findMany({
     where: { propertyId },
@@ -13,9 +13,9 @@ export async function GET() {
   });
   const unreadCount = await db.notification.count({ where: { propertyId, isRead: false } });
   return ok({ notifications, unreadCount });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const body = await parseBody(req);
   if (body.markReadId) {
@@ -30,4 +30,4 @@ export async function POST(req: Request) {
   if (!title || !message) return fail("title and message required", "VALIDATION");
   const n = await db.notification.create({ data: { propertyId, type, title, message } });
   return ok(n);
-}
+});

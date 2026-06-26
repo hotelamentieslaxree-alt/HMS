@@ -1,10 +1,10 @@
 // /api/guests — list (search) + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody } from "@/lib/hms";
+import { ok, fail, parseBody, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withHandler(async (req: Request) => {
   const url = new URL(req.url);
   const search = url.searchParams.get("search") || "";
   const vipOnly = url.searchParams.get("vip") === "true";
@@ -47,9 +47,9 @@ export async function GET(req: Request) {
     reservationCount: g.primaryReservations.length,
     blacklisted: g.blacklisted,
   })));
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withHandler(async (req: Request) => {
   const body = await parseBody(req);
   const { title = "Mr", firstName, lastName, email, phone, nationality = "IN", idType, idNumber, preferences, vipStatus = false } = body;
   if (!firstName || !lastName) return fail("firstName and lastName required", "VALIDATION");
@@ -65,4 +65,4 @@ export async function POST(req: Request) {
     },
   });
   return ok(guest);
-}
+});

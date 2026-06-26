@@ -1,10 +1,10 @@
 // PUT /api/rooms/[id]/status — update room status
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, broadcast, logAudit, PROPERTY_ID } from "@/lib/hms";
+import { ok, fail, parseBody, broadcast, logAudit, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const PUT = withHandler(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const propertyId = await PROPERTY_ID();
   const body = await parseBody(req);
@@ -29,4 +29,4 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   await broadcast("room.status.updated", { roomId: id, roomNumber: room.roomNumber, newStatus: status, reason }, propertyId);
 
   return ok({ id, oldStatus, newStatus: status });
-}
+});

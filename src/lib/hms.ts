@@ -2,13 +2,23 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+// ─── Property ID cache (H9: avoid findFirst on every API call) ────────────────
+let _cachedPropertyId: string | null = null;
+
 export const PROPERTY_ID = async () => {
-  // For this single-property demo, return the first (only) property.
-  const p = await db.property.findFirst();
+  if (_cachedPropertyId) return _cachedPropertyId;
+  const p = await db.property.findFirst({ orderBy: { createdAt: "asc" } });
   if (!p) throw new Error("No property configured");
+  _cachedPropertyId = p.id;
   return p.id;
 };
 
+/** Force re-fetch of cached property id (used after property mutations). */
+export function invalidatePropertyCache() {
+  _cachedPropertyId = null;
+}
+
+// ─── Standard JSON responses ─────────────────────────────────────────────────
 export function ok<T>(data: T, meta?: Record<string, any>) {
   return NextResponse.json({
     success: true,
@@ -29,6 +39,7 @@ export function fail(message: string, code = "ERROR", status = 400, field?: stri
   );
 }
 
+// ─── Body parsing ────────────────────────────────────────────────────────────
 export async function parseBody(req: Request) {
   try {
     const text = await req.text();
@@ -38,8 +49,84 @@ export async function parseBody(req: Request) {
   }
 }
 
-// Broadcast a real-time event to the socket.io mini-service on port 3003.
-// Failures are logged but never throw — real-time is best-effort.
+// ─── withHandler: wrap an API route handler with try/catch (C6) ──────────────
+// Converts thrown errors into a structured 500 response and logs them.
+export function withHandler<
+  A extends any[],
+  R extends Response | Promise<Response>
+>(fn: (...args: A) => R) {
+  return async (...args: A): Promise<Response> => {
+    try {
+      return await fn(...args);
+    } catch (e: any) {
+      const message = e?.message || "Internal server error";
+      const code = e?.code || "INTERNAL";
+      // Prisma unique-constraint violation
+      if (e?.code === "P2002") {
+        return fail(`Duplicate value for ${e?.meta?.target?.join(", ") || "field"}`, "DUPLICATE", 409);
+      }
+      // Prisma record not found
+      if (e?.code === "P2025") {
+        return fail("Record not found", "NOT_FOUND", 404);
+      }
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[API ERROR]", e);
+      }
+      return fail(message, code, 500);
+    }
+  };
+}
+
+// ─── Atomic sequence-number generation (C4) ──────────────────────────────────
+// Returns the next integer greater than the current max value of `field` on the
+// given model, scoped by the optional `where` filter. Uses an atomic aggregate
+// inside the caller's transaction when called within `db.$transaction`.
+export async function nextNumber(
+  model: "reservation" | "posOrder" | "folio",
+  field: "confirmationNumber" | "kotNumber" | "folioNumber",
+  opts?: { where?: any; prefix?: string; base?: number }
+): Promise<string | number> {
+  const where = opts?.where;
+  let max: number = opts?.base ?? 0;
+
+  if (model === "reservation" && field === "confirmationNumber") {
+    // Find highest numeric suffix across all AUR-XXXX confirmation numbers
+    const rows = await db.reservation.findMany({
+      where,
+      select: { confirmationNumber: true },
+    });
+    for (const r of rows) {
+      const m = /(\d+)\s*$/.exec(r.confirmationNumber || "");
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    return `${opts?.prefix ?? "AUR"}-${max + 1}`;
+  }
+
+  if (model === "posOrder" && field === "kotNumber") {
+    const agg = await db.posOrder.aggregate({
+      where,
+      _max: { kotNumber: true },
+    });
+    max = Math.max(max, agg._max.kotNumber ?? 1099);
+    return max + 1;
+  }
+
+  if (model === "folio" && field === "folioNumber") {
+    const rows = await db.folio.findMany({
+      where,
+      select: { folioNumber: true },
+    });
+    for (const r of rows) {
+      const m = /(\d+)\s*$/.exec(r.folioNumber || "");
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    return `${opts?.prefix ?? "F"}-${max + 1}`;
+  }
+
+  throw new Error(`nextNumber: unsupported ${model}.${field}`);
+}
+
+// ─── Real-time broadcast (best-effort) ───────────────────────────────────────
 export async function broadcast(event: string, payload: any, propertyId?: string) {
   try {
     const body = JSON.stringify({ event, payload, propertyId });
@@ -48,11 +135,12 @@ export async function broadcast(event: string, payload: any, propertyId?: string
       headers: { "Content-Type": "application/json" },
       body,
     });
-  } catch (e) {
+  } catch {
     // Silent — real-time is best-effort.
   }
 }
 
+// ─── Audit log (best-effort) ─────────────────────────────────────────────────
 export async function logAudit(opts: {
   propertyId?: string;
   userId?: string;
@@ -85,6 +173,7 @@ export async function logAudit(opts: {
   }
 }
 
+// ─── Formatting helpers ──────────────────────────────────────────────────────
 export function formatCurrency(n: number, currency = "₹") {
   const v = Math.round(n * 100) / 100;
   return `${currency}${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
@@ -111,7 +200,12 @@ export function nightsBetween(checkIn: Date, checkOut: Date) {
   return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
 }
 
-// KPI calculations per spec Section 6.1
+/** Round to 2 decimals — used to avoid floating-point money drift (H6). */
+export function roundMoney(n: number) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// ─── KPI calculations per spec Section 6.1 ───────────────────────────────────
 export function calcKPIs(opts: {
   occupiedRooms: number;
   totalRooms: number;

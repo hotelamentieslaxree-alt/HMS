@@ -1,10 +1,10 @@
 // GET /api/rate-plans
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const plans = await db.ratePlan.findMany({
     where: { propertyId },
@@ -22,4 +22,4 @@ export async function GET() {
     reservationCount: p._count.reservations,
     categories: p.categories.map((c) => ({ id: c.id, name: c.name, code: c.code, baseRate: c.baseRate })),
   })));
-}
+});

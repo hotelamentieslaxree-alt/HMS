@@ -1,10 +1,10 @@
 // GET /api/rooms — list all rooms with category + status
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withHandler(async () => {
   const propertyId = await PROPERTY_ID();
   const rooms = await db.room.findMany({
     where: { propertyId },
@@ -32,4 +32,4 @@ export async function GET() {
       category: { id: r.category.id, name: r.category.name, code: r.category.code, baseRate: r.category.baseRate, maxAdults: r.category.maxAdults, maxChildren: r.category.maxChildren, amenities: JSON.parse(r.category.amenities) },
     })),
   });
-}
+});

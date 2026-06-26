@@ -1,7 +1,7 @@
 // Reservations module
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApi, apiPost } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { ResStatusBadge, SOURCE_META, VipBadge, fmtINR, fmtDate } from "../shared";
@@ -21,29 +21,42 @@ export function ReservationsModule() {
   const { refreshTick, triggerRefresh } = useAppStore();
   const [view, setView] = useState("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const { data, loading, reload } = useApi<any[]>(`/api/reservations?view=${view}&search=${encodeURIComponent(search)}`, [view, search, refreshTick]);
+  const { data, loading, reload } = useApi<any[]>(`/api/reservations?view=${view}&search=${encodeURIComponent(debouncedSearch)}`, [view, debouncedSearch, refreshTick]);
 
-  const checkIn = async (id: string) => {
+  // Debounce search input (M13 fix): avoid firing a request on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const checkIn = async (id: string, confNum: string, guestName: string) => {
+    if (!confirm(`Check in ${guestName} (${confNum})?`)) return;
     try {
       const r = await apiPost(`/api/reservations/${id}/check-in`);
-      toast.success(`Checked in · Room ${r.data.roomNumber}`);
+      // C2 fix: apiPost already unwraps json.data, so r IS the data, not r.data.
+      toast.success(`Checked in · Room ${r.roomNumber}`);
       triggerRefresh();
       reload();
     } catch (e: any) { toast.error(e.message); }
   };
-  const checkOut = async (id: string) => {
+  const checkOut = async (id: string, confNum: string, guestName: string) => {
+    if (!confirm(`Check out ${guestName} (${confNum})? Any unpaid balance will be auto-settled as cash.`)) return;
     try {
       const r = await apiPost(`/api/reservations/${id}/check-out`);
-      toast.success(`Checked out · Total ${fmtINR(r.data.folioTotal)}`);
+      // C2 fix: r.folioTotal, not r.data.folioTotal.
+      const settledNote = r.autoSettled > 0 ? ` · ₹${r.autoSettled.toLocaleString("en-IN")} auto-settled as cash` : "";
+      toast.success(`Checked out · Total ${fmtINR(r.folioTotal)}${settledNote}`);
       triggerRefresh();
       reload();
     } catch (e: any) { toast.error(e.message); }
   };
   const cancel = async (id: string) => {
-    if (!confirm("Cancel this reservation?")) return;
+    const reason = prompt("Reason for cancellation?") || "Cancelled by user";
+    if (!confirm("Confirm cancellation? This cannot be undone.")) return;
     try {
-      await apiPost(`/api/reservations/${id}/cancel`, { reason: "Cancelled by user" });
+      await apiPost(`/api/reservations/${id}/cancel`, { reason });
       toast.success("Reservation cancelled");
       triggerRefresh();
       reload();
@@ -134,17 +147,17 @@ export function ReservationsModule() {
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-end gap-1">
                           {(r.status === "confirmed" || r.status === "tentative") && (
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-[#16A34A] text-[#16A34A] hover:bg-[#16A34A] hover:text-white" onClick={() => checkIn(r.id)}>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-[#16A34A] text-[#16A34A] hover:bg-[#16A34A] hover:text-white" onClick={() => checkIn(r.id, r.confirmationNumber, `${r.guest.firstName} ${r.guest.lastName}`)} aria-label={`Check in ${r.guest.firstName} ${r.guest.lastName}`}>
                               <LogIn className="h-3 w-3 mr-1" /> Check-in
                             </Button>
                           )}
                           {r.status === "checked_in" && (
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-[#D97706] text-[#D97706] hover:bg-[#D97706] hover:text-white" onClick={() => checkOut(r.id)}>
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-[#D97706] text-[#D97706] hover:bg-[#D97706] hover:text-white" onClick={() => checkOut(r.id, r.confirmationNumber, `${r.guest.firstName} ${r.guest.lastName}`)} aria-label={`Check out ${r.guest.firstName} ${r.guest.lastName}`}>
                               <LogOut className="h-3 w-3 mr-1" /> Check-out
                             </Button>
                           )}
                           {(r.status === "confirmed" || r.status === "tentative") && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-[#DC2626]" onClick={() => cancel(r.id)}>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-[#DC2626]" onClick={() => cancel(r.id)} aria-label={`Cancel reservation ${r.confirmationNumber}`}>
                               <Ban className="h-3 w-3" />
                             </Button>
                           )}

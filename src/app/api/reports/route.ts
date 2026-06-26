@@ -1,11 +1,11 @@
 // /api/reports — daily revenue summary, occupancy trend, channel production, GST, folio audit
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID, calcKPIs } from "@/lib/hms";
+import { ok, PROPERTY_ID, calcKPIs, withHandler } from "@/lib/hms";
 import { startOfDay, addDays, subDays, format, eachDayOfInterval } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withHandler(async (req: Request) => {
   const propertyId = await PROPERTY_ID();
   const url = new URL(req.url);
   const type = url.searchParams.get("type") || "daily_revenue";
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     return ok(await paymentMethods(propertyId, from, to));
   }
   return ok({ error: "Unknown report type" });
-}
+});
 
 async function dailyRevenue(propertyId: string, from: Date, to: Date) {
   const folios = await db.folio.findMany({

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react";
 import {
   BedDouble, IndianRupee, TrendingUp, Percent, LogIn, LogOut, Sparkles,
   Wrench, UtensilsCrossed, AlertCircle, Activity, ArrowRight, Users,
@@ -23,8 +24,12 @@ export function DashboardModule() {
   const { data, loading, reload } = useApi<any>("/api/dashboard", []);
   const { refreshTick, setActiveModule } = useAppStore();
 
-  // re-fetch when refreshTick changes
-  useApi<any>("/api/dashboard", [refreshTick]);
+  // Re-fetch when refreshTick changes (C1 fix: previously used a second
+  // useApi call whose return value was discarded, so the displayed data
+  // never updated).
+  useEffect(() => {
+    if (refreshTick > 0) reload();
+  }, [refreshTick, reload]);
 
   if (loading || !data) {
     return (

@@ -136,6 +136,11 @@ function OutletView({ outletId, onBack }: { outletId: string; onBack: () => void
   const { data: outlets } = useApi<any[]>("/api/pos/outlets", [refreshTick]);
   const outlet = outlets?.find((o: any) => o.id === outletId);
 
+  // H2 fix: tables come from the menu endpoint with real IDs; the UI sends
+  // actual table.id values instead of synthetic "T1" strings that violate
+  // the RestaurantTable FK constraint.
+  const tables: { id: string; number: string; capacity: number; status: string }[] = menu?.tables ?? [];
+
   const addToCart = (item: any) => {
     setCart((c) => {
       const ex = c.find((x) => x.itemId === item.id);
@@ -159,8 +164,10 @@ function OutletView({ outletId, onBack }: { outletId: string; onBack: () => void
         lines: cart.map((c) => ({ itemId: c.itemId, quantity: c.quantity })),
         guestsCount: 1,
       });
-      toast.success(`Order sent to kitchen · KOT #${r.data.kotNumber}`);
+      // C2 fix: r.kotNumber, not r.data.kotNumber.
+      toast.success(`Order sent to kitchen · KOT #${r.kotNumber} · ${fmtINR(r.total)}`);
       setCart([]);
+      setTableId("");
       triggerRefresh();
     } catch (e: any) { toast.error(e.message); }
   };
@@ -216,12 +223,12 @@ function OutletView({ outletId, onBack }: { outletId: string; onBack: () => void
             {cart.length > 0 && <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setCart([])}>Clear</Button>}
           </CardHeader>
           <CardContent className="space-y-2">
-            {outlet && outlet.tableCount > 0 && (
+            {tables.length > 0 && (
               <div>
                 <p className="text-[10px] uppercase text-muted-foreground mb-1">Table (optional)</p>
                 <div className="flex flex-wrap gap-1">
-                  {Array.from({ length: outlet.tableCount }, (_, i) => `T${i + 1}`).map((t) => (
-                    <button key={t} onClick={() => setTableId(tableId === t ? "" : t)} className={cn("rounded border px-2 py-1 text-xs", tableId === t ? "border-gold bg-gold text-navy" : "border-border hover:bg-muted")}>{t}</button>
+                  {tables.map((t) => (
+                    <button key={t.id} onClick={() => setTableId(tableId === t.id ? "" : t.id)} disabled={t.status === "occupied"} aria-label={`Select table ${t.number}`} className={cn("rounded border px-2 py-1 text-xs transition-colors", tableId === t.id ? "border-gold bg-gold text-navy" : t.status === "occupied" ? "border-border bg-muted/50 text-muted-foreground cursor-not-allowed line-through" : "border-border hover:bg-muted")}>{t.number}</button>
                   ))}
                 </div>
               </div>
