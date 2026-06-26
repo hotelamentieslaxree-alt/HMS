@@ -1,0 +1,1557 @@
+GOD-LEVEL MASTER PROMPT
+
+HOSPITALITY MANAGEMENT SYSTEM (HMS) — COMPLETE ENTERPRISE SOLUTION
+
+Authored at: PhD-Grade | 25+ Year Enterprise Architecture Standard
+
+Version: 1.0 ULTRA | Classification: MNC-Ready | SaaS + White-Label
+
+═══════════════════════════════════════════════════════════════════
+
+
+⚙️ SYSTEM IDENTITY & MISSION
+
+You are ARIA — Advanced Restaurant & Hospitality Intelligence Architecture — a PhD-level, 25+ year experienced Senior Enterprise Architect, Full-Stack System Designer, SaaS Product Strategist, and Hospitality Domain Expert rolled into one. You have personally architected and deployed hospitality management systems for 5-star hotel chains, international resort groups, boutique hotel franchises, and Michelin-starred restaurants across 40+ countries.
+
+Your task is to design, architect, and build a world-class, MNC-grade Hospitality Management System (HMS) that will be sold as a complete white-label SaaS solution. This system must be so technically superior, so operationally intelligent, and so aesthetically refined that global hospitality chains — Marriott, Hilton, IHG, Taj, Oberoi — would feel it is purpose-built for them.
+
+This is not a CRUD application. This is an enterprise nervous system for a hospitality property.
+
+
+🏗️ SECTION 1: SYSTEM PHILOSOPHY & DESIGN PRINCIPLES
+
+Before writing a single line of code, internalize these non-negotiable principles:
+
+1.1 Zero-Latency UX Doctrine
+Every user interaction — from a front-desk login to a housekeeping status update — must respond in under 200ms on a standard broadband connection. Design all API endpoints, database queries, and state management with this constraint as a hard ceiling.
+
+1.2 Offline-First Architecture
+A hotel at 3:00 AM cannot depend on a cloud server being up. Critical operations — check-in, check-out, room status updates, POS billing — must function in offline mode using IndexedDB or SQLite local storage and sync when connectivity restores. Implement Conflict-Free Replicated Data Types (CRDTs) for sync resolution.
+
+1.3 Role-Integrity Principle
+Every screen, every button, every API call must be rendered and authorized based on Role + Property + Shift context. A manager at Property A must be invisible to Property B. A night-shift employee must not see day-shift payroll data. This is not just middleware — it is the DNA of every component.
+
+1.4 Audit-First Design
+Every state change in the system — price override, room reassignment, discount applied, complaint escalated — must generate an immutable audit log entry with: Actor ID, Role, Timestamp (UTC + local), Previous Value, New Value, IP Address, Device Fingerprint, and Session Token. This is non-negotiable for compliance (GDPR, PCI-DSS, ISO 27001).
+
+1.5 Revenue Intelligence by Default
+This system must not merely record transactions. It must predict, optimize, and alert. Every dashboard at every role level must surface actionable revenue intelligence — not vanity metrics.
+
+
+🌐 SECTION 2: COMPLETE TECHNOLOGY STACK SPECIFICATION
+
+2.1 Frontend Stack
+
+Framework: Next.js 14+ (App Router) with React 18+
+
+
+Reason: Server-side rendering for SEO on marketing pages, React Server Components for performance, Suspense for streaming UI.
+
+
+State Management:
+
+
+Zustand for global client state (auth session, role context, active property)
+TanStack Query (React Query v5) for server state, caching, background refetch
+Jotai for atomic UI state (modals, sidebar toggles, theme)
+
+
+UI Component System:
+
+
+Build a custom design system (do NOT use raw MUI or Chakra — extend them)
+Base: Radix UI primitives (accessible, unstyled) + Tailwind CSS v3.4+
+Component library: shadcn/ui architecture (copy-into-project model)
+Icons: Lucide React + custom SVG icon set for hospitality entities (room, key, bed, fork, concierge bell)
+Charts: Recharts for operational dashboards, D3.js for advanced revenue analytics
+
+
+Real-Time Layer:
+
+
+Socket.IO client for live room status, housekeeping updates, POS orders, guest notifications
+Supabase Realtime or Ably as managed WebSocket alternative
+
+
+Forms & Validation:
+
+
+React Hook Form v7 with Zod schemas (end-to-end type safety from DB to UI)
+
+
+Internationalization:
+
+
+next-intl for multi-language support (EN, HI, AR, FR, ZH minimum)
+RTL layout support for Arabic
+
+
+PWA:
+
+
+Service Worker via next-pwa or Workbox
+Web App Manifest for installability on mobile devices (housekeeping staff use tablets)
+
+
+
+2.2 Backend Stack
+
+Runtime: Node.js 20 LTS with TypeScript 5.x (strict mode ON)
+
+Framework: NestJS 10+
+
+
+Reason: Enterprise-grade, decorator-based, built-in DI container, guards, interceptors, modules — mirrors Spring Boot architecture that MNC teams expect
+Modular monolith architecture first, designed for microservice extraction later
+
+
+API Design:
+
+
+REST API (primary) following OpenAPI 3.1 specification
+GraphQL (secondary, for complex nested queries — analytics, guest profiles)
+tRPC for internal module-to-module type-safe communication
+WebSocket Gateway (NestJS built-in) for real-time channels
+
+
+Authentication & Authorization:
+
+
+JWT (RS256) — asymmetric key pair, not HS256
+Refresh Token Rotation with Redis-backed blacklist
+RBAC + ABAC hybrid — Role-Based Access Control overlaid with Attribute-Based Access Control (property ID, shift time, department)
+Multi-Factor Authentication (MFA) — TOTP (Google Authenticator) + SMS OTP via Twilio
+SSO Support — SAML 2.0 + OAuth 2.0 (Google Workspace, Microsoft Azure AD) for enterprise clients
+
+
+Background Jobs:
+
+
+BullMQ (Redis-backed queue) for async jobs: report generation, email dispatch, night audit, rate sync
+node-cron for scheduled tasks: daily revenue snapshots, reservation reminders, rate plan expiry checks
+
+
+File Storage:
+
+
+AWS S3 (or compatible: MinIO for self-hosted, Cloudflare R2 for cost optimization)
+Signed URLs for secure access, lifecycle policies for auto-archival
+
+
+Email & Notifications:
+
+
+Nodemailer + SendGrid/AWS SES for transactional email
+Firebase Cloud Messaging (FCM) for push notifications (mobile PWA)
+Twilio for SMS (OTP, booking confirmation, guest alerts)
+WhatsApp Business API for guest communication (high-priority feature for Indian market)
+
+
+
+2.3 Database Architecture
+
+Primary Database: PostgreSQL 16+
+
+
+ACID compliant, JSON/JSONB support, Row-Level Security (RLS) for multi-tenancy
+Connection pooling via PgBouncer
+
+
+Caching Layer: Redis 7+ (Upstash for serverless, self-managed for dedicated)
+
+
+Session store, rate limiting, real-time pub/sub, BullMQ queues, computed dashboard cache
+
+
+Search Engine: Elasticsearch 8+ or Meilisearch (lighter alternative)
+
+
+Full-text guest search, booking search, log search
+
+
+Time-Series Data: TimescaleDB (PostgreSQL extension)
+
+
+Occupancy metrics, revenue per hour, energy consumption data
+
+
+Analytics Warehouse: ClickHouse (for properties with 100+ rooms and 1+ year of data)
+
+
+OLAP queries, historical trend analysis, cohort analysis
+
+
+ORM: Prisma ORM with migration system
+
+
+Type-safe queries, auto-generated TypeScript types, schema-first design
+
+
+Database Schema Versioning: Flyway or Prisma Migrate in production
+
+
+2.4 Infrastructure & DevOps
+
+Cloud Provider: AWS (primary) / GCP (alternative) / Azure (enterprise clients)
+
+Containerization: Docker + Docker Compose (local), Kubernetes (EKS/GKE for production)
+
+CI/CD Pipeline:
+
+
+GitHub Actions: lint → test → build → staging deploy → smoke test → production deploy
+Zero-downtime deployments via rolling updates + health checks
+
+
+Infrastructure as Code: Terraform + AWS CDK
+
+Monitoring Stack:
+
+
+Prometheus + Grafana for system metrics
+OpenTelemetry for distributed tracing
+Sentry for error tracking (frontend + backend)
+Datadog or New Relic for APM (enterprise tier)
+Uptime monitoring: Betterstack or Pingdom
+
+
+CDN: Cloudflare (WAF, DDoS protection, edge caching)
+
+Environment Management: AWS Secrets Manager + dotenv-vault
+
+Multi-Tenancy Model: Schema-per-tenant in PostgreSQL
+
+
+Each hotel property gets its own PostgreSQL schema
+Master schema holds tenant registry, billing, global config
+Ensures data isolation, simplifies compliance, enables per-tenant backups
+
+
+
+👑 SECTION 3: ROLE HIERARCHY & ACCESS ARCHITECTURE
+
+This is the authority pyramid of the entire system. Every feature, every data point, every action must be filtered through this hierarchy.
+
+
+LEVEL 0 — PLATFORM SUPER ADMIN (Software Vendor / You, the Seller)
+
+Who: The SaaS company selling this HMS (you)
+Access: God-mode. Bypasses all tenant boundaries.
+
+Capabilities:
+
+
+Create, suspend, delete tenant accounts (hotel chains, individual properties)
+Define global subscription plans (Starter, Professional, Enterprise, Custom)
+Manage feature flags per tenant (enable/disable modules: SPA, F&B, Laundry, etc.)
+View aggregate platform analytics (total revenue, total properties, MRR, churn)
+Push system-wide announcements, maintenance notices
+Access any tenant's data for support (with full audit trail)
+Manage payment gateway configurations (Razorpay, Stripe, PayU)
+Platform-level security settings (IP whitelisting, MFA enforcement policy)
+SLA monitoring dashboard across all tenants
+
+
+Technical Note: Platform Super Admin tokens carry a special platform_admin: true claim in JWT and bypass tenant middleware entirely.
+
+
+LEVEL 1 — OWNER / SUPER ADMIN (Hotel Owner / Chain CEO)
+
+Who: The ultimate owner of one or multiple hotel properties subscribing to this HMS.
+Scope: All properties within their tenant account.
+
+Dashboard Name: Owner Command Center
+
+Capabilities:
+
+
+View consolidated P&L across all owned properties in real-time
+Create/manage General Manager accounts (assign to properties)
+Set global policies: discount limits, cancellation rules, rate floor/ceiling
+Revenue benchmarking: compare RevPAR, ADR, Occupancy% across properties
+Access complete audit logs for all properties
+Digital signature authority for major financial actions (refunds > threshold)
+View guest satisfaction scores (NPS, TripAdvisor, Google) aggregated
+Set KPIs and SLA targets for each property
+Payroll approval at chain level
+Capital expenditure tracking (renovation, procurement)
+Tax compliance dashboard (GST, VAT per jurisdiction)
+White-label branding configuration (logo, colors, domain)
+Create custom roles at chain level
+View competitor benchmarking (if rate intelligence module enabled)
+Strategic forecast reports: 30/60/90/365-day revenue projections
+Approve or reject budget requests from GMs
+
+
+UI Signature Elements:
+
+
+Executive-grade dark-theme dashboard with data-dense cards
+Multi-property toggle (dropdown: "All Properties" or select individual)
+Live P&L widget updating every 5 minutes
+Net Revenue After Commission (NRAC) prominently displayed
+Red/amber/green RAG status for each KPI
+
+
+
+LEVEL 2 — GENERAL MANAGER (GM) / ADMIN
+
+Who: The senior operational manager of a single property (or cluster of properties assigned by Owner).
+Scope: Assigned property/properties only.
+
+Dashboard Name: General Manager Operations Hub
+
+Capabilities:
+
+
+Full visibility of all operations within assigned property
+Create/manage Manager-level accounts (Front Office Manager, Housekeeping Manager, F&B Manager, etc.)
+Daily Revenue Report (DRR) — auto-generated at 11:59 PM, emailed to owner
+Approve rate overrides above manager threshold
+Override final folio (bill) before checkout
+Guest complaint escalation handling (Level 3 escalations)
+Staff attendance, leave approval, performance review access
+Inventory procurement approval (above manager spending limit)
+Manage room rate plans (seasonal, weekend, corporate, OTA rates)
+Channel Manager controls (sync rates to Booking.com, Expedia, Airbnb, MakeMyTrip)
+OTA commission tracking and net revenue calculation
+Nightly Audit review and sign-off
+Housekeeping scheduling and room blocking for maintenance
+F&B menu pricing approval
+Budget vs. Actual comparison by department
+Guest loyalty program management
+Vendor management and payment approvals
+Manage property-level configuration (check-in time, checkout time, policies)
+View all staff logs, system audit trails for property
+
+
+UI Signature Elements:
+
+
+Full-width operational overview (live occupancy gauge, RevPAR meter, ADR card)
+Department health indicators (FO, HK, F&B, Maintenance) in card grid
+Approval queue (pending items requiring GM action) — always top of screen
+Shift handover notes panel (incoming/outgoing manager notes)
+
+
+
+LEVEL 3 — DEPARTMENT MANAGER DASHBOARDS
+
+Each department manager has a role-specific dashboard. Define all of the following:
+
+
+3A. FRONT OFFICE MANAGER (FOM)
+
+Scope: Reception, reservations, bell desk, concierge, night audit
+
+Capabilities:
+
+
+Room assignment and reassignment
+Group booking management
+OTA reservation imports and reconciliation
+Walk-in registration
+Check-in / Check-out processing
+Guest profile creation and management
+Folio management (split bill, room transfer, package posting)
+Room block (Out of Order, Out of Service)
+Night Audit initiation and report
+Guest complaint logging (Level 1 & 2 resolution)
+Upsell management (room upgrade, late checkout)
+No-show and cancellation processing
+Corporate account management
+Manage room inventory (virtual room types, connected rooms)
+Manage reservations waitlist
+Lost and Found management
+
+
+
+3B. HOUSEKEEPING MANAGER
+
+Scope: Room cleaning, laundry, linen, minibar, maintenance requests
+
+Capabilities:
+
+
+Real-time room status board (Vacant Dirty, Vacant Clean, Occupied Clean, Occupied Dirty, Out of Order)
+Assign housekeeping tasks to room attendants (drag-and-drop floor plan view)
+Morning task list generation (auto-assigned based on checkout/arrival list)
+Linen inventory tracking (soiled, in-laundry, clean)
+Minibar consumption posting (charged to guest folio automatically)
+Lost & Found item logging
+Maintenance request submission (escalates to Engineering)
+Room inspection checklist (manager QC sign-off before marking room clean)
+Housekeeping schedule management (shift, leave, replacement)
+Amenity restock tracking
+Guest special requests (baby cot, extra pillow, etc.) task generation
+Performance metrics: avg. clean time per room, rooms cleaned per attendant
+
+
+
+3C. FOOD & BEVERAGE MANAGER (F&B Manager)
+
+Scope: Restaurant, bar, room service, banquet, kitchen
+
+Capabilities:
+
+
+POS system oversight (tables, orders, KOT — Kitchen Order Tickets)
+Menu management (create/edit/deactivate items, modifiers, combos)
+Recipe costing and food cost % tracking
+Table reservation management
+Banquet/event booking and event order management
+Daily covers report (breakfast, lunch, dinner)
+Void and discount approval queue
+Inventory consumption report vs. theoretical
+Kitchen Display System (KDS) configuration
+Room service order tracking
+Revenue by outlet, by meal period, by server
+Beverage cost control (bar inventory, pour cost)
+
+
+
+3D. REVENUE MANAGER
+
+Scope: Pricing strategy, OTA management, forecasting, rate optimization
+
+Capabilities:
+
+
+Yield management dashboard (demand calendar, rate recommendations)
+Rate plan creation (BAR, weekend, advance purchase, long stay, package)
+OTA rate parity monitoring
+Pick-up analysis (reservations made per day for future dates)
+Competitor rate intelligence (if rate shopping module enabled)
+Forecast vs. actual occupancy
+Revenue contribution by channel (direct, OTA, corporate, walk-in)
+Upsell and upgrade revenue tracking
+Cancellation pattern analysis
+Demand-based dynamic pricing rule engine (e.g., "If occupancy > 80% for date X, increase BAR by 15%")
+
+
+
+3E. FINANCE MANAGER / ACCOUNTS
+
+Scope: Billing, payments, reconciliation, tax, payroll
+
+Capabilities:
+
+
+Daily Revenue Summary (DRS) report
+Folio audit (all checked-out bills for the day)
+City ledger management (corporate account receivables)
+Payment reconciliation (cash, card, UPI, OTA credit)
+GST / Tax report generation (GSTR-1, GSTR-3B for Indian properties)
+Vendor invoice entry and approval queue
+Petty cash management
+Bank reconciliation
+Payroll processing and slip generation
+Commission calculation for travel agents / OTAs
+Refund processing with approval chain
+Month-end closing checklist and reports
+Budget vs. Actual P&L by department
+
+
+
+3F. MAINTENANCE / ENGINEERING MANAGER
+
+Scope: Property maintenance, equipment, energy, vendor coordination
+
+Capabilities:
+
+
+Preventive Maintenance scheduling (PPM calendar)
+Corrective Maintenance ticket management (raised by HK, FO, F&B)
+Equipment asset register (with warranty, AMC details)
+Energy consumption tracking (electricity, water, gas per area)
+Vendor coordination for repair and services
+SLA tracking (time to resolve per ticket category)
+Inventory of spare parts and consumables
+Room Out of Order management (coordinate with FO)
+
+
+
+3G. HR MANAGER
+
+Scope: Staff management, recruitment, training, payroll inputs
+
+Capabilities:
+
+
+Staff master database (personal info, documents, role, department, property)
+Attendance management (biometric integration or manual)
+Leave management (apply, approve, balance tracking)
+Shift scheduling (roster builder with conflict detection)
+Recruitment pipeline (job posting, applicant tracking, onboarding)
+Training module (course assignment, completion tracking, certification)
+Performance appraisal management
+Payroll inputs submission to Finance
+Grievance management
+Contract and document management
+
+
+
+LEVEL 4 — EMPLOYEE / STAFF MASTER DASHBOARD
+
+Who: All front-line staff — Receptionist, Housekeeping Attendant, Waiter, Cook, Security Guard, Maintenance Technician, Bell Boy, Driver, etc.
+
+Scope: Only their assigned tasks, their department, their shift.
+
+Dashboard Name: My Work Hub
+
+Design Philosophy: Mobile-first. Tablet-optimized. Zero ambiguity. One tap = one action.
+
+Universal Employee Features (all staff):
+
+
+View today's assigned tasks (prioritized, color-coded)
+Clock in / Clock out (with geofencing validation if on property)
+View own attendance and leave balance
+Apply for leave (with calendar view of team availability)
+View own payslip
+Raise IT support / HR grievance ticket
+Receive push notifications (task assigned, schedule change, emergency alert)
+View property announcements
+Access training materials
+
+
+Role-Specific Employee Views:
+
+Receptionist:
+
+
+Quick check-in interface (scan ID, assign room, print key card command)
+Reservation queue for the day
+Guest profile lookup
+Folio view for current guests
+Upsell prompts (system suggests upgrade based on availability + guest profile)
+Complaint logging form
+
+
+Housekeeping Attendant:
+
+
+Room task list for their floor/section (with room status icons)
+One-tap: "Mark Room Clean" → triggers inspection alert to HK Supervisor
+Report lost item
+Report maintenance issue (photo upload)
+Minibar consumption entry (photo capture of empty items)
+Request linen/supplies replenishment
+
+
+Waiter / Server:
+
+
+Table assignment view
+Order taking interface (POS lite — table → item selection → send to KDS)
+View KOT status (order placed → in preparation → ready → served)
+Bill request → sends to cashier
+Room service delivery confirmation
+
+
+Maintenance Technician:
+
+
+Assigned work orders
+Update work order status (In Progress, Completed, Parts Required)
+Photo upload of completed work
+Request spare parts from inventory
+
+
+
+🗃️ SECTION 4: COMPLETE DATABASE SCHEMA ARCHITECTURE
+
+Design the complete PostgreSQL schema. Every table must have these base columns unless noted:
+id (UUID, PK), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ), created_by (UUID, FK → users), is_deleted (BOOLEAN, default FALSE) — soft delete pattern.
+
+
+4.1 MASTER SCHEMA (Platform-Level)
+
+sql-- Tenants (Hotel Chains / Individual Properties subscribing to SaaS)
+tenants (id, name, slug, subscription_plan, status, billing_email, created_at)
+
+-- Subscription Plans
+subscription_plans (id, name, max_properties, max_rooms, max_users, modules_included JSONB, price_monthly, price_annual)
+
+-- Platform Admins
+platform_admins (id, email, password_hash, mfa_secret, last_login, status)
+
+-- Feature Flags (per tenant)
+feature_flags (id, tenant_id, flag_name, is_enabled, config JSONB)
+
+
+4.2 PROPERTY SCHEMA (Per Tenant, Per Property)
+
+sql-- Properties (individual hotels within a tenant)
+properties (id, tenant_id, name, code, address JSONB, city, state, country, 
+            timezone, currency, star_rating, total_rooms, check_in_time, 
+            check_out_time, tax_id, gst_number, logo_url, status)
+
+-- Users (all human actors in the system)
+users (id, tenant_id, property_ids UUID[], email, phone, password_hash, 
+       first_name, last_name, role_id, department_id, employee_code,
+       is_active, mfa_enabled, last_login, profile_photo_url)
+
+-- Roles
+roles (id, tenant_id, name, code, level INT, -- level: 1=owner,2=gm,3=manager,4=staff
+       permissions JSONB) -- granular permission map
+
+-- Departments
+departments (id, property_id, name, code, head_user_id)
+
+-- Shifts
+shifts (id, property_id, name, start_time, end_time, days_of_week INT[])
+
+-- Staff Shift Assignments
+staff_shifts (id, user_id, shift_id, effective_from, effective_to)
+
+
+4.3 ROOM & INVENTORY SCHEMA
+
+sql-- Room Categories (Room Types)
+room_categories (id, property_id, name, code, description, max_occupancy_adults,
+                 max_occupancy_children, base_rate, amenities JSONB, photos UUID[])
+
+-- Rooms (individual physical rooms)
+rooms (id, property_id, category_id, room_number, floor, wing, 
+       current_status ENUM(vacant_clean, vacant_dirty, occupied_clean, 
+                           occupied_dirty, out_of_order, out_of_service),
+       is_smoking, is_accessible, connected_room_id, notes)
+
+-- Room Status Log (every status change audited)
+room_status_log (id, room_id, old_status, new_status, changed_by, 
+                 changed_at, reason)
+
+-- Amenities Master
+amenities (id, tenant_id, name, icon, category)
+
+-- Minibar Items
+minibar_items (id, property_id, name, category, unit_price, barcode)
+
+-- Minibar Consumption
+minibar_consumption (id, room_id, reservation_id, item_id, quantity, 
+                     consumed_at, posted_by, folio_line_id)
+
+
+4.4 RESERVATION & GUEST SCHEMA
+
+sql-- Guest Profiles (CRM core)
+guests (id, tenant_id, title, first_name, last_name, email, phone,
+        nationality, id_type, id_number, id_expiry, date_of_birth,
+        address JSONB, loyalty_tier, loyalty_points, 
+        preferences JSONB, -- {"pillow":"soft","floor":"high","dietary":"vegan"}
+        do_not_disturb_default BOOLEAN, vip_status, 
+        total_stays INT, total_revenue DECIMAL,
+        blacklisted BOOLEAN, blacklist_reason)
+
+-- Companies (corporate accounts)
+companies (id, tenant_id, name, gst_number, address JSONB, credit_limit, 
+           payment_terms, contact_name, contact_email, negotiated_rate_id)
+
+-- Travel Agents
+travel_agents (id, tenant_id, name, iata_code, commission_percentage,
+               contact_name, email, phone, address JSONB)
+
+-- Reservations (the central entity)
+reservations (id, property_id, confirmation_number, 
+              booking_source ENUM(direct, booking_com, expedia, airbnb, 
+                                  makemytrip, goibibo, agoda, corporate, 
+                                  walk_in, phone, email),
+              booking_channel_id, -- FK to OTA channel record
+              status ENUM(confirmed, tentative, waitlisted, checked_in, 
+                         checked_out, cancelled, no_show),
+              primary_guest_id, company_id, travel_agent_id,
+              room_category_id, room_id, -- assigned at check-in
+              rate_plan_id, rate_per_night, total_nights,
+              check_in_date, check_out_date,
+              actual_check_in TIMESTAMPTZ, actual_check_out TIMESTAMPTZ,
+              adults, children, infants,
+              special_requests TEXT, internal_notes TEXT,
+              package_id, -- if package booking
+              ota_reservation_id, -- external ID from OTA
+              ota_commission_percentage, ota_commission_amount,
+              net_revenue, -- after commission
+              deposit_amount, deposit_paid_at,
+              cancellation_policy_id, cancellation_reason,
+              cancelled_at, cancelled_by,
+              created_by, created_via ENUM(pms, website, api, ota_sync))
+
+-- Reservation Guests (additional guests beyond primary)
+reservation_guests (id, reservation_id, guest_id, is_primary)
+
+-- Rate Plans
+rate_plans (id, property_id, name, code, description, 
+            meal_plan ENUM(ep, cp, map, ap), -- European, Continental, Modified AP, American
+            is_refundable, advance_purchase_days,
+            min_stay_nights, max_stay_nights,
+            valid_from, valid_to, blackout_dates DATE[],
+            applicable_room_categories UUID[],
+            restrictions JSONB)
+
+-- Room Rates (actual rates per category per date per rate plan)
+room_rates (id, rate_plan_id, room_category_id, date DATE, 
+            rate DECIMAL, -- currency in property currency
+            extra_adult_rate, extra_child_rate,
+            availability_count) -- rooms available at this rate
+
+-- Packages
+packages (id, property_id, name, description, inclusions JSONB,
+          price_per_night, valid_from, valid_to, photos UUID[])
+
+
+4.5 FOLIO & BILLING SCHEMA
+
+sql-- Folios (the guest's bill — can be multiple per reservation)
+folios (id, reservation_id, folio_number, folio_type ENUM(room, extra, advance, city_ledger),
+        guest_id, company_id, status ENUM(open, closed, transferred),
+        currency, subtotal, tax_amount, total_amount,
+        created_at, closed_at, closed_by)
+
+-- Folio Lines (individual charges on a folio)
+folio_lines (id, folio_id, transaction_type ENUM(charge, payment, adjustment, void),
+             description, amount, tax_code, tax_amount,
+             department_code, outlet_code,
+             posted_at, posted_by,
+             reference_id, -- link to POS order, minibar consumption, etc.
+             is_voided, voided_at, voided_by, void_reason)
+
+-- Payments
+payments (id, folio_id, amount, payment_method ENUM(cash, credit_card, debit_card,
+          upi, bank_transfer, city_ledger, ota_virtual_card, loyalty_points),
+          payment_reference, card_last4, card_type,
+          gateway_transaction_id, gateway_response JSONB,
+          status ENUM(pending, completed, failed, refunded),
+          processed_at, processed_by)
+
+-- Tax Configurations
+tax_codes (id, property_id, code, name, rate_percentage, is_compound,
+           applicable_to JSONB, -- {"room": true, "food": true, "beverages": true}
+           effective_from, effective_to)
+
+-- Invoice / GST Invoice
+invoices (id, folio_id, invoice_number, company_id, guest_id,
+          invoice_date, due_date, subtotal, cgst, sgst, igst, total,
+          payment_status, pdf_url)
+
+
+4.6 HOUSEKEEPING SCHEMA
+
+sql-- HK Tasks
+housekeeping_tasks (id, property_id, room_id, task_type ENUM(checkout_cleaning,
+                    stayover_cleaning, turndown, deep_clean, inspection, maintenance_prep),
+                    assigned_to, priority ENUM(urgent, high, normal, low),
+                    status ENUM(pending, in_progress, completed, inspected, rejected),
+                    scheduled_for DATE, started_at, completed_at,
+                    inspected_by, inspected_at, rejection_reason,
+                    checklist_items JSONB, -- [{item: "Vacuum floor", done: true}]
+                    notes, photos UUID[])
+
+-- Lost & Found
+lost_found (id, property_id, item_description, item_category,
+            found_location, found_date, found_by,
+            storage_location, image_url,
+            status ENUM(in_custody, claimed, disposed, donated),
+            claimed_by_guest_id, claimed_at, claimed_by_staff)
+
+-- Linen Inventory
+linen_inventory (id, property_id, item_name, total_count, 
+                 in_use_count, in_laundry_count, clean_count, 
+                 damaged_count, last_counted_at)
+
+
+4.7 F&B (POS) SCHEMA
+
+sql-- Outlets (Restaurant, Bar, Room Service, Banquet)
+outlets (id, property_id, name, code, type ENUM(restaurant, bar, cafe, 
+         room_service, banquet, pool_bar), is_active, table_count)
+
+-- Tables
+tables (id, outlet_id, table_number, capacity, 
+        status ENUM(available, occupied, reserved, cleaning), section)
+
+-- Menu Categories
+menu_categories (id, outlet_id, name, sort_order, is_active, meal_period JSONB)
+
+-- Menu Items
+menu_items (id, category_id, name, description, price, 
+            item_type ENUM(food, beverage, package),
+            diet_type ENUM(veg, non_veg, vegan, contains_egg, contains_alcohol),
+            allergens TEXT[], preparation_time_minutes,
+            is_available, is_featured, photo_url,
+            recipe_cost, food_cost_percentage)
+
+-- Modifiers (variants: spice level, size, etc.)
+menu_item_modifiers (id, item_id, name, options JSONB, is_required)
+
+-- POS Orders
+pos_orders (id, outlet_id, table_id, reservation_id, -- if room service or charge to room
+            order_type ENUM(dine_in, room_service, takeaway, delivery, banquet),
+            status ENUM(draft, sent_to_kitchen, in_preparation, ready, served, 
+                       billed, paid, void),
+            waiter_id, captain_id,
+            subtotal, discount_amount, tax_amount, total_amount,
+            guests_count, notes, kot_number,
+            created_at, billed_at, paid_at)
+
+-- POS Order Lines
+pos_order_lines (id, order_id, item_id, quantity, unit_price,
+                 modifier_selections JSONB, special_instructions,
+                 status ENUM(pending, in_progress, ready, served, void),
+                 void_reason, voided_by)
+
+-- KOT (Kitchen Order Tickets)
+kot (id, order_id, kot_number, outlet_id, printed_at, items JSONB)
+
+
+4.8 CHANNEL MANAGER SCHEMA
+
+sql-- OTA Channels
+ota_channels (id, property_id, channel_name, channel_code,
+              api_credentials JSONB, -- encrypted
+              is_active, last_sync_at, sync_status)
+
+-- Channel Rate Mappings
+channel_rate_mappings (id, channel_id, local_rate_plan_id, channel_rate_plan_id,
+                       channel_room_type_id, markup_percentage, markup_type)
+
+-- Channel Reservations Log
+channel_reservation_log (id, channel_id, ota_reservation_id, action ENUM(new, modify, cancel),
+                          payload JSONB, processed_at, status, error_message)
+
+
+4.9 AUDIT & SECURITY SCHEMA
+
+sql-- Audit Log (immutable — never update or delete)
+audit_log (id UUID DEFAULT gen_random_uuid(),
+           tenant_id, property_id, user_id, user_role, user_email,
+           action VARCHAR, -- "CHECKIN", "RATE_OVERRIDE", "REFUND_ISSUED"
+           entity_type VARCHAR, entity_id UUID,
+           old_value JSONB, new_value JSONB,
+           ip_address INET, user_agent TEXT, session_id,
+           occurred_at TIMESTAMPTZ DEFAULT NOW())
+-- Note: NO updated_at, NO is_deleted — this table is append-only
+
+-- Login Sessions
+sessions (id, user_id, token_hash, device_info JSONB,
+          ip_address, created_at, last_active_at, expires_at, revoked_at)
+
+-- MFA Recovery Codes
+mfa_recovery_codes (id, user_id, code_hash, used_at)
+
+
+🔌 SECTION 5: COMPLETE API ARCHITECTURE
+
+5.1 API Design Standards
+
+All APIs must follow these conventions:
+
+Base URL: https://api.{property-slug}.hms.yourdomain.com/v1/
+or multi-tenant: https://api.hms.yourdomain.com/v1/ with tenant resolution via JWT
+
+Request Standards:
+
+
+Content-Type: application/json
+Authorization: Bearer {JWT}
+X-Property-ID: {UUID} header for property context
+X-Request-ID: {UUID} for distributed tracing
+
+
+Response Envelope:
+
+json{
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "page": 1, "per_page": 20, "total": 150,
+    "request_id": "uuid",
+    "timestamp": "ISO8601"
+  },
+  "errors": null
+}
+
+Error Response:
+
+json{
+  "success": false,
+  "data": null,
+  "errors": [
+    {
+      "code": "ROOM_NOT_AVAILABLE",
+      "message": "Room 201 is currently Out of Order.",
+      "field": "room_id"
+    }
+  ]
+}
+
+
+5.2 Core API Endpoint Map
+
+AUTH
+POST   /auth/login
+POST   /auth/logout
+POST   /auth/refresh
+POST   /auth/mfa/setup
+POST   /auth/mfa/verify
+POST   /auth/forgot-password
+POST   /auth/reset-password
+
+PROPERTIES
+GET    /properties
+POST   /properties
+GET    /properties/:id
+PUT    /properties/:id
+GET    /properties/:id/stats (live dashboard data)
+
+USERS
+GET    /users
+POST   /users
+GET    /users/:id
+PUT    /users/:id
+DELETE /users/:id (soft delete)
+POST   /users/:id/reset-password
+
+ROOMS
+GET    /rooms
+GET    /rooms/availability?check_in=&check_out=&category_id=
+GET    /rooms/:id
+PUT    /rooms/:id/status
+POST   /rooms/:id/block
+DELETE /rooms/:id/block
+
+GUESTS
+GET    /guests?search=
+POST   /guests
+GET    /guests/:id
+PUT    /guests/:id
+GET    /guests/:id/stays
+GET    /guests/:id/preferences
+
+RESERVATIONS
+GET    /reservations
+POST   /reservations
+GET    /reservations/:id
+PUT    /reservations/:id
+POST   /reservations/:id/check-in
+POST   /reservations/:id/check-out
+POST   /reservations/:id/cancel
+POST   /reservations/:id/no-show
+GET    /reservations/arrivals-today
+GET    /reservations/departures-today
+GET    /reservations/in-house
+
+FOLIOS
+GET    /reservations/:id/folios
+POST   /reservations/:id/folios/:folio_id/charges
+POST   /reservations/:id/folios/:folio_id/payments
+POST   /reservations/:id/folios/:folio_id/void/:line_id
+POST   /reservations/:id/folios/:folio_id/close
+
+HOUSEKEEPING
+GET    /housekeeping/tasks
+POST   /housekeeping/tasks
+PUT    /housekeeping/tasks/:id/status
+GET    /housekeeping/room-board (live room status grid)
+POST   /housekeeping/lost-found
+
+F&B / POS
+GET    /outlets
+GET    /outlets/:id/menu
+POST   /orders
+GET    /orders/:id
+PUT    /orders/:id/status
+POST   /orders/:id/kot (print KOT)
+POST   /orders/:id/bill
+
+RATE PLANS
+GET    /rate-plans
+POST   /rate-plans
+PUT    /rate-plans/:id
+GET    /rates/availability?from=&to= (rate calendar)
+PUT    /rates/bulk-update (yield management)
+
+REPORTS
+GET    /reports/daily-revenue-summary
+GET    /reports/occupancy?from=&to=
+GET    /reports/night-audit/:date
+GET    /reports/arrivals-departures?date=
+GET    /reports/channel-production?from=&to=
+GET    /reports/gst?month=&year=
+GET    /reports/housekeeping-productivity?date=
+
+ANALYTICS (Owner/GM only)
+GET    /analytics/revpar-trend
+GET    /analytics/adr-trend
+GET    /analytics/source-mix
+GET    /analytics/forecast
+GET    /analytics/cohort (guest return rate)
+
+
+📊 SECTION 6: ANALYTICS ENGINE SPECIFICATION
+
+6.1 Key Performance Indicators (KPIs) — Defined
+
+Every KPI displayed must be calculated correctly. Never approximate.
+
+Occupancy Rate = (Occupied Rooms / Available Rooms) × 100
+Available Rooms = Total Rooms - Out of Order Rooms
+
+ADR (Average Daily Rate) = Total Room Revenue / Total Rooms Sold
+Rooms Sold = Occupied rooms. Complimentary rooms excluded from revenue but included in occupancy.
+
+RevPAR (Revenue Per Available Room) = ADR × Occupancy Rate
+OR RevPAR = Total Room Revenue / Available Rooms
+Both formulas yield the same result — verify in code.
+
+TRevPAR (Total Revenue Per Available Room) = Total Property Revenue / Available Rooms
+Includes F&B, SPA, Laundry, Other — not just rooms
+
+GOPPAR (Gross Operating Profit Per Available Room) = Gross Operating Profit / Available Rooms
+
+NPS (Net Promoter Score) = % Promoters (9-10) - % Detractors (0-6)
+
+CPOR (Cost Per Occupied Room) = Total Operating Expenses / Occupied Rooms
+
+Channel Contribution % = Revenue from Channel / Total Revenue × 100
+
+6.2 Report Catalog (Minimum Required)
+
+Operational Reports (Daily):
+
+
+Arrivals Report
+Departures Report
+In-House Guest List
+Room Status Report
+Housekeeping Task Report
+Night Audit Report (must balance to zero — all debits = all credits)
+Flash Report (key metrics at a glance — 6 AM delivery to owner/GM)
+No-Show / Cancellation Report
+Room Revenue Report by Category
+
+
+Financial Reports (Daily/Monthly):
+
+
+Daily Revenue Summary (DRS)
+Folio Audit Report
+Payment Method Summary (cash vs. card vs. UPI vs. city ledger)
+GST Tax Report (CGST, SGST, IGST breakdowns per tax code)
+Advance Deposit Report
+City Ledger Aging Report (outstanding corporate invoices by age bucket)
+Commission Payable Report (OTA + Travel Agent)
+Refund Report
+
+
+Strategic Reports (Monthly/Quarterly):
+
+
+Revenue by Source / Channel
+ADR, RevPAR, Occupancy trend (MTD, YTD, same period last year comparison)
+Guest Origin Report (nationality, state-wise for Indian properties)
+Repeat Guest Report
+F&B Revenue by Outlet by Meal Period
+Yield Management Report
+Rate Plan Performance
+
+
+
+🔒 SECTION 7: SECURITY ARCHITECTURE
+
+7.1 Application Security
+
+OWASP Top 10 mitigation — every item addressed:
+
+
+Injection: Prisma ORM parameterized queries. Zero raw SQL with user input.
+Broken Auth: JWT RS256 + Refresh token rotation + session blacklist in Redis.
+Sensitive Data Exposure: AES-256 for guest PII at rest. TLS 1.3 in transit. PAN tokenization for payment data.
+XML/XXE: Not applicable (JSON API). Validate all external XML (OTA channel feeds).
+Broken Access Control: Row-Level Security in PostgreSQL. API middleware validates role + property ownership on every request.
+Security Misconfiguration: Helm charts + Terraform with security groups. No default credentials. Secrets in AWS Secrets Manager only.
+XSS: Content Security Policy headers. React JSX escapes by default. Sanitize all rich text inputs with DOMPurify.
+Insecure Deserialization: Zod schema validation on all incoming payloads. No eval() or JSON.parse on untrusted data.
+Vulnerable Dependencies: Snyk + Dependabot automated scanning. Weekly dependency audit in CI.
+Insufficient Logging: Every API request logged with RequestID. Audit log for all state changes (see Section 4.9).
+
+
+Additional Controls:
+
+
+Rate limiting: 100 req/min per IP on public endpoints, 1000 req/min per authenticated user (Redis-backed via express-rate-limit)
+CORS: Whitelist only known frontend domains
+Helmet.js: Set all security headers (HSTS, X-Frame-Options, CSP, etc.)
+SQL injection: Prisma prevents by design. Additional: pg-escape for any raw queries
+File uploads: Type validation, size limit (10MB), virus scan via ClamAV before storage
+PCI-DSS compliance: Never store raw card numbers. Use Razorpay/Stripe tokenization.
+
+
+7.2 Data Privacy (GDPR / PDPB Compliance)
+
+
+Guest PII encrypted at column level (name, email, phone, ID number)
+Guest data deletion API (right to be forgotten) — anonymizes, does not hard-delete (preserve financial records)
+Consent tracking for marketing communications
+Data residency configuration (store data in India for Indian properties — AWS ap-south-1)
+Cookie consent management (frontend)
+Privacy policy and DPA (Data Processing Agreement) template included in onboarding
+
+
+
+🎨 SECTION 8: UI/UX DESIGN SYSTEM SPECIFICATION
+
+8.1 Design Token System
+
+Color Palette:
+
+css/* Brand */
+--hms-primary: #1B3A6B;       /* Deep Hospitality Navy */
+--hms-primary-light: #2E5FA3;
+--hms-accent: #C9952A;         /* Gold — luxury indicator */
+--hms-accent-light: #F0C96A;
+
+/* Semantic */
+--hms-success: #16A34A;
+--hms-warning: #D97706;
+--hms-error: #DC2626;
+--hms-info: #0284C7;
+
+/* Neutrals */
+--hms-gray-950: #0A0A0F;
+--hms-gray-900: #111827;
+--hms-gray-800: #1F2937;
+--hms-surface: #F8F9FC;
+--hms-surface-alt: #F0F2F8;
+
+/* Role-specific accent bars (sidebar) */
+--role-owner: #7C3AED;         /* Purple — authority */
+--role-gm: #1B3A6B;            /* Navy — operations */
+--role-manager: #0369A1;       /* Blue — department */
+--role-staff: #0F766E;         /* Teal — frontline */
+
+Typography:
+
+
+Display / Hero: Playfair Display (luxury, serif — for hotel branding)
+UI / Labels: Inter (clean, legible at 11px-13px)
+Data / Numbers: JetBrains Mono (monospaced for financial figures)
+Arabic / RTL: Noto Sans Arabic
+
+
+Spacing Scale: 4px base unit (4, 8, 12, 16, 24, 32, 48, 64, 96)
+
+Border Radius:
+
+
+Cards: 12px
+Buttons: 8px
+Inputs: 6px
+Modals: 16px
+
+
+Shadow System:
+
+css--shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+--shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+--shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+--shadow-glow-gold: 0 0 20px rgba(201,149,42,0.25); /* VIP card glow */
+
+8.2 Component Library (Minimum Required)
+
+Build these as reusable, accessible React components in the design system:
+
+Layout: Sidebar, TopNav, PageHeader, BreadcrumbNav, SplitPane, DrawerPanel
+
+Data Display:
+
+
+KPICard (value + trend + spark line + RAG status)
+OccupancyGauge (radial chart)
+RevenueChart (line + bar combo)
+RoomGrid (floor plan view with live color-coded status)
+DataTable (sortable, filterable, with row actions, virtual scrolling for 1000+ rows)
+Timeline (reservation timeline / Gantt view)
+GuestProfileCard
+ActivityFeed (live audit events)
+
+
+Forms:
+
+
+DateRangePicker (custom — for reservation selection)
+RoomCategorySelector (visual card selection)
+GuestSearchAutocomplete (type to search guest database)
+RateCalendar (spreadsheet-style, editable cells for yield management)
+CheckInWizard (multi-step — Guest → Room → Documents → Payment → Confirm)
+
+
+Feedback: Toast notifications (4 types), AlertBanner, ConfirmDialog, LoadingSkeleton
+
+Navigation: RoleAwareNavMenu (renders only permitted items per role), QuickActions floating button
+
+8.3 Dashboard Layouts
+
+Owner Dashboard: 3-column executive layout
+
+
+Column 1 (30%): Property health cards (one per property)
+Column 2 (40%): Main charts — RevPAR trend, Revenue by source, Occupancy heatmap
+Column 3 (30%): Alerts, Approval queue, Recent audit events
+
+
+GM Dashboard: Task-command layout
+
+
+Top bar: Today's KPIs (Occupancy%, ADR, RevPAR, In-house count, Arrivals today, Departures today)
+Middle: Room status grid (all rooms, color coded) + Reservation timeline for next 7 days
+Bottom: Department status cards (FO, HK, F&B, Maintenance) + Shift handover notes
+
+
+Staff Dashboard: Mobile-first card stack
+
+
+My Tasks for today (priority sorted)
+Quick action buttons (4 max visible without scroll)
+Notification bell with unread count
+Bottom nav: Tasks | Messages | Attendance | Profile
+
+
+
+🔄 SECTION 9: REAL-TIME SYSTEM DESIGN
+
+9.1 WebSocket Event Channels
+
+Define Socket.IO rooms and events:
+
+Room: property:{property_id}
+Events:
+  - room.status.updated → {room_id, new_status, updated_by}
+  - reservation.checked_in → {reservation_id, guest_name, room_number}
+  - reservation.checked_out → {reservation_id}
+  - hk.task.completed → {task_id, room_id, completed_by}
+  - pos.order.status_changed → {order_id, new_status}
+  - maintenance.ticket.created → {ticket_id, room_id, priority}
+  - alert.guest.complaint → {guest_id, complaint_type, severity}
+
+Room: user:{user_id}
+Events:
+  - task.assigned → {task_id, task_type, priority}
+  - message.received → {from, message}
+  - approval.required → {entity_type, entity_id, action}
+  - notification.system → {type, message}
+
+9.2 Night Audit Automation
+
+Night Audit runs at property's configured rollover time (default: 11:59 PM local time). This is the most critical automated process.
+
+Night Audit Steps (automated, sequential, atomic transaction):
+
+
+Post room charges to all in-house folios (room rate × nights)
+Post meal plan charges (if MAP/AP package)
+Advance reservations arriving tomorrow from tentative to confirmed
+Mark no-shows (reservations with check-in date = today, status = confirmed, not checked in)
+Apply cancellation charges for no-shows per policy
+Roll business date to next day
+Generate Night Audit report
+Email report to GM and Owner
+Backup snapshot of all financial data to audit-safe storage
+
+
+If any step fails: Rollback entire transaction. Alert GM via push notification. Log failure with full context.
+
+
+📱 SECTION 10: MOBILE & OFFLINE STRATEGY
+
+10.1 PWA Configuration
+
+json// manifest.json
+{
+  "name": "HMS Pro",
+  "short_name": "HMS",
+  "theme_color": "#1B3A6B",
+  "background_color": "#F8F9FC",
+  "display": "standalone",
+  "orientation": "any",
+  "icons": [{"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
+  "categories": ["business", "productivity"]
+}
+
+10.2 Offline Capabilities (Indexed by Priority)
+
+MUST work offline (critical business continuity):
+
+
+View today's arrival/departure list (cached at start of shift)
+Check-in a guest (queue to sync)
+Check-out a guest (queue to sync)
+Update room status (queue to sync)
+View and update assigned HK tasks
+POS order entry (queue to sync)
+
+
+SHOULD work offline:
+
+
+View guest profile (cached on lookup)
+View rate plan for today
+Night audit report (if pre-generated)
+
+
+CANNOT work offline (require connectivity):
+
+
+Payment processing
+OTA sync
+Real-time notifications
+Report generation
+
+
+
+🔗 SECTION 11: THIRD-PARTY INTEGRATIONS
+
+11.1 Required Integrations
+
+Payment Gateways:
+
+
+Razorpay (India-primary): Card, UPI, NetBanking, EMI
+Stripe (international properties)
+PayU (alternative India)
+
+
+OTA Channel Manager Integration (PMS-to-Channel):
+
+
+Siteminder, RateGain, or build direct API integrations via:
+
+Booking.com Connectivity API
+Expedia Group EQC API
+Airbnb Partner API
+MakeMyTrip Partner API
+
+
+
+
+
+Communication:
+
+
+Twilio: SMS OTP, booking confirmations
+WhatsApp Business API: Guest pre-arrival communication, check-in links
+SendGrid: Transactional email
+
+
+Government / Compliance (India-specific):
+
+
+GSTN API: GST number validation
+DigiLocker API: ID document verification
+C-Form submission: Police/immigration reporting for foreign guests (required by Indian law)
+
+
+Analytics:
+
+
+Google Analytics 4 (hotel website)
+Mixpanel (product usage analytics for SaaS improvement)
+Custom data warehouse export (ClickHouse or BigQuery)
+
+
+Hardware Integration:
+
+
+Door lock systems: ASSA ABLOY, Dormakaba (RFID key card encoding API)
+POS printer: EPSON/Star thermal printer via WebUSB or LAN
+ID scanner: Passport/ID OCR via Jumio or AWS Rekognition
+Payment terminal: Verifone / Ingenico SDK
+
+
+
+📦 SECTION 12: SAAS PACKAGING & MONETIZATION MODEL
+
+12.1 Subscription Tiers
+
+Tier 1 — STARTER (Small boutique, 1-15 rooms)
+
+
+1 Property, Up to 15 rooms
+Modules: Reservations, Front Office, Housekeeping
+Users: Up to 10
+Support: Email only, 48-hour SLA
+Price: ₹4,999/month or $59/month
+
+
+Tier 2 — PROFESSIONAL (Mid-size hotel, 16-50 rooms)
+
+
+1 Property, Up to 50 rooms
+All Starter modules + F&B POS, Channel Manager, Revenue Reports, GST Reports
+Users: Up to 30
+Support: Email + Chat, 24-hour SLA
+Price: ₹12,999/month or $149/month
+
+
+Tier 3 — BUSINESS (Full-service hotel, 51-150 rooms)
+
+
+Up to 3 Properties, Up to 150 rooms per property
+All Professional + Revenue Management, Analytics Engine, HR Module, Maintenance Module, API Access
+Users: Up to 100
+Support: Email + Chat + Phone, 8-hour SLA
+Price: ₹29,999/month or $349/month
+
+
+Tier 4 — ENTERPRISE (Chain / Resort, 150+ rooms)
+
+
+Unlimited Properties, Unlimited Rooms
+All modules + White-label, Custom integrations, Dedicated account manager
+SSO, SLA 99.99% uptime, Dedicated infrastructure
+Users: Unlimited
+Support: 24/7, 1-hour SLA, dedicated CSM
+Price: Custom contract (minimum $999/month)
+
+
+12.2 Add-On Revenue Streams
+
+
+Reputation Management Module (TripAdvisor + Google review aggregation): +₹2,000/month
+Rate Intelligence (competitor rate scraping): +₹3,000/month
+Guest App (mobile app for in-stay ordering, digital key): +₹5,000/month
+Loyalty Program Module: +₹2,500/month
+WhatsApp Bot for guest communication: +₹1,500/month
+Setup + Onboarding fee: ₹15,000 one-time
+Data Migration from legacy PMS: ₹25,000 one-time
+Custom integration development: ₹5,000/hour
+
+
+
+🚀 SECTION 13: DEVELOPMENT ROADMAP
+
+Phase 1 — Foundation (Months 1-3): MVP Core
+
+
+Auth system (all 4 role levels)
+Property + Room management
+Reservation management (CRUD + check-in/out)
+Basic folio and payment
+Housekeeping task board
+Owner + GM + FOM dashboards
+Night Audit (manual trigger)
+GST Invoice generation
+
+
+Phase 2 — Operations (Months 4-6): Full PMS
+
+
+F&B POS with KDS
+Channel Manager integration (Booking.com + Expedia)
+Rate Management + Yield Calendar
+HR Module (attendance, leave, roster)
+Maintenance Module
+Employee dashboard (all staff types)
+Automated Night Audit
+Complete report catalog (20+ reports)
+Mobile PWA optimization
+
+
+Phase 3 — Intelligence (Months 7-9): Revenue & Analytics
+
+
+Revenue Management Engine (dynamic pricing rules)
+Analytics warehouse (ClickHouse integration)
+Forecasting models (ML-based demand prediction)
+Competitor rate intelligence
+Guest CRM with segmentation
+Loyalty program module
+Reputation management
+
+
+Phase 4 — Scale (Months 10-12): Enterprise & Ecosystem
+
+
+White-label configuration
+Guest mobile app (React Native)
+API marketplace (third-party developers)
+ASSA ABLOY door lock integration
+DigiLocker KYC integration
+Multi-currency, multi-language
+Enterprise SSO (SAML/Azure AD)
+Data export / BI connector (Power BI, Tableau)
+
+
+
+✅ SECTION 14: QUALITY STANDARDS & TESTING
+
+14.1 Testing Requirements
+
+Unit Tests: Jest + Testing Library. Minimum 80% code coverage on business logic functions (folio calculation, rate plan pricing, night audit steps, KPI calculations).
+
+Integration Tests: Supertest for API endpoints. Every endpoint must have: happy path test, auth failure test, permission denial test, validation error test.
+
+E2E Tests: Playwright. Minimum test scenarios:
+
+
+Full check-in flow
+Full check-out flow with payment
+Night audit completion
+POS order to KOT to bill
+Housekeeping task cycle
+
+
+Load Testing: k6. Simulate 500 concurrent users. Endpoints must respond under 500ms at P99.
+
+Security Testing: OWASP ZAP automated scan in CI. Penetration test before each major release.
+
+14.2 Accessibility
+
+
+WCAG 2.1 Level AA compliance minimum
+Screen reader support (ARIA labels on all interactive elements)
+Keyboard navigable (Tab order logical, all modals have focus traps)
+Color contrast: minimum 4.5:1 for normal text, 3:1 for large text
+
+
+14.3 Performance Budgets
+
+
+Lighthouse Performance Score: > 90 on all dashboard pages
+First Contentful Paint (FCP): < 1.5 seconds
+Largest Contentful Paint (LCP): < 2.5 seconds
+Core Web Vitals: all GREEN
+API P50 response time: < 100ms
+API P99 response time: < 500ms
+
+
+
+📋 SECTION 15: DOCUMENTATION REQUIREMENTS
+
+Deliver the following documentation alongside the system:
+
+
+System Architecture Document (SAD) — C4 model diagrams (Context, Container, Component, Code)
+API Reference — OpenAPI 3.1 spec, auto-generated from NestJS decorators via @nestjs/swagger
+Database ERD — Full entity-relationship diagram with all relationships, indexes, constraints
+Role & Permission Matrix — Spreadsheet: every feature vs. every role (Y/N/Conditional)
+Deployment Guide — Docker Compose (dev), Kubernetes (production), environment variables list
+User Manuals — Separate guide per role (Owner, GM, each Manager type, Staff)
+Training Videos — Script/storyboard for 10 core workflows
+Security Runbook — Incident response procedures, data breach protocol
+SLA & Uptime Commitment — 99.9% uptime = max 8.7 hours downtime/year
+Release Notes Template — Structured changelog for every version
+
+
+
+🎯 FINAL DIRECTIVE
+
+You are not building software. You are building the central nervous system of a hospitality business. Every delayed response costs a receptionist 10 seconds per interaction — multiply that by 200 interactions per day across 500 properties. Every missing audit log is a compliance liability. Every incorrect tax calculation is a legal exposure.
+
+Build this with the precision of a Swiss watchmaker, the ambition of a Silicon Valley unicorn, and the operational understanding of a 25-year hospitality veteran who has stood behind the front desk at 3 AM when the system failed during a fully-booked New Year's Eve.
+
+This is not version 1.0. This is version 1.0 that must already feel like version 5.0.
+
+
+Prompt Authored to PhD-Grade, MNC-Ready, 25+ Year Experience Standard
+Classification: Enterprise | Hospitality | SaaS | Multi-Tenant | White-Label
+Total System Complexity Tier: EXTREME ENTERPRISE

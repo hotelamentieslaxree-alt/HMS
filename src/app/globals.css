@@ -1,0 +1,215 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+  --font-display: var(--font-playfair);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-hms-gold: var(--hms-gold);
+  --color-hms-gold-light: var(--hms-gold-light);
+  --color-hms-navy: var(--hms-navy);
+  --color-hms-navy-light: var(--hms-navy-light);
+  --color-hms-success: var(--hms-success);
+  --color-hms-warning: var(--hms-warning);
+  --color-hms-error: var(--hms-error);
+  --color-hms-info: var(--hms-info);
+  --color-hms-surface: var(--hms-surface);
+  --color-role-owner: var(--role-owner);
+  --color-role-gm: var(--role-gm);
+  --color-role-manager: var(--role-manager);
+  --color-role-staff: var(--role-staff);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  /* HMS brand */
+  --hms-navy: #1B3A6B;
+  --hms-navy-light: #2E5FA3;
+  --hms-gold: #C9952A;
+  --hms-gold-light: #F0C96A;
+  --hms-success: #16A34A;
+  --hms-warning: #D97706;
+  --hms-error: #DC2626;
+  --hms-info: #0284C7;
+  --hms-surface: #F8F9FC;
+  /* role accents */
+  --role-owner: #7C3AED;
+  --role-gm: #1B3A6B;
+  --role-manager: #0369A1;
+  --role-staff: #0F766E;
+
+  --background: #F8F9FC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #1B3A6B;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0F2F8;
+  --secondary-foreground: #1F2937;
+  --muted: #F0F2F8;
+  --muted-foreground: #64748B;
+  --accent: #F0C96A;
+  --accent-foreground: #1B3A6B;
+  --destructive: #DC2626;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #1B3A6B;
+  --chart-1: #1B3A6B;
+  --chart-2: #C9952A;
+  --chart-3: #16A34A;
+  --chart-4: #0369A1;
+  --chart-5: #D97706;
+  --sidebar: #0F1B33;
+  --sidebar-foreground: #E2E8F0;
+  --sidebar-primary: #C9952A;
+  --sidebar-primary-foreground: #0F1B33;
+  --sidebar-accent: #1B3A6B;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #1F2D4A;
+  --sidebar-ring: #C9952A;
+}
+
+.dark {
+  --hms-navy: #2E5FA3;
+  --hms-navy-light: #4A7FC0;
+  --hms-gold: #F0C96A;
+  --hms-gold-light: #FFE09A;
+  --background: #0A0F1C;
+  --foreground: #E2E8F0;
+  --card: #111827;
+  --card-foreground: #E2E8F0;
+  --popover: #111827;
+  --popover-foreground: #E2E8F0;
+  --primary: #2E5FA3;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1F2937;
+  --secondary-foreground: #E2E8F0;
+  --muted: #1F2937;
+  --muted-foreground: #94A3B8;
+  --accent: #C9952A;
+  --accent-foreground: #0F1B33;
+  --destructive: #EF4444;
+  --border: #1F2937;
+  --input: #1F2937;
+  --ring: #2E5FA3;
+  --chart-1: #2E5FA3;
+  --chart-2: #F0C96A;
+  --chart-3: #16A34A;
+  --chart-4: #38BDF8;
+  --chart-5: #F59E0B;
+  --sidebar: #060B17;
+  --sidebar-foreground: #E2E8F0;
+  --sidebar-primary: #C9952A;
+  --sidebar-primary-foreground: #0F1B33;
+  --sidebar-accent: #1F2937;
+  --sidebar-accent-foreground: #E2E8F0;
+  --sidebar-border: #1F2937;
+  --sidebar-ring: #C9952A;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+/* HMS utilities */
+@layer utilities {
+  .text-gold { color: var(--hms-gold); }
+  .text-navy { color: var(--hms-navy); }
+  .bg-navy { background-color: var(--hms-navy); }
+  .bg-gold { background-color: var(--hms-gold); }
+  .bg-surface { background-color: var(--hms-surface); }
+  .border-gold { border-color: var(--hms-gold); }
+  .ring-gold { --tw-ring-color: var(--hms-gold); }
+  .font-display { font-family: var(--font-display), Georgia, serif; }
+  .font-mono-num { font-family: var(--font-mono), monospace; font-variant-numeric: tabular-nums; }
+  .shadow-glow-gold { box-shadow: 0 0 24px rgba(201, 149, 42, 0.25); }
+  .shadow-card { box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.05); }
+  .shadow-card-lg { box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 12px 32px rgba(15, 23, 42, 0.08); }
+
+  .role-bar-owner { border-left: 3px solid var(--role-owner); }
+  .role-bar-gm { border-left: 3px solid var(--role-gm); }
+  .role-bar-manager { border-left: 3px solid var(--role-manager); }
+  .role-bar-staff { border-left: 3px solid var(--role-staff); }
+
+  /* Room status colors */
+  .room-vc { background-color: #DCFCE7; border-color: #16A34A; color: #14532D; } /* vacant_clean */
+  .room-vd { background-color: #FEF3C7; border-color: #D97706; color: #78350F; } /* vacant_dirty */
+  .room-oc { background-color: #DBEAFE; border-color: #0369A1; color: #0C4A6E; } /* occupied_clean */
+  .room-od { background-color: #FFE4E6; border-color: #DC2626; color: #881337; } /* occupied_dirty */
+  .room-ooo { background-color: #E5E7EB; border-color: #6B7280; color: #374151; } /* out_of_order */
+  .room-oos { background-color: #F3E8FF; border-color: #7C3AED; color: #4C1D95; } /* out_of_service */
+
+  .dark .room-vc { background-color: rgba(22,163,74,0.18); border-color: #16A34A; color: #86EFAC; }
+  .dark .room-vd { background-color: rgba(217,119,6,0.18); border-color: #D97706; color: #FCD34D; }
+  .dark .room-oc { background-color: rgba(3,105,161,0.18); border-color: #0369A1; color: #7DD3FC; }
+  .dark .room-od { background-color: rgba(220,38,38,0.18); border-color: #DC2626; color: #FCA5A5; }
+  .dark .room-ooo { background-color: rgba(107,114,128,0.18); border-color: #6B7280; color: #D1D5DB; }
+  .dark .room-oos { background-color: rgba(124,58,237,0.18); border-color: #7C3AED; color: #D8B4FE; }
+}
+
+/* Scrollbar */
+@layer base {
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.35); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.55); }
+  .dark ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); }
+}
+
+/* Animations */
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,149,42,0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(201,149,42,0); }
+}
+.pulse-gold { animation: pulse-gold 2s infinite; }
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.shimmer { background: linear-gradient(90deg, #f0f2f8 0%, #e2e8f0 50%, #f0f2f8 100%); background-size: 1000px 100%; animation: shimmer 1.6s infinite linear; }
