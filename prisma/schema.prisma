@@ -47,6 +47,10 @@ model Property {
   users             User[]
   departments       Department[]
   shiftHandovers    ShiftHandover[]
+  attendance        Attendance[]
+  payrollRecords    PayrollRecord[]
+  companyEvents     CompanyEvent[]
+  scorecards        Scorecard[]
 }
 
 model Department {
@@ -84,8 +88,12 @@ model User {
   department  Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   hkTasks     HousekeepingTask[] @relation("HkTaskAssignee")
   hkInspected HousekeepingTask[] @relation("HkTaskInspector")
-  posOrders   PosOrder[]   @relation("PosOrderWaiter")
-  auditLogs   AuditLog[]
+  posOrders     PosOrder[]       @relation("PosOrderWaiter")
+  auditLogs     AuditLog[]
+  attendance    Attendance[]
+  payrollRecords PayrollRecord[]
+  scorecards    Scorecard[]
+  organizedEvents CompanyEvent[]  @relation("EventOrganizer")
 
   @@index([propertyId])
 }
@@ -610,4 +618,120 @@ model NightAuditLog {
 
   @@index([propertyId, businessDate])
   @@index([propertyId, status])
+}
+
+// ════════════════════════════════════════════════════════════════
+// HR MODULE — Attendance, Payroll, Events, Scorecards
+// ════════════════════════════════════════════════════════════════
+
+model Attendance {
+  id            String   @id @default(cuid())
+  propertyId    String
+  userId        String
+  date          DateTime
+  checkIn       DateTime?
+  checkOut      DateTime?
+  status        String   @default("present") // present | absent | half_day | late | on_leave | holiday | weekly_off
+  overtimeHours Float    @default(0)
+  workHours     Float    @default(0)
+  notes         String?
+  source        String   @default("manual") // manual | excel | biometric | system
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([propertyId, date])
+  @@index([userId, date])
+}
+
+model PayrollRecord {
+  id              String    @id @default(cuid())
+  propertyId      String
+  userId          String
+  month           Int       // 1-12
+  year            Int
+  basicSalary     Float     @default(0)
+  hra             Float     @default(0)
+  da              Float     @default(0)
+  conveyance      Float     @default(0)
+  medical         Float     @default(0)
+  specialAllow    Float     @default(0)
+  overtime        Float     @default(0)
+  bonus           Float     @default(0)
+  grossEarnings   Float     @default(0)
+  pf              Float     @default(0)
+  esi             Float     @default(0)
+  tax             Float     @default(0)
+  pt              Float     @default(0) // Professional Tax
+  loanDeduction   Float     @default(0)
+  otherDeductions Float     @default(0)
+  totalDeductions Float     @default(0)
+  netPay          Float     @default(0)
+  presentDays     Int       @default(0)
+  absentDays      Int       @default(0)
+  leaveDays       Int       @default(0)
+  halfDays        Int       @default(0)
+  status          String    @default("draft") // draft | processed | paid
+  paidOn          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year])
+  @@index([propertyId, month, year])
+  @@index([status])
+}
+
+model CompanyEvent {
+  id          String    @id @default(cuid())
+  propertyId  String
+  title       String
+  description String?
+  type        String    @default("other") // festival | training | meeting | celebration | audit | inspection | other
+  eventDate   DateTime
+  endDate     DateTime?
+  venue       String?
+  organizerId String?
+  status      String    @default("upcoming") // upcoming | ongoing | completed | cancelled
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  organizer User?    @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, eventDate])
+  @@index([status])
+}
+
+model Scorecard {
+  id              String   @id @default(cuid())
+  propertyId      String
+  userId          String
+  period          String   // "2024-01" monthly or "2024-Q1" quarterly
+  attendance      Float    @default(0) // percentage
+  punctuality     Float    @default(0) // 0-10
+  taskCompletion  Float    @default(0) // percentage
+  guestFeedback   Float    @default(0) // 0-10
+  teamwork        Float    @default(0) // 0-10
+  initiative      Float    @default(0) // 0-10
+  grooming        Float    @default(0) // 0-10
+  communication   Float    @default(0) // 0-10
+  overallScore    Float    @default(0) // weighted average 0-100
+  grade           String   @default("B") // A+ | A | B+ | B | C | D
+  remarks         String?
+  reviewedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period])
+  @@index([propertyId])
+  @@index([userId])
 }

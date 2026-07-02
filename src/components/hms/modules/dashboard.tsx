@@ -15,7 +15,7 @@ import {
   Wrench, UtensilsCrossed, AlertCircle, Activity, ArrowRight, Users,
   Shield, DollarSign, BarChart3, Clock, CheckCircle2, AlertTriangle,
   ClipboardList, ChefHat, CreditCard, Wallet, FileText, UserCog, Building2,
-  MoonStar,
+  MoonStar, Calendar,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
@@ -628,12 +628,14 @@ function HRDashboard() {
   const { data, loading } = useDashboardData();
   const { setActiveModule } = useAppStore();
   const { data: staffData } = useApi<any>("/api/staff", []);
+  const { data: attnData } = useApi<any>("/api/hr/attendance?view=monthly", []);
+  const { data: payrollData } = useApi<any>("/api/hr/payroll", []);
+  const { data: eventsData } = useApi<any>("/api/hr/events", []);
+  const { data: scoreData } = useApi<any>("/api/hr/scorecards?period=" + new Date().toISOString().slice(0, 7), []);
 
   if (loading || !data) return <DashboardSkeleton />;
 
-  // Staff API returns an array of users directly
   const staff = Array.isArray(staffData) ? staffData : (staffData?.users ?? []);
-  // Derive departments from staff data
   const deptMap = new Map<string, { id: string; name: string; code: string }>();
   staff.forEach((s: any) => {
     if (s.department && s.departmentCode) {
@@ -641,51 +643,160 @@ function HRDashboard() {
     }
   });
   const departments = Array.from(deptMap.values());
+  const attnSummary = attnData?.summary ?? {};
+  const payrollSummary = payrollData?.summary ?? {};
+  const upcomingEvents = (eventsData?.events ?? []).filter((e: any) => e.status === "upcoming").slice(0, 4);
+  const topPerformers = (scoreData?.scorecards ?? [])
+    .sort((a: any, b: any) => (b.overallScore ?? 0) - (a.overallScore ?? 0))
+    .slice(0, 5);
+
+  const CHART_COLORS_LOCAL = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#BE185D]/30 bg-gradient-to-r from-[#9D174D] to-[#BE185D] px-5 py-4 text-white shadow-card">
         <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Human Resources</p>
+          <p className="text-[11px] uppercase tracking-widest text-white/70">Human Resources Command Center</p>
           <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <Metric label="Staff" value={`${staff.length}`} />
           <Divider />
-          <Metric label="Departments" value={`${departments.length}`} />
+          <Metric label="Attendance" value={`${Math.round(attnSummary.attendanceRate ?? 0)}%`} />
+          <Divider />
+          <Metric label="Payroll" value={fmtINR(payrollSummary.totalNetPay ?? 0)} />
         </div>
         <Button size="sm" variant="secondary" onClick={() => setActiveModule("staff")} className="bg-white text-[#BE185D] hover:bg-white/90 font-semibold">
-          Manage Staff
+          HR Module
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard label="Total Staff" value={staff.length} icon={Users} accent="navy" />
-        <KpiCard label="Departments" value={departments.length} icon={Building2} accent="gold" />
-        <KpiCard label="Active" value={staff.filter((s: any) => s.isActive).length} icon={UserCog} accent="success" />
-        <KpiCard label="Occupancy" value={data.kpis.occupancyRate} unit="%" icon={Percent} accent="info" />
+        <KpiCard label="Attendance Rate" value={Math.round(attnSummary.attendanceRate ?? 0)} unit="%" icon={ClipboardList} accent="success" />
+        <KpiCard label="Present (Month)" value={attnSummary.totalPresent ?? 0} icon={CheckCircle2} accent="info" />
+        <KpiCard label="Late/Absent" value={(attnSummary.totalLate ?? 0) + (attnSummary.totalAbsent ?? 0)} icon={AlertTriangle} accent="warning" />
+        <KpiCard label="Monthly Payroll" value={fmtINR(payrollSummary.totalNetPay ?? 0)} icon={IndianRupee} accent="gold" />
+        <KpiCard label="Avg Score" value={Math.round(scoreData?.overallStats?.averageScore ?? 0)} icon={BarChart3} accent="navy" />
       </div>
 
-      {/* Department breakdown */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-display">Department Staffing</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {departments.map((d: any) => {
-              const deptStaff = staff.filter((s: any) => s.departmentCode === d.code);
-              return (
-                <div key={d.id} className="rounded-xl border border-border p-3">
-                  <p className="text-sm font-semibold">{d.name}</p>
-                  <p className="text-lg font-display font-bold">{deptStaff.length}</p>
-                  <p className="text-[10px] text-muted-foreground">{d.code} department</p>
+      {/* Two columns: Department Staffing + Top Performers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-display">Department Staffing</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {departments.map((d: any) => {
+                const deptStaff = staff.filter((s: any) => s.departmentCode === d.code);
+                return (
+                  <div key={d.id} className="rounded-xl border border-border p-3 hover:shadow-card transition-shadow cursor-pointer" onClick={() => setActiveModule("staff")}>
+                    <p className="text-sm font-semibold">{d.name}</p>
+                    <p className="text-lg font-display font-bold">{deptStaff.length}</p>
+                    <p className="text-[10px] text-muted-foreground">{d.code} department</p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-display">Top Performers</CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("staff")}>All Scorecards</Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {topPerformers.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">No scorecard data</p>
+              ) : topPerformers.map((s: any, i: number) => (
+                <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/40">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: CHART_COLORS_LOCAL[i % 6] }}>
+                    #{i + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold">{s.userName ?? (`${s.user?.firstName ?? ""} ${s.user?.lastName ?? ""}`.trim() || "—")}</p>
+                    <p className="text-[10px] text-muted-foreground">{[s.department ?? s.user?.department, s.user?.role].filter(Boolean).join(" · ") || "—"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-display font-bold">{Math.round(s.overallScore ?? 0)}%</p>
+                    <Badge className={cn("text-[9px] px-1.5 py-0", {
+                      "bg-[#16A34A] text-white": s.grade === "A+" || s.grade === "A",
+                      "bg-[#0369A1] text-white": s.grade === "B+" || s.grade === "B",
+                      "bg-[#D97706] text-white": s.grade === "C",
+                      "bg-[#DC2626] text-white": s.grade === "D",
+                    })}>{s.grade}</Badge>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Payroll Summary + Upcoming Events */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-display flex items-center gap-2"><IndianRupee className="h-4 w-4 text-gold" /> Payroll Summary</CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("staff")}>Full Payroll</Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg bg-[#16A34A]/10 border border-[#16A34A]/20 p-3 text-center">
+                  <p className="text-[10px] text-muted-foreground">Gross</p>
+                  <p className="text-sm font-display font-bold text-[#16A34A]">{fmtINR(payrollSummary.totalGrossEarnings ?? 0)}</p>
+                </div>
+                <div className="rounded-lg bg-[#DC2626]/10 border border-[#DC2626]/20 p-3 text-center">
+                  <p className="text-[10px] text-muted-foreground">Deductions</p>
+                  <p className="text-sm font-display font-bold text-[#DC2626]">{fmtINR(payrollSummary.totalDeductions ?? 0)}</p>
+                </div>
+                <div className="rounded-lg bg-navy/10 border border-navy/20 p-3 text-center">
+                  <p className="text-[10px] text-muted-foreground">Net Pay</p>
+                  <p className="text-sm font-display font-bold text-navy">{fmtINR(payrollSummary.totalNetPay ?? 0)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{payrollSummary.draftCount ?? 0} draft</span>
+                <span>·</span>
+                <span>{payrollSummary.processedCount ?? 0} processed</span>
+                <span>·</span>
+                <span>{payrollSummary.paidCount ?? 0} paid</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-display flex items-center gap-2"><Calendar className="h-4 w-4 text-gold" /> Upcoming Events</CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("staff")}>All Events</Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {upcomingEvents.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-6">No upcoming events</p>
+              ) : upcomingEvents.map((e: any) => {
+                const typeColor: Record<string, string> = { festival: "#C9952A", training: "#0369A1", meeting: "#1B3A6B", celebration: "#16A34A", audit: "#DC2626", other: "#6B7280" };
+                return (
+                  <div key={e.id} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/40">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${typeColor[e.type] ?? "#6B7280"}20` }}>
+                      <Calendar className="h-4 w-4" style={{ color: typeColor[e.type] ?? "#6B7280" }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold">{e.title}</p>
+                      <p className="text-[10px] text-muted-foreground">{fmtDate(e.eventDate)} · {e.venue ?? "TBD"}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[9px]">{e.type}</Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

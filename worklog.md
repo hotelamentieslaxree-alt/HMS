@@ -1,45 +1,37 @@
 ---
-Task ID: 1
+Task ID: 2
 Agent: Main
-Task: Fix bugs, add login system with role-based auth, department-specific dashboards
+Task: Enhance HMS with professional HR module (Attendance, Payroll, Events, Scorecards) + department-specific solutions
 
 Work Log:
-- Examined existing project state: backend complete, frontend modules exist but no auth system
-- Created `/api/auth/login` route — validates email+password (demo: aurelian2024), returns user data with token
-- Created `/api/auth/me` route — returns current user from token
-- Created `/api/auth/logout` route — stateless logout
-- Updated Zustand store (`src/lib/store.ts`) with auth state, ROLE_MODULES mapping (which modules each role can access), ROLE_META with 13 roles
-- Updated API client (`src/lib/api.ts`) to include auth token from localStorage
-- Built professional login page (`src/components/hms/login-page.tsx`) with:
-  - Dark luxury theme with animated background effects
-  - 12 role cards for Quick Access login (Owner, GM, FOM, HK Mgr, FB Mgr, Finance Mgr, Eng Mgr, Revenue Mgr, HR Mgr, Receptionist, HK Attendant, Waiter)
-  - Manual Sign In tab with email/password form
-  - Session persistence via localStorage
-- Updated AppShell to gate behind authentication — shows LoginPage when not authenticated
-- Updated Sidebar with role-based navigation filtering — only shows modules the current role can access
-- Updated Topbar with user avatar, name, role label, and sign-out button
-- Built 9 role-specific dashboard views:
-  - **Owner**: Full command center with all KPIs, revenue charts, channel mix
-  - **GM**: Operations overview with occupancy, arrivals/departures, department health
-  - **Front Desk**: Arrivals/departures focus, room status board
-  - **Housekeeping**: Task counts, room status, task list with assignees
-  - **F&B**: Outlet grid, table counts, POS quick access
-  - **Finance**: Revenue bar chart, TRevPAR/GOPPAR/CPOR, report quick actions
-  - **Engineering**: Ticket list, OOO/OOS room counts
-  - **Revenue**: WoW KPI deltas, channel production breakdown
-  - **HR**: Staff counts, department staffing breakdown
-- Fixed 3 bugs found during browser validation:
-  1. MoonStar icon not imported in dashboard.tsx
-  2. F&B outlets data shape mismatch (array vs object)
-  3. HK task assignee name access (firstName/lastName vs name)
-- Fixed HK dashboard to use HK API summary for accurate task counts
-- Fixed F&B dashboard to show "Tables Available" instead of "HK Completed"
-- Fixed HR dashboard to correctly parse staff API response
+- Added 4 new Prisma models: Attendance, PayrollRecord, CompanyEvent, Scorecard
+- Added reverse relations to User and Property models
+- Pushed schema changes to SQLite database
+- Created 4 HR API routes:
+  - /api/hr/attendance — CRUD + Excel bulk upload + monthly/weekly/daily views + auto work hours calc
+  - /api/hr/payroll — Auto-generate payroll with Indian salary structure (HRA, DA, PF, ESI, PT) + process/pay workflow
+  - /api/hr/events — CRUD for company events (festival, training, meeting, celebration, audit)
+  - /api/hr/scorecards — Weighted scoring (8 metrics) + auto grade calculation (A+ to D)
+  - /api/hr/employees — Employee CRUD with search/filter/add
+- Seeded HR data: 32 attendance records, 16 payroll records, 10 events, 16 scorecards
+- Built complete 6-tab HR module (staff.tsx):
+  - Overview: KPI cards, attendance chart, department distribution, events, top performers
+  - Attendance: Monthly/weekly/daily views, mark attendance, bulk upload, summary cards
+  - Employees: Directory with search/filter, add/edit/deactivate
+  - Payroll: Salary breakdown, generate/process/pay workflow, professional salary slip dialog
+  - Events: Calendar-style list with color-coded types, add events
+  - Scorecards: Department averages chart, detailed metrics table, add scorecard
+- Enhanced HR Dashboard in main dashboard module:
+  - Added attendance rate, present count, late/absent, payroll, avg score KPIs
+  - Added Top Performers section with grades
+  - Added Payroll Summary (Gross/Deductions/Net)
+  - Added Upcoming Events list
+- Fixed Top Performers name display (userName vs user.firstName)
+- Fixed "Present Today" label to "Present (Month)" for accuracy
 
 Stage Summary:
-- Full role-based authentication system with professional login page
-- 12 role cards for instant department-specific login
-- 9 unique department dashboards with themed banners
-- Role-based sidebar navigation filtering
-- All 24 browser test steps pass
-- Lint clean, no compilation errors
+- Full HR management system with attendance tracking, payroll processing, salary slip generation, event management, and performance scorecards
+- 6-tab professional HR module with rich data and interactive features
+- Indian salary structure with proper deductions (PF 12%, ESI 0.75%, PT ₹200)
+- Weighted scorecard system with auto-grading
+- All features browser-validated and working

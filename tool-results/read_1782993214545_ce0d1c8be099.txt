@@ -1,0 +1,738 @@
+     1→     1→// ARIA HMS — Hospitality Management System
+     2→     2→// Prisma schema (SQLite). Note: SQLite has no native ENUM / array / JSONB,
+     3→     3→// so enums are stored as String with app-level validation, and arrays/objects
+     4→     4→// are stored as JSON strings.
+     5→     5→
+     6→     6→generator client {
+     7→     7→  provider = "prisma-client-js"
+     8→     8→}
+     9→     9→
+    10→    10→datasource db {
+    11→    11→  provider = "sqlite"
+    12→    12→  url      = env("DATABASE_URL")
+    13→    13→}
+    14→    14→
+    15→    15→// ════════════════════════════════════════════════════════════════
+    16→    16→// PROPERTY & ORG
+    17→    17→// ════════════════════════════════════════════════════════════════
+    18→    18→
+    19→    19→model Property {
+    20→    20→  id            String   @id @default(cuid())
+    21→    21→  name          String
+    22→    22→  code          String
+    23→    23→  city          String
+    24→    24→  state         String?
+    25→    25→  country       String
+    26→    26→  timezone      String   @default("Asia/Calcutta")
+    27→    27→  currency      String   @default("INR")
+    28→    28→  starRating    Int      @default(5)
+    29→    29→  totalRooms    Int      @default(0)
+    30→    30→  checkInTime   String   @default("14:00")
+    31→    31→  checkOutTime  String   @default("12:00")
+    32→    32→  gstNumber     String?
+    33→    33→  taxId         String?
+    34→    34→  logoUrl       String?
+    35→    35→  status        String   @default("active") // active | suspended
+    36→    36→  businessDate  DateTime @default(now())    // current business date
+    37→    37→  createdAt     DateTime @default(now())
+    38→    38→  updatedAt     DateTime @updatedAt
+    39→    39→
+    40→    40→  roomCategories    RoomCategory[]
+    41→    41→  rooms             Room[]
+    42→    42→  reservations      Reservation[]
+    43→    43→  housekeepingTasks HousekeepingTask[]
+    44→    44→  outlets           Outlet[]
+    45→    45→  ratePlans         RatePlan[]
+    46→    46→  auditLogs         AuditLog[]
+    47→    47→  users             User[]
+    48→    48→  departments       Department[]
+    49→    49→  shiftHandovers    ShiftHandover[]
+    50→    50→  attendance        Attendance[]
+    51→    51→  payrollRecords    PayrollRecord[]
+    52→    52→  companyEvents     CompanyEvent[]
+    53→    53→  scorecards        Scorecard[]
+    54→    54→}
+    55→    55→
+    56→    56→model Department {
+    57→    57→  id         String   @id @default(cuid())
+    58→    58→  propertyId String
+    59→    59→  name       String
+    60→    60→  code       String // FO | HK | FB | ENG | HR | FIN | SEC
+    61→    61→  headUserId String?
+    62→    62→  createdAt  DateTime @default(now())
+    63→    63→  updatedAt  DateTime @updatedAt
+    64→    64→
+    65→    65→  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+    66→    66→  users    User[]
+    67→    67→
+    68→    68→  @@index([propertyId])
+    69→    69→}
+    70→    70→
+    71→    71→model User {
+    72→    72→  id            String   @id @default(cuid())
+    73→    73→  propertyId    String?
+    74→    74→  email         String   @unique
+    75→    75→  firstName     String
+    76→    76→  lastName      String
+    77→    77→  role          String   // owner | gm | fom | hk_mgr | fb_mgr | rev_mgr | fin_mgr | eng_mgr | hr_mgr | receptionist | hk_attendant | waiter | technician
+    78→    78→  roleLevel     Int      @default(4) // 1 owner, 2 gm, 3 manager, 4 staff
+    79→    79→  departmentId  String?
+    80→    80→  employeeCode  String?
+    81→    81→  phone         String?
+    82→    82→  isActive      Boolean  @default(true)
+    83→    83→  avatarUrl     String?
+    84→    84→  createdAt     DateTime @default(now())
+    85→    85→  updatedAt     DateTime @updatedAt
+    86→    86→
+    87→    87→  property    Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+    88→    88→  department  Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+    89→    89→  hkTasks     HousekeepingTask[] @relation("HkTaskAssignee")
+    90→    90→  hkInspected HousekeepingTask[] @relation("HkTaskInspector")
+    91→    91→  posOrders     PosOrder[]       @relation("PosOrderWaiter")
+    92→    92→  auditLogs     AuditLog[]
+    93→    93→  attendance    Attendance[]
+    94→    94→  payrollRecords PayrollRecord[]
+    95→    95→  scorecards    Scorecard[]
+    96→    96→  organizedEvents CompanyEvent[]  @relation("EventOrganizer")
+    97→    97→
+    98→    98→  @@index([propertyId])
+    99→    99→}
+   100→   100→
+   101→   101→// ════════════════════════════════════════════════════════════════
+   102→   102→// ROOMS & RATES
+   103→   103→// ════════════════════════════════════════════════════════════════
+   104→   104→
+   105→   105→model RoomCategory {
+   106→   106→  id                  String   @id @default(cuid())
+   107→   107→  propertyId          String
+   108→   108→  name                String
+   109→   109→  code                String
+   110→   110→  description         String?
+   111→   111→  maxAdults           Int      @default(2)
+   112→   112→  maxChildren         Int      @default(1)
+   113→   113→  baseRate            Float
+   114→   114→  amenities           String   @default("[]") // JSON array
+   115→   115→  createdAt           DateTime @default(now())
+   116→   116→  updatedAt           DateTime @updatedAt
+   117→   117→
+   118→   118→  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   119→   119→  rooms        Room[]
+   120→   120→  ratePlans    RatePlan[]   @relation("RatePlanCategories")
+   121→   121→  reservations Reservation[]
+   122→   122→
+   123→   123→  @@index([propertyId])
+   124→   124→}
+   125→   125→
+   126→   126→model Room {
+   127→   127→  id            String   @id @default(cuid())
+   128→   128→  propertyId    String
+   129→   129→  categoryId    String
+   130→   130→  roomNumber    String
+   131→   131→  floor         Int
+   132→   132→  wing          String?
+   133→   133→  currentStatus String   @default("vacant_clean")
+   134→   134→  // vacant_clean | vacant_dirty | occupied_clean | occupied_dirty | out_of_order | out_of_service
+   135→   135→  isSmoking     Boolean  @default(false)
+   136→   136→  isAccessible  Boolean  @default(false)
+   137→   137→  notes         String?
+   138→   138→  blockedReason String?
+   139→   139→  blockedUntil  DateTime?
+   140→   140→  createdAt     DateTime @default(now())
+   141→   141→  updatedAt     DateTime @updatedAt
+   142→   142→
+   143→   143→  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   144→   144→  category         RoomCategory      @relation(fields: [categoryId], references: [id])
+   145→   145→  statusLogs       RoomStatusLog[]
+   146→   146→  hkTasks          HousekeepingTask[]
+   147→   147→  reservationRooms Reservation[]
+   148→   148→  maintenanceTickets MaintenanceTicket[]
+   149→   149→
+   150→   150→  @@unique([propertyId, roomNumber])
+   151→   151→  @@index([propertyId, currentStatus])
+   152→   152→}
+   153→   153→
+   154→   154→model RoomStatusLog {
+   155→   155→  id         String   @id @default(cuid())
+   156→   156→  roomId     String
+   157→   157→  oldStatus  String?
+   158→   158→  newStatus  String
+   159→   159→  changedBy  String?
+   160→   160→  reason     String?
+   161→   161→  changedAt  DateTime @default(now())
+   162→   162→
+   163→   163→  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+   164→   164→
+   165→   165→  @@index([roomId])
+   166→   166→}
+   167→   167→
+   168→   168→model RatePlan {
+   169→   169→  id                 String   @id @default(cuid())
+   170→   170→  propertyId         String
+   171→   171→  name               String
+   172→   172→  code               String
+   173→   173→  description        String?
+   174→   174→  mealPlan           String   @default("ep") // ep | cp | map | ap
+   175→   175→  isRefundable       Boolean  @default(true)
+   176→   176→  advancePurchaseDays Int     @default(0)
+   177→   177→  minStayNights      Int      @default(1)
+   178→   178→  maxStayNights      Int      @default(30)
+   179→   179→  validFrom          DateTime
+   180→   180→  validTo            DateTime
+   181→   181→  markupPercent      Float    @default(0) // over base rate
+   182→   182→  createdAt          DateTime @default(now())
+   183→   183→  updatedAt          DateTime @updatedAt
+   184→   184→
+   185→   185→  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   186→   186→  categories  RoomCategory[] @relation("RatePlanCategories")
+   187→   187→  reservations Reservation[]
+   188→   188→
+   189→   189→  @@index([propertyId])
+   190→   190→}
+   191→   191→
+   192→   192→// ════════════════════════════════════════════════════════════════
+   193→   193→// GUESTS & RESERVATIONS
+   194→   194→// ════════════════════════════════════════════════════════════════
+   195→   195→
+   196→   196→model Guest {
+   197→   197→  id              String   @id @default(cuid())
+   198→   198→  title           String   @default("Mr")
+   199→   199→  firstName       String
+   200→   200→  lastName        String
+   201→   201→  email           String?
+   202→   202→  phone           String?
+   203→   203→  nationality     String   @default("IN")
+   204→   204→  idType          String?  // passport | aadhaar | driving_license | voter
+   205→   205→  idNumber        String?
+   206→   206→  dateOfBirth     DateTime?
+   207→   207→  address         String?
+   208→   208→  city            String?
+   209→   209→  state           String?
+   210→   210→  country         String   @default("IN")
+   211→   211→  loyaltyTier     String   @default("silver") // none | silver | gold | platinum
+   212→   212→  loyaltyPoints   Int      @default(0)
+   213→   213→  preferences     String   @default("{}") // JSON
+   214→   214→  vipStatus       Boolean  @default(false)
+   215→   215→  doNotDisturb    Boolean  @default(false)
+   216→   216→  totalStays      Int      @default(0)
+   217→   217→  totalRevenue    Float    @default(0)
+   218→   218→  blacklisted     Boolean  @default(false)
+   219→   219→  blacklistReason String?
+   220→   220→  createdAt       DateTime @default(now())
+   221→   221→  updatedAt       DateTime @updatedAt
+   222→   222→
+   223→   223→  primaryReservations Reservation[] @relation("PrimaryGuestReservations")
+   224→   224→
+   225→   225→  @@index([email])
+   226→   226→  @@index([phone])
+   227→   227→}
+   228→   228→
+   229→   229→model Company {
+   230→   230→  id            String   @id @default(cuid())
+   231→   231→  name          String
+   232→   232→  gstNumber     String?
+   233→   233→  address       String?
+   234→   234→  creditLimit   Float    @default(0)
+   235→   235→  paymentTerms  String?
+   236→   236→  contactName   String?
+   237→   237→  contactEmail  String?
+   238→   238→  negotiatedRate Float?
+   239→   239→  createdAt     DateTime @default(now())
+   240→   240→  updatedAt     DateTime @updatedAt
+   241→   241→
+   242→   242→  reservations Reservation[]
+   243→   243→}
+   244→   244→
+   245→   245→model Reservation {
+   246→   246→  id              String   @id @default(cuid())
+   247→   247→  propertyId      String
+   248→   248→  confirmationNumber String @unique
+   249→   249→  bookingSource   String   @default("direct") // direct | booking_com | expedia | airbnb | makemytrip | goibibo | agoda | corporate | walk_in | phone
+   250→   250→  status          String   @default("confirmed") // confirmed | tentative | waitlisted | checked_in | checked_out | cancelled | no_show
+   251→   251→  primaryGuestId  String
+   252→   252→  companyId       String?
+   253→   253→  categoryId      String
+   254→   254→  roomId          String?
+   255→   255→  ratePlanId      String?
+   256→   256→  ratePerNight    Float
+   257→   257→  totalNights     Int
+   258→   258→  checkInDate     DateTime
+   259→   259→  checkOutDate    DateTime
+   260→   260→  actualCheckIn   DateTime?
+   261→   261→  actualCheckOut  DateTime?
+   262→   262→  adults          Int      @default(2)
+   263→   263→  children        Int      @default(0)
+   264→   264→  infants         Int      @default(0)
+   265→   265→  specialRequests String?
+   266→   266→  internalNotes   String?
+   267→   267→  otaCommissionPercent Float @default(0)
+   268→   268→  otaCommissionAmount   Float @default(0)
+   269→   269→  netRevenue      Float    @default(0)
+   270→   270→  depositAmount   Float    @default(0)
+   271→   271→  cancellationReason String?
+   272→   272→  cancelledAt     DateTime?
+   273→   273→  cancelledBy     String?
+   274→   274→  createdAt       DateTime @default(now())
+   275→   275→  updatedAt       DateTime @updatedAt
+   276→   276→
+   277→   277→  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   278→   278→  primaryGuest Guest        @relation("PrimaryGuestReservations", fields: [primaryGuestId], references: [id])
+   279→   279→  company      Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+   280→   280→  category     RoomCategory @relation(fields: [categoryId], references: [id])
+   281→   281→  room         Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+   282→   282→  ratePlan     RatePlan?    @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
+   283→   283→  folios       Folio[]
+   284→   284→
+   285→   285→  @@index([propertyId, status])
+   286→   286→  @@index([propertyId, checkInDate])
+   287→   287→  @@index([primaryGuestId])
+   288→   288→}
+   289→   289→
+   290→   290→// ════════════════════════════════════════════════════════════════
+   291→   291→// FOLIO & BILLING
+   292→   292→// ════════════════════════════════════════════════════════════════
+   293→   293→
+   294→   294→model Folio {
+   295→   295→  id           String   @id @default(cuid())
+   296→   296→  reservationId String
+   297→   297→  folioNumber  String   @unique
+   298→   298→  folioType    String   @default("room") // room | extra | advance | city_ledger
+   299→   299→  status       String   @default("open") // open | closed | transferred
+   300→   300→  subtotal     Float    @default(0)
+   301→   301→  taxAmount    Float    @default(0)
+   302→   302→  totalAmount  Float    @default(0)
+   303→   303→  paidAmount   Float    @default(0)
+   304→   304→  balance      Float    @default(0)
+   305→   305→  createdAt    DateTime @default(now())
+   306→   306→  closedAt     DateTime?
+   307→   307→  closedBy     String?
+   308→   308→
+   309→   309→  reservation Reservation  @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+   310→   310→  lines       FolioLine[]
+   311→   311→  payments    Payment[]
+   312→   312→
+   313→   313→  @@index([reservationId])
+   314→   314→}
+   315→   315→
+   316→   316→model FolioLine {
+   317→   317→  id              String   @id @default(cuid())
+   318→   318→  folioId         String
+   319→   319→  transactionType String   @default("charge") // charge | payment | adjustment | void
+   320→   320→  description     String
+   321→   321→  amount          Float    @default(0)
+   322→   322→  taxCode         String?
+   323→   323→  taxAmount       Float    @default(0)
+   324→   324→  departmentCode  String?  // ROOM | FB | MINIBAR | LAUNDRY | SPA | MISC
+   325→   325→  outletCode      String?
+   326→   326→  postedAt        DateTime @default(now())
+   327→   327→  postedBy        String?
+   328→   328→  referenceType   String?  // pos_order | minibar | room_rate | manual
+   329→   329→  referenceId     String?
+   330→   330→  isVoided        Boolean  @default(false)
+   331→   331→  voidedAt        DateTime?
+   332→   332→  voidedById      String?
+   333→   333→  voidReason      String?
+   334→   334→
+   335→   335→  folio Folio @relation(fields: [folioId], references: [id], onDelete: Cascade)
+   336→   336→
+   337→   337→  @@index([folioId])
+   338→   338→}
+   339→   339→
+   340→   340→model Payment {
+   341→   341→  id            String   @id @default(cuid())
+   342→   342→  folioId       String
+   343→   343→  amount        Float
+   344→   344→  paymentMethod String   // cash | credit_card | debit_card | upi | bank_transfer | city_ledger
+   345→   345→  paymentReference String?
+   346→   346→  cardLast4     String?
+   347→   347→  cardType      String?
+   348→   348→  status        String   @default("completed") // pending | completed | failed | refunded
+   349→   349→  processedAt   DateTime @default(now())
+   350→   350→  processedBy   String?
+   351→   351→
+   352→   352→  folio Folio @relation(fields: [folioId], references: [id], onDelete: Cascade)
+   353→   353→
+   354→   354→  @@index([folioId])
+   355→   355→}
+   356→   356→
+   357→   357→// ════════════════════════════════════════════════════════════════
+   358→   358→// HOUSEKEEPING
+   359→   359→// ════════════════════════════════════════════════════════════════
+   360→   360→
+   361→   361→model HousekeepingTask {
+   362→   362→  id            String   @id @default(cuid())
+   363→   363→  propertyId    String
+   364→   364→  roomId        String
+   365→   365→  taskType      String   @default("checkout_cleaning") // checkout_cleaning | stayover | turndown | deep_clean | inspection | maintenance_prep
+   366→   366→  assignedToId  String?
+   367→   367→  priority      String   @default("normal") // urgent | high | normal | low
+   368→   368→  status        String   @default("pending") // pending | in_progress | completed | inspected | rejected
+   369→   369→  scheduledFor  DateTime @default(now())
+   370→   370→  startedAt     DateTime?
+   371→   371→  completedAt   DateTime?
+   372→   372→  inspectedById String?
+   373→   373→  inspectedAt   DateTime?
+   374→   374→  rejectionReason String?
+   375→   375→  checklist     String   @default("[]") // JSON array of {item, done}
+   376→   376→  notes         String?
+   377→   377→  createdAt     DateTime @default(now())
+   378→   378→  updatedAt     DateTime @updatedAt
+   379→   379→
+   380→   380→  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   381→   381→  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+   382→   382→  assignee    User?    @relation("HkTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+   383→   383→  inspector   User?    @relation("HkTaskInspector", fields: [inspectedById], references: [id], onDelete: SetNull)
+   384→   384→
+   385→   385→  @@index([propertyId, status])
+   386→   386→  @@index([assignedToId])
+   387→   387→}
+   388→   388→
+   389→   389→model LostFound {
+   390→   390→  id              String   @id @default(cuid())
+   391→   391→  propertyId      String
+   392→   392→  itemDescription String
+   393→   393→  itemCategory    String?
+   394→   394→  foundLocation   String?
+   395→   395→  foundDate       DateTime @default(now())
+   396→   396→  foundBy         String?
+   397→   397→  storageLocation String?
+   398→   398→  status          String   @default("in_custody") // in_custody | claimed | disposed | donated
+   399→   399→  claimedBy       String?
+   400→   400→  claimedAt       DateTime?
+   401→   401→  createdAt       DateTime @default(now())
+   402→   402→  updatedAt       DateTime @updatedAt
+   403→   403→
+   404→   404→  @@index([propertyId, status])
+   405→   405→}
+   406→   406→
+   407→   407→// ════════════════════════════════════════════════════════════════
+   408→   408→// F&B / POS
+   409→   409→// ════════════════════════════════════════════════════════════════
+   410→   410→
+   411→   411→model Outlet {
+   412→   412→  id         String   @id @default(cuid())
+   413→   413→  propertyId String
+   414→   414→  name       String
+   415→   415→  code       String
+   416→   416→  type       String   @default("restaurant") // restaurant | bar | cafe | room_service | banquet | pool_bar
+   417→   417→  isActive   Boolean  @default(true)
+   418→   418→  tableCount Int      @default(0)
+   419→   419→  createdAt  DateTime @default(now())
+   420→   420→  updatedAt  DateTime @updatedAt
+   421→   421→
+   422→   422→  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   423→   423→  tables     RestaurantTable[]
+   424→   424→  menuCategories MenuCategory[]
+   425→   425→  orders     PosOrder[]
+   426→   426→
+   427→   427→  @@index([propertyId])
+   428→   428→}
+   429→   429→
+   430→   430→model RestaurantTable {
+   431→   431→  id         String   @id @default(cuid())
+   432→   432→  outletId   String
+   433→   433→  tableNumber String
+   434→   434→  capacity   Int      @default(4)
+   435→   435→  status     String   @default("available") // available | occupied | reserved | cleaning
+   436→   436→  section    String?
+   437→   437→  createdAt  DateTime @default(now())
+   438→   438→  updatedAt  DateTime @updatedAt
+   439→   439→
+   440→   440→  outlet Outlet    @relation(fields: [outletId], references: [id], onDelete: Cascade)
+   441→   441→  orders PosOrder[]
+   442→   442→
+   443→   443→  @@unique([outletId, tableNumber])
+   444→   444→}
+   445→   445→
+   446→   446→model MenuCategory {
+   447→   447→  id         String   @id @default(cuid())
+   448→   448→  outletId   String
+   449→   449→  name       String
+   450→   450→  sortOrder  Int      @default(0)
+   451→   451→  isActive   Boolean  @default(true)
+   452→   452→  mealPeriod String   @default("[]") // JSON array
+   453→   453→  createdAt  DateTime @default(now())
+   454→   454→  updatedAt  DateTime @updatedAt
+   455→   455→
+   456→   456→  outlet Outlet     @relation(fields: [outletId], references: [id], onDelete: Cascade)
+   457→   457→  items  MenuItem[]
+   458→   458→
+   459→   459→  @@index([outletId])
+   460→   460→}
+   461→   461→
+   462→   462→model MenuItem {
+   463→   463→  id            String   @id @default(cuid())
+   464→   464→  categoryId    String
+   465→   465→  name          String
+   466→   466→  description   String?
+   467→   467→  price         Float
+   468→   468→  itemType      String   @default("food") // food | beverage | package
+   469→   469→  dietType      String   @default("veg") // veg | non_veg | vegan | contains_egg | contains_alcohol
+   470→   470→  allergens     String   @default("[]")
+   471→   471→  preparationTimeMinutes Int @default(15)
+   472→   472→  isAvailable   Boolean  @default(true)
+   473→   473→  isFeatured    Boolean  @default(false)
+   474→   474→  photoUrl      String?
+   475→   475→  recipeCost    Float    @default(0)
+   476→   476→  createdAt     DateTime @default(now())
+   477→   477→  updatedAt     DateTime @updatedAt
+   478→   478→
+   479→   479→  category   MenuCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+   480→   480→  orderLines PosOrderLine[]
+   481→   481→
+   482→   482→  @@index([categoryId])
+   483→   483→}
+   484→   484→
+   485→   485→model PosOrder {
+   486→   486→  id            String   @id @default(cuid())
+   487→   487→  outletId      String
+   488→   488→  tableId       String?
+   489→   489→  reservationId String?
+   490→   490→  orderType     String   @default("dine_in") // dine_in | room_service | takeaway | delivery | banquet
+   491→   491→  status        String   @default("draft") // draft | sent_to_kitchen | in_preparation | ready | served | billed | paid | void
+   492→   492→  waiterId      String?
+   493→   493→  subtotal      Float    @default(0)
+   494→   494→  discountAmount Float   @default(0)
+   495→   495→  taxAmount     Float    @default(0)
+   496→   496→  totalAmount   Float    @default(0)
+   497→   497→  guestsCount   Int      @default(1)
+   498→   498→  notes         String?
+   499→   499→  kotNumber     Int?
+   500→   500→  createdAt     DateTime @default(now())
+   501→   501→  billedAt      DateTime?
+   502→   502→  paidAt        DateTime?
+   503→   503→
+   504→   504→  outlet Outlet           @relation(fields: [outletId], references: [id], onDelete: Cascade)
+   505→   505→  table  RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+   506→   506→  waiter User?            @relation("PosOrderWaiter", fields: [waiterId], references: [id], onDelete: SetNull)
+   507→   507→  lines  PosOrderLine[]
+   508→   508→
+   509→   509→  @@index([outletId, status])
+   510→   510→}
+   511→   511→
+   512→   512→model PosOrderLine {
+   513→   513→  id                String   @id @default(cuid())
+   514→   514→  orderId           String
+   515→   515→  itemId            String
+   516→   516→  quantity          Int      @default(1)
+   517→   517→  unitPrice         Float
+   518→   518→  specialInstructions String?
+   519→   519→  status            String   @default("pending") // pending | in_progress | ready | served | void
+   520→   520→  voidReason        String?
+   521→   521→  createdAt         DateTime @default(now())
+   522→   522→
+   523→   523→  order PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+   524→   524→  item  MenuItem  @relation(fields: [itemId], references: [id])
+   525→   525→
+   526→   526→  @@index([orderId])
+   527→   527→}
+   528→   528→
+   529→   529→// ════════════════════════════════════════════════════════════════
+   530→   530→// MAINTENANCE
+   531→   531→// ════════════════════════════════════════════════════════════════
+   532→   532→
+   533→   533→model MaintenanceTicket {
+   534→   534→  id          String   @id @default(cuid())
+   535→   535→  propertyId  String
+   536→   536→  roomId      String?
+   537→   537→  title       String
+   538→   538→  description String?
+   539→   539→  priority    String   @default("normal") // urgent | high | normal | low
+   540→   540→  status      String   @default("open") // open | in_progress | completed | cancelled
+   541→   541→  category    String?  // electrical | plumbing | hvac | carpentry | civil | av | it
+   542→   542→  raisedBy    String?
+   543→   543→  assignedTo  String?
+   544→   544→  createdAt   DateTime @default(now())
+   545→   545→  updatedAt   DateTime @updatedAt
+   546→   546→  completedAt DateTime?
+   547→   547→
+   548→   548→  room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+   549→   549→
+   550→   550→  @@index([propertyId, status])
+   551→   551→  @@index([roomId])
+   552→   552→}
+   553→   553→
+   554→   554→// ════════════════════════════════════════════════════════════════
+   555→   555→// AUDIT & NOTIFICATIONS
+   556→   556→// ════════════════════════════════════════════════════════════════
+   557→   557→
+   558→   558→model AuditLog {
+   559→   559→  id          String   @id @default(cuid())
+   560→   560→  propertyId  String?
+   561→   561→  userId      String?
+   562→   562→  userRole    String?
+   563→   563→  user_email  String?
+   564→   564→  action      String
+   565→   565→  entityType  String?
+   566→   566→  entityId    String?
+   567→   567→  oldValue    String?  // JSON
+   568→   568→  newValue    String?  // JSON
+   569→   569→  ipAddress   String?
+   570→   570→  occurredAt  DateTime @default(now())
+   571→   571→
+   572→   572→  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+   573→   573→  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+   574→   574→
+   575→   575→  @@index([propertyId, occurredAt])
+   576→   576→  @@index([action])
+   577→   577→}
+   578→   578→
+   579→   579→model Notification {
+   580→   580→  id         String   @id @default(cuid())
+   581→   581→  propertyId String?
+   582→   582→  userId     String?
+   583→   583→  type       String   // info | success | warning | error | approval | alert
+   584→   584→  title      String
+   585→   585→  message    String
+   586→   586→  isRead     Boolean  @default(false)
+   587→   587→  createdAt  DateTime @default(now())
+   588→   588→
+   589→   589→  @@index([propertyId, isRead])
+   590→   590→  @@index([userId, isRead])
+   591→   591→}
+   592→   592→
+   593→   593→model ShiftHandover {
+   594→   594→  id          String   @id @default(cuid())
+   595→   595→  propertyId  String
+   596→   596→  fromUser    String
+   597→   597→  toUser      String?
+   598→   598→  shift       String   // morning | evening | night
+   599→   599→  notes       String
+   600→   600→  openIssues  String?
+   601→   601→  createdAt   DateTime @default(now())
+   602→   602→
+   603→   603→  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   604→   604→}
+   605→   605→
+   606→   606→model NightAuditLog {
+   607→   607→  id            String   @id @default(cuid())
+   608→   608→  propertyId    String
+   609→   609→  businessDate  DateTime
+   610→   610→  status        String   @default("running") // running | completed | failed
+   611→   611→  startedAt     DateTime @default(now())
+   612→   612→  completedAt   DateTime?
+   613→   613→  startedBy     String
+   614→   614→  postingsCount Int      @default(0)
+   615→   615→  revenuePosted Float    @default(0)
+   616→   616→  noShowsCount  Int      @default(0)
+   617→   617→  notes         String?
+   618→   618→
+   619→   619→  @@index([propertyId, businessDate])
+   620→   620→  @@index([propertyId, status])
+   621→   621→}
+   622→   622→
+   623→   623→// ════════════════════════════════════════════════════════════════
+   624→   624→// HR MODULE — Attendance, Payroll, Events, Scorecards
+   625→   625→// ════════════════════════════════════════════════════════════════
+   626→   626→
+   627→   627→model Attendance {
+   628→   628→  id            String   @id @default(cuid())
+   629→   629→  propertyId    String
+   630→   630→  userId        String
+   631→   631→  date          DateTime
+   632→   632→  checkIn       DateTime?
+   633→   633→  checkOut      DateTime?
+   634→   634→  status        String   @default("present") // present | absent | half_day | late | on_leave | holiday | weekly_off
+   635→   635→  overtimeHours Float    @default(0)
+   636→   636→  workHours     Float    @default(0)
+   637→   637→  notes         String?
+   638→   638→  source        String   @default("manual") // manual | excel | biometric | system
+   639→   639→  createdAt     DateTime @default(now())
+   640→   640→  updatedAt     DateTime @updatedAt
+   641→   641→
+   642→   642→  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   643→   643→  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   644→   644→
+   645→   645→  @@unique([userId, date])
+   646→   646→  @@index([propertyId, date])
+   647→   647→  @@index([userId, date])
+   648→   648→}
+   649→   649→
+   650→   650→model PayrollRecord {
+   651→   651→  id              String    @id @default(cuid())
+   652→   652→  propertyId      String
+   653→   653→  userId          String
+   654→   654→  month           Int       // 1-12
+   655→   655→  year            Int
+   656→   656→  basicSalary     Float     @default(0)
+   657→   657→  hra             Float     @default(0)
+   658→   658→  da              Float     @default(0)
+   659→   659→  conveyance      Float     @default(0)
+   660→   660→  medical         Float     @default(0)
+   661→   661→  specialAllow    Float     @default(0)
+   662→   662→  overtime        Float     @default(0)
+   663→   663→  bonus           Float     @default(0)
+   664→   664→  grossEarnings   Float     @default(0)
+   665→   665→  pf              Float     @default(0)
+   666→   666→  esi             Float     @default(0)
+   667→   667→  tax             Float     @default(0)
+   668→   668→  pt              Float     @default(0) // Professional Tax
+   669→   669→  loanDeduction   Float     @default(0)
+   670→   670→  otherDeductions Float     @default(0)
+   671→   671→  totalDeductions Float     @default(0)
+   672→   672→  netPay          Float     @default(0)
+   673→   673→  presentDays     Int       @default(0)
+   674→   674→  absentDays      Int       @default(0)
+   675→   675→  leaveDays       Int       @default(0)
+   676→   676→  halfDays        Int       @default(0)
+   677→   677→  status          String    @default("draft") // draft | processed | paid
+   678→   678→  paidOn          DateTime?
+   679→   679→  createdAt       DateTime  @default(now())
+   680→   680→  updatedAt       DateTime  @updatedAt
+   681→   681→
+   682→   682→  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   683→   683→  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   684→   684→
+   685→   685→  @@unique([userId, month, year])
+   686→   686→  @@index([propertyId, month, year])
+   687→   687→  @@index([status])
+   688→   688→}
+   689→   689→
+   690→   690→model CompanyEvent {
+   691→   691→  id          String    @id @default(cuid())
+   692→   692→  propertyId  String
+   693→   693→  title       String
+   694→   694→  description String?
+   695→   695→  type        String    @default("other") // festival | training | meeting | celebration | audit | inspection | other
+   696→   696→  eventDate   DateTime
+   697→   697→  endDate     DateTime?
+   698→   698→  venue       String?
+   699→   699→  organizerId String?
+   700→   700→  status      String    @default("upcoming") // upcoming | ongoing | completed | cancelled
+   701→   701→  createdAt   DateTime  @default(now())
+   702→   702→  updatedAt   DateTime  @updatedAt
+   703→   703→
+   704→   704→  property  Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   705→   705→  organizer User?    @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: SetNull)
+   706→   706→
+   707→   707→  @@index([propertyId, eventDate])
+   708→   708→  @@index([status])
+   709→   709→}
+   710→   710→
+   711→   711→model Scorecard {
+   712→   712→  id              String   @id @default(cuid())
+   713→   713→  propertyId      String
+   714→   714→  userId          String
+   715→   715→  period          String   // "2024-01" monthly or "2024-Q1" quarterly
+   716→   716→  attendance      Float    @default(0) // percentage
+   717→   717→  punctuality     Float    @default(0) // 0-10
+   718→   718→  taskCompletion  Float    @default(0) // percentage
+   719→   719→  guestFeedback   Float    @default(0) // 0-10
+   720→   720→  teamwork        Float    @default(0) // 0-10
+   721→   721→  initiative      Float    @default(0) // 0-10
+   722→   722→  grooming        Float    @default(0) // 0-10
+   723→   723→  communication   Float    @default(0) // 0-10
+   724→   724→  overallScore    Float    @default(0) // weighted average 0-100
+   725→   725→  grade           String   @default("B") // A+ | A | B+ | B | C | D
+   726→   726→  remarks         String?
+   727→   727→  reviewedBy      String?
+   728→   728→  createdAt       DateTime @default(now())
+   729→   729→  updatedAt       DateTime @updatedAt
+   730→   730→
+   731→   731→  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   732→   732→  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   733→   733→
+   734→   734→  @@unique([userId, period])
+   735→   735→  @@index([propertyId])
+   736→   736→  @@index([userId])
+   737→   737→}
+   738→   738→
