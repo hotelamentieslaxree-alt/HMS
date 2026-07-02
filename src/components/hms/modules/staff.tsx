@@ -1,716 +1,926 @@
-// ARIA HMS — Enhanced HR / Staff Module (6 tabs)
+// ARIA HMS — Staff Directory Module
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useApi, apiPost, apiPut } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { KpiCard, fmtINR, fmtDate, fmtDateTime, timeAgo } from "../shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Users, UserCheck, Percent, Star, Briefcase, IndianRupee,
-  CalendarDays, Clock, Upload, CheckCheck, Plus, Pencil, Trash2,
-  Eye, FileText, Printer, BarChart3, Award, Calendar, MapPin,
-  UserCircle, Search, Building2,
+  Users, UserCheck, Search, Building2, Phone, Mail,
+  MapPin, Filter, ChevronRight, ChevronDown, UserCircle,
+  Briefcase, GitBranch, PhoneCall, MailOpen,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
 } from "recharts";
 
-const CC = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const now = new Date();
+// ─── CONSTANTS ──────────────────────────────────────────────────────
+const NAVY = "#1B3A6B";
+const GOLD = "#C9952A";
+const SUCCESS = "#16A34A";
+const CHART_COLORS = [NAVY, GOLD, SUCCESS, "#0369A1", "#D97706", "#7C3AED", "#BE185D", "#0F766E"];
 
-const ATTENDANCE_COLORS: Record<string, string> = {
-  present: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]",
-  absent: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]",
-  late: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]",
-  half_day: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]",
-  on_leave: "bg-[#F3E8FF] text-[#4C1D95] border-[#7C3AED]",
-  holiday: "bg-muted text-muted-foreground border-border",
-  weekly_off: "bg-muted text-muted-foreground border-border",
-};
-const PAYROLL_COLORS: Record<string, string> = {
-  draft: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]",
-  processed: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]",
-  paid: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]",
-};
-const EVENT_COLORS: Record<string, string> = {
-  festival: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]",
-  training: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]",
-  meeting: "bg-[#1B3A6B] text-white border-[#1B3A6B]",
-  celebration: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]",
-  audit: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]",
-};
-const GRADE_COLORS: Record<string, string> = {
-  "A+": "bg-[#DCFCE7] text-[#14532D]", A: "bg-[#DCFCE7] text-[#16A34A]",
-  "B+": "bg-[#DBEAFE] text-[#1B3A6B]", B: "bg-[#DBEAFE] text-[#0369A1]",
-  C: "bg-[#FEF3C7] text-[#78350F]", D: "bg-[#FFE4E6] text-[#881337]",
-};
-const ROLES = ["owner","gm","fom","receptionist","hk_mgr","hk_attendant","fb_mgr","waiter","rev_mgr","fin_mgr","eng_mgr","technician","hr_mgr"];
 const ROLE_LABEL: Record<string, string> = {
-  owner:"Owner/CEO", gm:"General Manager", fom:"Front Office Mgr", receptionist:"Receptionist",
-  hk_mgr:"Housekeeping Mgr", hk_attendant:"HK Attendant", fb_mgr:"F&B Manager", waiter:"Waiter",
-  rev_mgr:"Revenue Mgr", fin_mgr:"Finance Mgr", eng_mgr:"Engineering Mgr", technician:"Technician", hr_mgr:"HR Manager",
+  owner: "Owner/CEO",
+  gm: "General Manager",
+  fom: "Front Office Mgr",
+  receptionist: "Receptionist",
+  hk_mgr: "Housekeeping Mgr",
+  hk_attendant: "HK Attendant",
+  fb_mgr: "F&B Manager",
+  waiter: "Waiter",
+  rev_mgr: "Revenue Mgr",
+  fin_mgr: "Finance Mgr",
+  eng_mgr: "Engineering Mgr",
+  technician: "Technician",
+  hr_mgr: "HR Manager",
+  sales_mgr: "Sales Manager",
+  sales_exec: "Sales Executive",
+  mkt_mgr: "Marketing Manager",
+  mkt_exec: "Marketing Executive",
 };
 
-// ─── MAIN COMPONENT ────────────────────────────────────────────────
-export function StaffModule() {
-  const [tab, setTab] = useState("overview");
+const ROLE_LEVEL: Record<string, number> = {
+  owner: 1, gm: 2,
+  fom: 3, hk_mgr: 3, fb_mgr: 3, rev_mgr: 3, fin_mgr: 3, eng_mgr: 3, hr_mgr: 3, sales_mgr: 3, mkt_mgr: 3,
+  receptionist: 4, hk_attendant: 4, waiter: 4, technician: 4, sales_exec: 4, mkt_exec: 4,
+};
+
+const ROLE_DEPT: Record<string, string> = {
+  owner: "Management", gm: "Management",
+  fom: "Front Office", receptionist: "Front Office", rev_mgr: "Front Office",
+  hk_mgr: "Housekeeping", hk_attendant: "Housekeeping",
+  fb_mgr: "Food & Beverage", waiter: "Food & Beverage",
+  fin_mgr: "Finance",
+  eng_mgr: "Engineering", technician: "Engineering",
+  hr_mgr: "Human Resources",
+  sales_mgr: "Sales", sales_exec: "Sales",
+  mkt_mgr: "Marketing", mkt_exec: "Marketing",
+};
+
+const DEPT_ICONS: Record<string, any> = {
+  Management: Briefcase,
+  "Front Office": UserCheck,
+  Housekeeping: Building2,
+  "Food & Beverage": Users,
+  Finance: Briefcase,
+  Engineering: Building2,
+  "Human Resources": Users,
+  Sales: Briefcase,
+  Marketing: Briefcase,
+};
+
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  active: { label: "Active", cls: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]" },
+  inactive: { label: "Inactive", cls: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]" },
+  on_leave: { label: "On Leave", cls: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]" },
+};
+
+// ─── HELPERS ────────────────────────────────────────────────────────
+function getInitials(firstName?: string, lastName?: string): string {
+  const f = firstName?.trim()?.[0] ?? "";
+  const l = lastName?.trim()?.[0] ?? "";
+  return (f + l).toUpperCase() || "?";
+}
+
+function getDepartment(emp: any): string {
+  if (emp.department?.name) return emp.department.name;
+  if (emp.departmentCode) return emp.departmentCode;
+  return ROLE_DEPT[emp.role] || "Unassigned";
+}
+
+function getRoleLabel(role: string): string {
+  return ROLE_LABEL[role] || role?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Staff";
+}
+
+function getStatus(emp: any): string {
+  if (emp.isActive === false) return "inactive";
+  if (emp.isOnLeave) return "on_leave";
+  return "active";
+}
+
+// ─── EMPLOYEE DETAIL DIALOG ────────────────────────────────────────
+function EmployeeDetailDialog({ employee, open, onClose }: { employee: any | null; open: boolean; onClose: () => void }) {
+  if (!employee) return null;
+  const status = getStatus(employee);
+  const statusMeta = STATUS_META[status] || STATUS_META.active;
+  const dept = getDepartment(employee);
+
   return (
-    <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="attendance">Attendance</TabsTrigger>
-        <TabsTrigger value="employees">Employees</TabsTrigger>
-        <TabsTrigger value="payroll">Payroll</TabsTrigger>
-        <TabsTrigger value="events">Events</TabsTrigger>
-        <TabsTrigger value="scorecards">Scorecards</TabsTrigger>
-      </TabsList>
-      <TabsContent value="overview"><OverviewTab /></TabsContent>
-      <TabsContent value="attendance"><AttendanceTab /></TabsContent>
-      <TabsContent value="employees"><EmployeesTab /></TabsContent>
-      <TabsContent value="payroll"><PayrollTab /></TabsContent>
-      <TabsContent value="events"><EventsTab /></TabsContent>
-      <TabsContent value="scorecards"><ScorecardsTab /></TabsContent>
-    </Tabs>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <Avatar className="h-14 w-14 border-2 border-[#1B3A6B]">
+              {employee.avatarUrl ? <AvatarImage src={employee.avatarUrl} alt={employee.firstName} /> : null}
+              <AvatarFallback className="bg-[#1B3A6B] text-white text-lg font-bold">
+                {getInitials(employee.firstName, employee.lastName)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-lg font-semibold">{employee.firstName} {employee.lastName}</p>
+              <p className="text-sm text-muted-foreground">{getRoleLabel(employee.role)}</p>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="flex items-center gap-2">
+            <Badge className={cn("text-xs border", statusMeta.cls)}>{statusMeta.label}</Badge>
+            {employee.employeeCode && <Badge variant="outline" className="text-xs">{employee.employeeCode}</Badge>}
+          </div>
+          <Separator />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Department:</span>
+              <span className="font-medium">{dept}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Email:</span>
+              <span className="font-medium truncate">{employee.email || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Phone:</span>
+              <span className="font-medium">{employee.phone || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Joined:</span>
+              <span className="font-medium">{employee.joinDate ? fmtDate(employee.joinDate) : "—"}</span>
+            </div>
+          </div>
+          {employee.property?.name && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground">Property:</span>
+                <span className="font-medium">{employee.property.name}</span>
+              </div>
+            </>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-// ─── TAB 1: OVERVIEW ───────────────────────────────────────────────
-function OverviewTab() {
-  const { data: empData, loading: l1 } = useApi<any>("/api/hr/employees?isActive=all", []);
-  const { data: attData, loading: l2 } = useApi<any>(`/api/hr/attendance?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
-  const { data: scoreData, loading: l3 } = useApi<any>(`/api/hr/scorecards?period=${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`, []);
-  const { data: eventData, loading: l4 } = useApi<any>(`/api/hr/events?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
+// ─── SKELETON LOADER ───────────────────────────────────────────────
+function SkeletonGrid() {
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="h-80 rounded-xl" />
+    </div>
+  );
+}
 
-  if (l1 || l2 || l3 || l4 || !empData) return <SkeletonGrid />;
+// ─── MAIN COMPONENT ────────────────────────────────────────────────
+const STAFF_TABS = [
+  { key: "directory", label: "Directory", icon: Users },
+  { key: "departments", label: "Departments", icon: Building2 },
+  { key: "orgchart", label: "Org Chart", icon: PieChartIcon },
+];
 
-  const emps: any[] = Array.isArray(empData) ? empData : [];
-  const totalEmployees = emps.length;
-  const activeCount = emps.filter((e: any) => e.isActive).length;
-  const byDepartment: Record<string, number> = {};
-  for (const e of emps) {
-    const d = e.department || "Unassigned";
-    byDepartment[d] = (byDepartment[d] || 0) + 1;
-  }
-  const attSummary = (attData as any).summary || {};
-  const overallStats = (scoreData as any).overallStats || {};
-  const events = (eventData as any).events || [];
-  const scorecards = (scoreData as any).scorecards || [];
-  const byDept = byDepartment;
+export function StaffModule() {
+  const { activeSubModule, setActiveSubModule } = useAppStore();
+  const [localTab, setLocalTab] = useState("directory");
+  const tab = (activeSubModule && STAFF_TABS.some(t => t.key === activeSubModule)) ? activeSubModule : localTab;
 
-  // Attendance trend (last 7 days)
-  const attRecords = (attData as any).attendance || [];
-  const trend: { name: string; Present: number; Absent: number }[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
-    const dayRecs = attRecords.filter((r: any) => new Date(r.date).toISOString().slice(0, 10) === ds);
-    trend.push({
-      name: d.toLocaleDateString("en-IN", { weekday: "short" }),
-      Present: dayRecs.filter((r: any) => r.status === "present" || r.status === "late").length,
-      Absent: dayRecs.filter((r: any) => r.status === "absent").length,
+  const handleTabChange = (newTab: string) => {
+    setLocalTab(newTab);
+    if (STAFF_TABS.some(t => t.key === newTab)) {
+      setActiveSubModule(newTab);
+    }
+  };
+
+  const activeTabMeta = STAFF_TABS.find(t => t.key === tab);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1B3A6B]/10">
+          <UserCheck className="h-4.5 w-4.5 text-[#1B3A6B]" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-bold tracking-tight text-foreground">Staff Directory</h2>
+          <p className="text-xs text-muted-foreground">{activeTabMeta?.label ?? "Directory"} · People & Organization</p>
+        </div>
+      </div>
+
+      <Tabs value={tab} onValueChange={handleTabChange} className="space-y-4">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="directory">Directory</TabsTrigger>
+          <TabsTrigger value="departments">Departments</TabsTrigger>
+          <TabsTrigger value="orgchart">Org Chart</TabsTrigger>
+        </TabsList>
+        <TabsContent value="directory"><DirectoryTab /></TabsContent>
+        <TabsContent value="departments"><DepartmentsTab /></TabsContent>
+        <TabsContent value="orgchart"><OrgChartTab /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ─── TAB 1: DIRECTORY ──────────────────────────────────────────────
+function DirectoryTab() {
+  const { data: empData, loading, error } = useApi<any>("/api/hr/employees?isActive=all", []);
+  const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const employees: any[] = useMemo(() => {
+    if (!empData) return [];
+    return Array.isArray(empData) ? empData : [];
+  }, [empData]);
+
+  // Derive department list from data
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    employees.forEach((e) => set.add(getDepartment(e)));
+    return Array.from(set).sort();
+  }, [employees]);
+
+  // Filtered list
+  const filtered = useMemo(() => {
+    let list = [...employees];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (e) =>
+          `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+          (e.email || "").toLowerCase().includes(q) ||
+          (e.phone || "").includes(q) ||
+          (e.employeeCode || "").toLowerCase().includes(q) ||
+          getRoleLabel(e.role).toLowerCase().includes(q) ||
+          getDepartment(e).toLowerCase().includes(q)
+      );
+    }
+    if (deptFilter !== "all") {
+      list = list.filter((e) => getDepartment(e) === deptFilter);
+    }
+    if (statusFilter !== "all") {
+      if (statusFilter === "active") list = list.filter((e) => getStatus(e) === "active");
+      else if (statusFilter === "inactive") list = list.filter((e) => getStatus(e) === "inactive");
+      else if (statusFilter === "on_leave") list = list.filter((e) => getStatus(e) === "on_leave");
+    }
+    // Sort: active first, then by role level, then name
+    list.sort((a, b) => {
+      const sa = getStatus(a) === "active" ? 0 : getStatus(a) === "on_leave" ? 1 : 2;
+      const sb = getStatus(b) === "active" ? 0 : getStatus(b) === "on_leave" ? 1 : 2;
+      if (sa !== sb) return sa - sb;
+      const la = ROLE_LEVEL[a.role] ?? 9;
+      const lb = ROLE_LEVEL[b.role] ?? 9;
+      if (la !== lb) return la - lb;
+      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
     });
-  }
+    return list;
+  }, [employees, search, deptFilter, statusFilter]);
 
-  const deptPie = Object.entries(byDept).map(([name, value]) => ({ name, value: value as number }));
+  // KPI stats
+  const totalStaff = employees.length;
+  const activeStaff = employees.filter((e) => getStatus(e) === "active").length;
+  const onLeave = employees.filter((e) => getStatus(e) === "on_leave").length;
+  const deptCount = departments.length;
 
-  // Estimate monthly payroll from active employees
-  const avgSalary = 45000;
-  const estPayroll = activeCount * avgSalary;
+  const openDetail = (emp: any) => {
+    setSelectedEmp(emp);
+    setDetailOpen(true);
+  };
+
+  if (loading) return <SkeletonGrid />;
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <KpiCard label="Total Staff" value={totalEmployees} icon={Users} accent="navy" />
-        <KpiCard label="Active Today" value={activeCount} icon={UserCheck} accent="success" />
-        <KpiCard label="Attendance Rate" value={attSummary.attendanceRate ?? 0} unit="%" icon={Percent} accent="gold" />
-        <KpiCard label="Avg Score" value={overallStats.averageScore ?? 0} icon={Star} accent="info" />
-        <KpiCard label="Open Positions" value={3} icon={Briefcase} accent="warning" hint="FOM, Chef, HK" />
-        <KpiCard label="Monthly Payroll" value={fmtINR(estPayroll)} icon={IndianRupee} accent="error" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Attendance Trend (7 days)</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={trend}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} /><Tooltip /><Legend />
-                <Bar dataKey="Present" fill={CC[0]} radius={[4,4,0,0]} /><Bar dataKey="Absent" fill={CC[4]} radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Department Distribution</CardTitle></CardHeader>
-          <CardContent>
-            {deptPie.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart><Pie data={deptPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
-                  {deptPie.map((_, i) => <Cell key={i} fill={CC[i % CC.length]} />)}
-                </Pie><Tooltip /></PieChart>
-              </ResponsiveContainer>
-            ) : <p className="text-sm text-muted-foreground text-center py-10">No department data</p>}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Recent Events</CardTitle></CardHeader>
-          <CardContent className="max-h-64 overflow-y-auto">
-            {events.length === 0 ? <p className="text-sm text-muted-foreground">No events this month</p> :
-              events.slice(0, 8).map((e: any) => (
-                <div key={e.id} className="flex items-center gap-3 py-2 border-b last:border-0">
-                  <Badge className={cn("text-[10px]", EVENT_COLORS[e.type] || "bg-muted")}>{e.type}</Badge>
-                  <div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{e.title}</p><p className="text-xs text-muted-foreground">{fmtDate(e.eventDate)}</p></div>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Top Performers</CardTitle></CardHeader>
-          <CardContent className="max-h-64 overflow-y-auto">
-            {scorecards.length === 0 ? <p className="text-sm text-muted-foreground">No scorecard data</p> :
-              scorecards.slice(0, 6).map((sc: any) => (
-                <div key={sc.id} className="flex items-center gap-3 py-2 border-b last:border-0">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1B3A6B] text-white text-xs font-bold">{(sc.userName||"?")[0]}</div>
-                  <div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{sc.userName}</p><p className="text-xs text-muted-foreground">{sc.department || sc.departmentCode || "—"}</p></div>
-                  <Badge className={cn("text-[10px]", GRADE_COLORS[sc.grade] || "")}>{sc.grade} — {sc.overallScore}</Badge>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ─── TAB 2: ATTENDANCE ─────────────────────────────────────────────
-function AttendanceTab() {
-  const [month, setMonth] = useState(String(now.getMonth() + 1));
-  const [year, setYear] = useState(String(now.getFullYear()));
-  const [view, setView] = useState("monthly");
-  const [markOpen, setMarkOpen] = useState(false);
-  const [form, setForm] = useState({ userId: "", date: "", checkIn: "", checkOut: "", status: "present" });
-  const { data: empData } = useApi<any>("/api/hr/employees?isActive=true", []);
-  const { data, loading, reload } = useApi<any>(`/api/hr/attendance?month=${month}&year=${year}&view=${view}`, [month, year, view]);
-  const { triggerRefresh } = useAppStore();
-
-  const employees: any[] = Array.isArray(empData) ? empData : [];
-  const summary = data?.summary || {};
-  const records: any[] = data?.attendance || data?.todayAttendance || [];
-
-  const handleMark = async () => {
-    try {
-      await apiPost("/api/hr/attendance", { ...form, source: "manual" });
-      toast.success("Attendance recorded"); setMarkOpen(false); reload(); triggerRefresh();
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  const markAllPresent = async () => {
-    try {
-      const recs = employees.map((e: any) => ({ userId: e.id, date: new Date().toISOString().slice(0, 10), status: "present" as const }));
-      await apiPut("/api/hr/attendance", { records: recs });
-      toast.success(`Marked ${recs.length} present`); reload(); triggerRefresh();
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  if (loading || !data) return <SkeletonGrid />;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
-        </Select>
-        <Input className="w-24" value={year} onChange={(e) => setYear(e.target.value)} placeholder="Year" />
-        <div className="flex gap-1">
-          {["daily","weekly","monthly"].map(v => (
-            <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{v.charAt(0).toUpperCase()+v.slice(1)}</Button>
-          ))}
-        </div>
-        <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={markAllPresent}><CheckCheck className="h-3.5 w-3.5 mr-1" />Mark All Present</Button>
-          <Button size="sm" variant="outline" onClick={() => toast.info("Excel upload coming soon")}><Upload className="h-3.5 w-3.5 mr-1" />Upload Excel</Button>
-          <Button size="sm" onClick={() => setMarkOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" />Mark Attendance</Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <KpiCard label="Present" value={summary.totalPresent ?? 0} icon={UserCheck} accent="success" />
-        <KpiCard label="Absent" value={summary.totalAbsent ?? 0} icon={Users} accent="error" />
-        <KpiCard label="Late" value={summary.totalLate ?? 0} icon={Clock} accent="warning" />
-        <KpiCard label="Half Day" value={summary.totalHalfDay ?? 0} icon={Percent} accent="info" />
-        <KpiCard label="On Leave" value={summary.totalOnLeave ?? 0} icon={CalendarDays} accent="navy" />
-        <KpiCard label="Att. Rate" value={summary.attendanceRate ?? 0} unit="%" icon={BarChart3} accent="gold" />
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead>Employee</TableHead><TableHead>Date</TableHead><TableHead>Check-In</TableHead><TableHead>Check-Out</TableHead>
-            <TableHead>Hours</TableHead><TableHead>Overtime</TableHead><TableHead>Status</TableHead><TableHead>Source</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {records.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No attendance records</TableCell></TableRow>
-            ) : records.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.user?.firstName} {r.user?.lastName}<p className="text-[10px] text-muted-foreground">{r.user?.employeeCode}</p></TableCell>
-                <TableCell className="font-mono-num text-xs">{fmtDate(r.date)}</TableCell>
-                <TableCell className="font-mono-num text-xs">{r.checkIn ? fmtDateTime(r.checkIn) : "—"}</TableCell>
-                <TableCell className="font-mono-num text-xs">{r.checkOut ? fmtDateTime(r.checkOut) : "—"}</TableCell>
-                <TableCell className="font-mono-num text-xs">{r.workHours ?? "—"}</TableCell>
-                <TableCell className="font-mono-num text-xs">{r.overtimeHours || "—"}</TableCell>
-                <TableCell><Badge className={cn("text-[10px] border", ATTENDANCE_COLORS[r.status] || "")}>{r.status?.replace("_"," ")}</Badge></TableCell>
-                <TableCell className="text-xs capitalize">{r.source}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <Dialog open={markOpen} onOpenChange={setMarkOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Mark Attendance</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Employee</Label><Select value={form.userId} onValueChange={v => setForm(f => ({ ...f, userId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-              <SelectContent>{employees.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.fullName}</SelectItem>)}</SelectContent>
-            </Select></div>
-            <div><Label>Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Check-In</Label><Input type="time" value={form.checkIn} onChange={e => setForm(f => ({ ...f, checkIn: e.target.value }))} /></div>
-              <div><Label>Check-Out</Label><Input type="time" value={form.checkOut} onChange={e => setForm(f => ({ ...f, checkOut: e.target.value }))} /></div>
-            </div>
-            <div><Label>Status</Label><Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["present","absent","late","half_day","on_leave"].map(s => <SelectItem key={s} value={s}>{s.replace("_"," ")}</SelectItem>)}</SelectContent>
-            </Select></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setMarkOpen(false)}>Cancel</Button><Button onClick={handleMark}>Save</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// ─── TAB 3: EMPLOYEES ──────────────────────────────────────────────
-function EmployeesTab() {
-  const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("all");
-  const [addOpen, setAddOpen] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", role: "", department: "", phone: "" });
-  const { data, loading, reload } = useApi<any>(`/api/hr/employees?isActive=all${search ? `&search=${search}` : ""}${deptFilter !== "all" ? `&department=${deptFilter}` : ""}`, [search, deptFilter]);
-  const { triggerRefresh } = useAppStore();
-
-  const employees: any[] = Array.isArray(data) ? data : [];
-  const summary = (data as any)?.summary || {};
-  const departments = Object.keys(summary.byDepartment || {});
-
-  const resetForm = () => setForm({ firstName: "", lastName: "", email: "", role: "", department: "", phone: "" });
-
-  const handleSave = async () => {
-    try {
-      const body = { ...form, departmentId: form.department || undefined };
-      if (editItem) { await apiPut("/api/hr/employees", { id: editItem.id, ...body }); toast.success("Employee updated"); }
-      else { await apiPost("/api/hr/employees", body); toast.success("Employee added"); }
-      setAddOpen(false); setEditItem(null); resetForm(); reload(); triggerRefresh();
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  const handleDelete = async (id: string) => {
-    try { await apiPut("/api/hr/employees", { id, isActive: false }); toast.success("Employee deactivated"); reload(); triggerRefresh(); }
-    catch (e: any) { toast.error(e.message); }
-  };
-
-  if (loading || !data) return <SkeletonGrid />;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} /></div>
-        <Select value={deptFilter} onValueChange={setDeptFilter}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Department" /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All Departments</SelectItem>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-        </Select>
-        <Button size="sm" onClick={() => { resetForm(); setEditItem(null); setAddOpen(true); }}><Plus className="h-3.5 w-3.5 mr-1" />Add Employee</Button>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead>Photo</TableHead><TableHead>Name</TableHead><TableHead>Code</TableHead><TableHead>Department</TableHead>
-            <TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Email</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {employees.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No employees found</TableCell></TableRow>
-            ) : employees.map((e: any) => (
-              <TableRow key={e.id}>
-                <TableCell><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1B3A6B] text-white text-xs font-bold">{e.firstName?.[0]}{e.lastName?.[0]}</div></TableCell>
-                <TableCell className="font-medium">{e.fullName}</TableCell>
-                <TableCell className="font-mono-num text-xs">{e.employeeCode}</TableCell>
-                <TableCell className="text-xs">{e.department || "—"}</TableCell>
-                <TableCell className="text-xs">{ROLE_LABEL[e.role] || e.role}</TableCell>
-                <TableCell className="text-xs">{e.phone || "—"}</TableCell>
-                <TableCell className="text-xs truncate max-w-[180px]">{e.email}</TableCell>
-                <TableCell><Badge className={cn("text-[10px]", e.isActive ? "bg-[#DCFCE7] text-[#14532D]" : "bg-muted text-muted-foreground")}>{e.isActive ? "Active" : "Inactive"}</Badge></TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setForm({ firstName: e.firstName, lastName: e.lastName, email: e.email, role: e.role, department: e.departmentCode || "", phone: e.phone || "" }); setEditItem(e); setAddOpen(true); }}><Pencil className="h-3 w-3" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-[#DC2626]" onClick={() => handleDelete(e.id)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent><DialogHeader><DialogTitle>{editItem ? "Edit Employee" : "Add Employee"}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>First Name</Label><Input value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} /></div>
-            <div><Label>Last Name</Label><Input value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} /></div>
-            <div className="col-span-2"><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
-            <div><Label>Role</Label><Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-              <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}</SelectContent>
-            </Select></div>
-            <div><Label>Department</Label><Select value={form.department} onValueChange={v => setForm(f => ({ ...f, department: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select dept" /></SelectTrigger>
-              <SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-            </Select></div>
-            <div className="col-span-2"><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => { setAddOpen(false); setEditItem(null); }}>Cancel</Button><Button onClick={handleSave}>{editItem ? "Update" : "Add"}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// ─── TAB 4: PAYROLL ────────────────────────────────────────────────
-function PayrollTab() {
-  const [month, setMonth] = useState(String(now.getMonth() + 1));
-  const [year, setYear] = useState(String(now.getFullYear()));
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [slipItem, setSlipItem] = useState<any>(null);
-  const { data, loading, reload } = useApi<any>(`/api/hr/payroll?month=${month}&year=${year}${statusFilter !== "all" ? `&status=${statusFilter}` : ""}`, [month, year, statusFilter]);
-  const { triggerRefresh } = useAppStore();
-
-  const summary = data?.summary || {};
-  const records: any[] = data?.records || [];
-
-  const handleAction = async (action: string) => {
-    try {
-      const res: any = await apiPost("/api/hr/payroll", { action, month: Number(month), year: Number(year) });
-      toast.success(res.message || `${action} done`); reload(); triggerRefresh();
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  if (loading || !data) return <SkeletonGrid />;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
-        </Select>
-        <Input className="w-24" value={year} onChange={e => setYear(e.target.value)} placeholder="Year" />
-        <div className="flex gap-1">
-          {[{ v: "all", l: "All" }, { v: "draft", l: "Draft" }, { v: "processed", l: "Processed" }, { v: "paid", l: "Paid" }].map(({ v, l }) => (
-            <Button key={v} size="sm" variant={statusFilter === v ? "default" : "outline"} onClick={() => setStatusFilter(v)}>{l}</Button>
-          ))}
-        </div>
-        <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleAction("generate")}><FileText className="h-3.5 w-3.5 mr-1" />Generate</Button>
-          <Button size="sm" variant="outline" onClick={() => handleAction("process")}><CheckCheck className="h-3.5 w-3.5 mr-1" />Process All</Button>
-          <Button size="sm" onClick={() => handleAction("pay")}><IndianRupee className="h-3.5 w-3.5 mr-1" />Mark Paid</Button>
-        </div>
-      </div>
-
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Total Gross" value={fmtINR(summary.totalGrossEarnings ?? 0)} icon={IndianRupee} accent="navy" />
-        <KpiCard label="Total Deductions" value={fmtINR(summary.totalDeductions ?? 0)} icon={Percent} accent="error" />
-        <KpiCard label="Total Net Pay" value={fmtINR(summary.totalNetPay ?? 0)} icon={IndianRupee} accent="success" />
-        <KpiCard label="Employees" value={summary.employeeCount ?? 0} icon={Users} accent="gold" />
+        <KpiCard label="Total Staff" value={totalStaff} icon={Users} accent="navy" />
+        <KpiCard label="Active" value={activeStaff} icon={UserCheck} accent="success" />
+        <KpiCard label="On Leave" value={onLeave} icon={MapPin} accent="warning" />
+        <KpiCard label="Departments" value={deptCount} icon={Building2} accent="gold" />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead>Employee</TableHead><TableHead>Basic</TableHead><TableHead>HRA</TableHead><TableHead>Gross</TableHead>
-            <TableHead>PF/ESI/PT</TableHead><TableHead>Deductions</TableHead><TableHead>Net Pay</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {records.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No payroll records. Click Generate to create.</TableCell></TableRow>
-            ) : records.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.user?.fullName}<p className="text-[10px] text-muted-foreground">{r.user?.employeeCode}</p></TableCell>
-                <TableCell className="font-mono-num text-xs">{fmtINR(r.basicSalary)}</TableCell>
-                <TableCell className="font-mono-num text-xs">{fmtINR(r.hra)}</TableCell>
-                <TableCell className="font-mono-num text-xs">{fmtINR(r.grossEarnings)}</TableCell>
-                <TableCell className="font-mono-num text-xs">{fmtINR(r.pf + r.esi + r.pt)}</TableCell>
-                <TableCell className="font-mono-num text-xs">{fmtINR(r.totalDeductions)}</TableCell>
-                <TableCell className="font-mono-num text-xs font-bold">{fmtINR(r.netPay)}</TableCell>
-                <TableCell><Badge className={cn("text-[10px] border", PAYROLL_COLORS[r.status] || "")}>{r.status}</Badge></TableCell>
-                <TableCell><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setSlipItem(r)}><Eye className="h-3 w-3" /></Button></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Search & Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, email, role, department..."
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={deptFilter} onValueChange={setDeptFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[140px]">
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="on_leave">On Leave</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Salary Slip Dialog */}
-      <Dialog open={!!slipItem} onOpenChange={() => setSlipItem(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle className="font-display text-center">The Aurelian Grand — Salary Slip</DialogTitle></DialogHeader>
-          {slipItem && (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-2 border-b pb-3">
-                <p><span className="text-muted-foreground">Name:</span> <strong>{slipItem.user?.fullName}</strong></p>
-                <p><span className="text-muted-foreground">Code:</span> {slipItem.user?.employeeCode}</p>
-                <p><span className="text-muted-foreground">Department:</span> {slipItem.user?.department || "—"}</p>
-                <p><span className="text-muted-foreground">Period:</span> {MONTHS[(slipItem.month||1)-1]} {slipItem.year}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Earnings</p>
-                  {[["Basic", slipItem.basicSalary],["HRA", slipItem.hra],["DA", slipItem.da],["Conveyance", slipItem.conveyance],
-                    ["Medical", slipItem.medical],["Special Allow", slipItem.specialAllow],["Overtime", slipItem.overtime],["Bonus", slipItem.bonus],
-                  ].map(([l, v]) => <div key={l as string} className="flex justify-between py-0.5"><span className="text-muted-foreground">{l}</span><span className="font-mono-num">{fmtINR(v as number)}</span></div>)
-                  }<div className="flex justify-between border-t pt-1 mt-1 font-bold"><span>Gross</span><span className="font-mono-num">{fmtINR(slipItem.grossEarnings)}</span></div>
-                </div>
-                <div>
-                  <p className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Deductions</p>
-                  {[["PF", slipItem.pf],["ESI", slipItem.esi],["Tax", slipItem.tax],["PT", slipItem.pt],
-                    ["Loan", slipItem.loanDeduction],["Other", slipItem.otherDeductions],
-                  ].map(([l, v]) => <div key={l as string} className="flex justify-between py-0.5"><span className="text-muted-foreground">{l}</span><span className="font-mono-num">{fmtINR(v as number)}</span></div>)
-                  }<div className="flex justify-between border-t pt-1 mt-1 font-bold"><span>Total Ded.</span><span className="font-mono-num">{fmtINR(slipItem.totalDeductions)}</span></div>
-                </div>
-              </div>
-              <div className="rounded-lg bg-[#1B3A6B] text-white p-3 text-center">
-                <p className="text-xs uppercase tracking-wider">Net Pay</p>
-                <p className="font-display text-2xl font-bold font-mono-num">{fmtINR(slipItem.netPay)}</p>
-              </div>
+      {/* Staff Table */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="font-display text-base">Staff Directory</CardTitle>
+          <CardDescription className="text-xs">
+            Showing {filtered.length} of {totalStaff} employees
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Users className="h-12 w-12 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">No employees found</p>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filters</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[280px]">Employee</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="hidden md:table-cell">Department</TableHead>
+                    <TableHead className="hidden lg:table-cell">Email</TableHead>
+                    <TableHead className="hidden lg:table-cell">Phone</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((emp) => {
+                    const status = getStatus(emp);
+                    const statusMeta = STATUS_META[status] || STATUS_META.active;
+                    const dept = getDepartment(emp);
+                    return (
+                      <TableRow
+                        key={emp.id}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => openDetail(emp)}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 border border-border">
+                              {emp.avatarUrl ? <AvatarImage src={emp.avatarUrl} alt={emp.firstName} /> : null}
+                              <AvatarFallback
+                                className="text-xs font-bold"
+                                style={{
+                                  backgroundColor: NAVY,
+                                  color: "white",
+                                }}
+                              >
+                                {getInitials(emp.firstName, emp.lastName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate">
+                                {emp.firstName} {emp.lastName}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {emp.employeeCode || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{getRoleLabel(emp.role)}</span>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <span className="text-sm text-muted-foreground">{dept}</span>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className="text-sm text-muted-foreground truncate max-w-[180px] block">
+                            {emp.email || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className="text-sm text-muted-foreground">{emp.phone || "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={cn("text-[10px] border", statusMeta.cls)}>
+                            {statusMeta.label}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => toast.info("Print functionality coming soon")}><Printer className="h-3.5 w-3.5 mr-1" />Print</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+
+      {/* Employee Detail Dialog */}
+      <EmployeeDetailDialog
+        employee={selectedEmp}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </div>
   );
 }
 
-// ─── TAB 5: EVENTS ─────────────────────────────────────────────────
-function EventsTab() {
-  const [month, setMonth] = useState(String(now.getMonth() + 1));
-  const [year, setYear] = useState(String(now.getFullYear()));
-  const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" });
-  const { data, loading, reload } = useApi<any>(`/api/hr/events?month=${month}&year=${year}`, [month, year]);
-  const { triggerRefresh } = useAppStore();
+// ─── TAB 2: DEPARTMENTS ────────────────────────────────────────────
+function DepartmentsTab() {
+  const { data: empData, loading } = useApi<any>("/api/hr/employees?isActive=all", []);
 
-  const events: any[] = data?.events || [];
+  const employees: any[] = useMemo(() => {
+    if (!empData) return [];
+    return Array.isArray(empData) ? empData : [];
+  }, [empData]);
 
-  const handleSave = async () => {
-    try {
-      await apiPost("/api/hr/events", form);
-      toast.success("Event created"); setAddOpen(false); setForm({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" }); reload(); triggerRefresh();
-    } catch (e: any) { toast.error(e.message); }
+  // Group by department
+  const deptGroups = useMemo(() => {
+    const map = new Map<string, any[]>();
+    employees.forEach((emp) => {
+      const dept = getDepartment(emp);
+      if (!map.has(dept)) map.set(dept, []);
+      map.get(dept)!.push(emp);
+    });
+    // Sort employees within each department by role level
+    map.forEach((emps) => {
+      emps.sort((a, b) => (ROLE_LEVEL[a.role] ?? 9) - (ROLE_LEVEL[b.role] ?? 9));
+    });
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [employees]);
+
+  // Pie chart data
+  const pieData = useMemo(
+    () => deptGroups.map(([name, emps]) => ({ name, value: emps.length })),
+    [deptGroups]
+  );
+
+  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const openDetail = (emp: any) => {
+    setSelectedEmp(emp);
+    setDetailOpen(true);
   };
 
-  if (loading || !data) return <SkeletonGrid />;
+  if (loading) return <SkeletonGrid />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
-        </Select>
-        <Input className="w-24" value={year} onChange={e => setYear(e.target.value)} placeholder="Year" />
-        <div className="ml-auto"><Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" />Add Event</Button></div>
+    <div className="space-y-5">
+      {/* Department Distribution Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="font-display text-sm">Department Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    innerRadius={50}
+                    paddingAngle={3}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={true}
+                  >
+                    {pieData.map((_, i) => (
+                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number, name: string) => [`${value} employees`, name]}
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[280px] text-sm text-muted-foreground">
+                No department data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="font-display text-sm">Department Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {deptGroups.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">No departments found</p>
+            ) : (
+              <div className="space-y-2">
+                {deptGroups.map(([dept, emps], idx) => {
+                  const activeCount = emps.filter((e) => getStatus(e) === "active").length;
+                  const color = CHART_COLORS[idx % CHART_COLORS.length];
+                  return (
+                    <div
+                      key={dept}
+                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors"
+                    >
+                      <div
+                        className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: color + "18" }}
+                      >
+                        <Building2 className="h-5 w-5" style={{ color }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{dept}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {emps.length} member{emps.length !== 1 ? "s" : ""} &middot; {activeCount} active
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold" style={{ color }}>
+                          {emps.length}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {events.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground"><CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No events this month</p></div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto">
-          {events.map((e: any) => (
-            <Card key={e.id} className="hover:shadow-card-lg transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold truncate">{e.title}</p>
-                    <Badge className={cn("mt-1 text-[10px] border", EVENT_COLORS[e.type] || "bg-muted")}>{e.type}</Badge>
+      {/* Department Cards */}
+      <div className="space-y-4">
+        {deptGroups.map(([dept, emps], idx) => {
+          const color = CHART_COLORS[idx % CHART_COLORS.length];
+          const head = emps.find((e) => ROLE_LEVEL[e.role] <= 3);
+          return (
+            <Card key={dept} className="overflow-hidden">
+              <div className="h-1.5" style={{ backgroundColor: color }} />
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-10 w-10 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: color + "18" }}
+                    >
+                      <Building2 className="h-5 w-5" style={{ color }} />
+                    </div>
+                    <div>
+                      <CardTitle className="font-display text-base">{dept}</CardTitle>
+                      <CardDescription className="text-xs">
+                        {emps.length} member{emps.length !== 1 ? "s" : ""}
+                        {head ? ` · Head: ${head.firstName} ${head.lastName}` : ""}
+                      </CardDescription>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">{e.status}</Badge>
+                  <Badge variant="outline" className="text-xs" style={{ borderColor: color, color }}>
+                    {emps.length}
+                  </Badge>
                 </div>
-                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                  <p className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{fmtDate(e.eventDate)}{e.endDate ? ` — ${fmtDate(e.endDate)}` : ""}</p>
-                  {e.venue && <p className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{e.venue}</p>}
-                  {e.organizerName && <p className="flex items-center gap-1.5"><UserCircle className="h-3 w-3" />{e.organizerName}</p>}
+              </CardHeader>
+              <CardContent className="pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {emps.map((emp) => {
+                    const status = getStatus(emp);
+                    const statusMeta = STATUS_META[status] || STATUS_META.active;
+                    return (
+                      <div
+                        key={emp.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 cursor-pointer transition-colors"
+                        onClick={() => openDetail(emp)}
+                      >
+                        <Avatar className="h-10 w-10 border shrink-0" style={{ borderColor: color }}>
+                          {emp.avatarUrl ? <AvatarImage src={emp.avatarUrl} alt={emp.firstName} /> : null}
+                          <AvatarFallback className="text-xs font-bold" style={{ backgroundColor: color, color: "white" }}>
+                            {getInitials(emp.firstName, emp.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate">{emp.firstName} {emp.lastName}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{getRoleLabel(emp.role)}</p>
+                          <Badge className={cn("text-[9px] border mt-1 px-1.5 py-0", statusMeta.cls)}>
+                            {statusMeta.label}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Add Event</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Title</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
-            <div><Label>Type</Label><Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{["festival","training","meeting","celebration","audit"].map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</SelectItem>)}</SelectContent>
-            </Select></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Start Date</Label><Input type="date" value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} /></div>
-              <div><Label>End Date</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
-            </div>
-            <div><Label>Venue</Label><Input value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} /></div>
-            <div><Label>Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={handleSave}>Create</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Employee Detail Dialog */}
+      <EmployeeDetailDialog
+        employee={selectedEmp}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </div>
   );
 }
 
-// ─── TAB 6: SCORECARDS ─────────────────────────────────────────────
-function ScorecardsTab() {
-  const [period, setPeriod] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`);
-  const [addOpen, setAddOpen] = useState(false);
-  const { data: empData } = useApi<any>("/api/hr/employees?isActive=true", []);
-  const { data, loading, reload } = useApi<any>(`/api/hr/scorecards?period=${period}`, [period]);
-  const { triggerRefresh } = useAppStore();
-  const [metrics, setMetrics] = useState({ userId: "", attendance: 90, punctuality: 8, taskCompletion: 85, guestFeedback: 8, teamwork: 7, initiative: 7, grooming: 9, communication: 8 });
+// ─── TAB 3: ORG CHART ──────────────────────────────────────────────
+function OrgChartTab() {
+  const { data: empData, loading } = useApi<any>("/api/hr/employees?isActive=all", []);
 
-  const employees: any[] = Array.isArray(empData) ? empData : [];
-  const overallStats = data?.overallStats || {};
-  const deptAvgs = data?.departmentAverages || {};
-  const scorecards: any[] = data?.scorecards || [];
+  const employees: any[] = useMemo(() => {
+    if (!empData) return [];
+    return Array.isArray(empData) ? empData : [];
+  }, [empData]);
 
-  const deptChartData = Object.entries(deptAvgs).map(([dept, d]: [string, any]) => ({ department: dept, average: d.average }));
+  // Build hierarchy: group by role level, then by department
+  const hierarchy = useMemo(() => {
+    const levels = new Map<number, Map<string, any[]>>();
 
-  const handleSave = async () => {
-    try {
-      await apiPost("/api/hr/scorecards", { ...metrics, period });
-      toast.success("Scorecard saved"); setAddOpen(false); reload(); triggerRefresh();
-    } catch (e: any) { toast.error(e.message); }
+    employees.forEach((emp) => {
+      const level = ROLE_LEVEL[emp.role] ?? 9;
+      const dept = getDepartment(emp);
+
+      if (!levels.has(level)) levels.set(level, new Map());
+      const deptMap = levels.get(level)!;
+      if (!deptMap.has(dept)) deptMap.set(dept, []);
+      deptMap.get(dept)!.push(emp);
+    });
+
+    // Sort each level's employees by name
+    levels.forEach((deptMap) => {
+      deptMap.forEach((emps) => {
+        emps.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+      });
+    });
+
+    return Array.from(levels.entries()).sort(([a], [b]) => a - b);
+  }, [employees]);
+
+  const LEVEL_LABELS: Record<number, string> = {
+    1: "Executive Leadership",
+    2: "General Management",
+    3: "Department Heads",
+    4: "Team Members",
   };
 
-  if (loading || !data) return <SkeletonGrid />;
+  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+
+  const toggleDept = (key: string) => {
+    setExpandedDepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const openDetail = (emp: any) => {
+    setSelectedEmp(emp);
+    setDetailOpen(true);
+  };
+
+  if (loading) return <SkeletonGrid />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 12 }, (_, i) => { const m = now.getMonth() - i; const d = new Date(now.getFullYear(), m, 1); const p = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; return p; })
-              .filter((v, i, a) => a.indexOf(v) === i).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <div className="ml-auto"><Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" />Add Scorecard</Button></div>
+    <div className="space-y-5">
+      {/* Org Overview KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard
+          label="Leadership"
+          value={employees.filter((e) => (ROLE_LEVEL[e.role] ?? 9) <= 2).length}
+          icon={GitBranch}
+          accent="navy"
+        />
+        <KpiCard
+          label="Dept Heads"
+          value={employees.filter((e) => (ROLE_LEVEL[e.role] ?? 9) === 3).length}
+          icon={Briefcase}
+          accent="gold"
+        />
+        <KpiCard
+          label="Team Members"
+          value={employees.filter((e) => (ROLE_LEVEL[e.role] ?? 9) >= 4).length}
+          icon={Users}
+          accent="success"
+        />
+        <KpiCard
+          label="Departments"
+          value={new Set(employees.map((e) => getDepartment(e))).size}
+          icon={Building2}
+          accent="info"
+        />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <KpiCard label="Avg Score" value={overallStats.averageScore ?? 0} icon={Star} accent="gold" />
-        <KpiCard label="A+ Count" value={(overallStats.byGrade || {})["A+"] ?? 0} icon={Award} accent="success" />
-        <KpiCard label="Total Evaluated" value={overallStats.totalEmployees ?? 0} icon={Users} accent="navy" />
+      {/* Hierarchy Cards */}
+      <div className="space-y-6">
+        {hierarchy.map(([level, deptMap]) => {
+          const levelLabel = LEVEL_LABELS[level] || `Level ${level}`;
+          const isExecutive = level <= 2;
+          const isHead = level === 3;
+          const accentColor = isExecutive ? NAVY : isHead ? GOLD : SUCCESS;
+
+          return (
+            <div key={level}>
+              {/* Level Header */}
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="h-8 w-1.5 rounded-full"
+                  style={{ backgroundColor: accentColor }}
+                />
+                <h3 className="font-display text-base font-semibold" style={{ color: accentColor }}>
+                  {levelLabel}
+                </h3>
+                <div className="flex-1 border-b border-dashed" />
+                <Badge variant="outline" className="text-xs">
+                  {Array.from(deptMap.values()).reduce((sum, emps) => sum + emps.length, 0)} people
+                </Badge>
+              </div>
+
+              {/* Executive / GM — special centered layout */}
+              {isExecutive ? (
+                <div className="flex flex-wrap justify-center gap-4">
+                  {Array.from(deptMap.values())
+                    .flat()
+                    .map((emp) => (
+                      <OrgPersonCard
+                        key={emp.id}
+                        emp={emp}
+                        accentColor={accentColor}
+                        large
+                        onClick={() => openDetail(emp)}
+                      />
+                    ))}
+                </div>
+              ) : (
+                /* Department Heads & Members — grouped by department */
+                <div className="space-y-3 ml-4">
+                  {Array.from(deptMap.entries()).map(([dept, emps]) => {
+                    const deptKey = `${level}-${dept}`;
+                    const isExpanded = expandedDepts.has(deptKey);
+                    const deptColor = CHART_COLORS[
+                      Array.from(
+                        new Set(employees.map((e) => getDepartment(e)))
+                      ).indexOf(dept) % CHART_COLORS.length
+                    ] || SUCCESS;
+
+                    return (
+                      <Card key={dept} className="overflow-hidden">
+                        <div
+                          className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                          onClick={() => toggleDept(deptKey)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
+                          <div
+                            className="h-6 w-1.5 rounded-full"
+                            style={{ backgroundColor: deptColor }}
+                          />
+                          <span className="text-sm font-semibold">{dept}</span>
+                          <Badge variant="outline" className="text-[10px] ml-auto">
+                            {emps.length}
+                          </Badge>
+                        </div>
+                        {isExpanded && (
+                          <CardContent className="pt-0 pb-3 px-3">
+                            <div className="flex flex-wrap gap-3 ml-6">
+                              {emps.map((emp) => (
+                                <OrgPersonCard
+                                  key={emp.id}
+                                  emp={emp}
+                                  accentColor={deptColor}
+                                  onClick={() => openDetail(emp)}
+                                />
+                              ))}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {deptChartData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Department Averages</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={deptChartData} layout="vertical"><CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="department" tick={{ fontSize: 11 }} width={100} />
-                <Tooltip /><Bar dataKey="average" fill={CC[0]} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader><TableRow>
-            <TableHead>Employee</TableHead><TableHead>Dept</TableHead><TableHead>Att%</TableHead><TableHead>Punct.</TableHead>
-            <TableHead>Task%</TableHead><TableHead>Feedback</TableHead><TableHead>Team</TableHead><TableHead>Init.</TableHead>
-            <TableHead>Groom.</TableHead><TableHead>Comm.</TableHead><TableHead>Overall</TableHead><TableHead>Grade</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {scorecards.length === 0 ? (
-              <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">No scorecards for this period</TableCell></TableRow>
-            ) : scorecards.map((sc: any) => (
-              <TableRow key={sc.id}>
-                <TableCell className="font-medium">{sc.userName}</TableCell>
-                <TableCell className="text-xs">{sc.department || "—"}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.attendance}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.punctuality}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.taskCompletion}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.guestFeedback}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.teamwork}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.initiative}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.grooming}</TableCell>
-                <TableCell className="font-mono-num text-xs">{sc.communication}</TableCell>
-                <TableCell className="font-mono-num text-xs font-bold">{sc.overallScore}</TableCell>
-                <TableCell><Badge className={cn("text-[10px]", GRADE_COLORS[sc.grade] || "")}>{sc.grade}</Badge></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Add Scorecard</DialogTitle></DialogHeader>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            <div><Label>Employee</Label><Select value={metrics.userId} onValueChange={v => setMetrics(m => ({ ...m, userId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-              <SelectContent>{employees.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.fullName}</SelectItem>)}</SelectContent>
-            </Select></div>
-            {[
-              { key: "attendance", label: "Attendance %", max: 100 }, { key: "punctuality", label: "Punctuality (0-10)", max: 10 },
-              { key: "taskCompletion", label: "Task Completion %", max: 100 }, { key: "guestFeedback", label: "Guest Feedback (0-10)", max: 10 },
-              { key: "teamwork", label: "Teamwork (0-10)", max: 10 }, { key: "initiative", label: "Initiative (0-10)", max: 10 },
-              { key: "grooming", label: "Grooming (0-10)", max: 10 }, { key: "communication", label: "Communication (0-10)", max: 10 },
-            ].map(({ key, label, max }) => (
-              <div key={key}><Label className="text-xs">{label}</Label><Input type="number" min={0} max={max} value={(metrics as any)[key]} onChange={e => setMetrics(m => ({ ...m, [key]: Number(e.target.value) }))} /></div>
-            ))}
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Employee Detail Dialog */}
+      <EmployeeDetailDialog
+        employee={selectedEmp}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </div>
   );
 }
 
-// ─── HELPERS ────────────────────────────────────────────────────────
-function SkeletonGrid() {
-  return <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
+// ─── ORG PERSON CARD ───────────────────────────────────────────────
+function OrgPersonCard({
+  emp,
+  accentColor,
+  large = false,
+  onClick,
+}: {
+  emp: any;
+  accentColor: string;
+  large?: boolean;
+  onClick: () => void;
+}) {
+  const status = getStatus(emp);
+  const statusMeta = STATUS_META[status] || STATUS_META.active;
+  const dept = getDepartment(emp);
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-xl border bg-card hover:shadow-md cursor-pointer transition-all",
+        large ? "p-4 min-w-[240px]" : "p-3"
+      )}
+      onClick={onClick}
+    >
+      <Avatar className={cn("border-2 shrink-0", large ? "h-14 w-14" : "h-10 w-10")} style={{ borderColor: accentColor }}>
+        {emp.avatarUrl ? <AvatarImage src={emp.avatarUrl} alt={emp.firstName} /> : null}
+        <AvatarFallback
+          className={cn("font-bold", large ? "text-base" : "text-xs")}
+          style={{ backgroundColor: accentColor, color: "white" }}
+        >
+          {getInitials(emp.firstName, emp.lastName)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <p className={cn("font-semibold truncate", large ? "text-base" : "text-sm")}>
+          {emp.firstName} {emp.lastName}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{getRoleLabel(emp.role)}</p>
+        {large && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <Badge className={cn("text-[9px] border px-1.5 py-0", statusMeta.cls)}>{statusMeta.label}</Badge>
+            <span className="text-[11px] text-muted-foreground">{dept}</span>
+          </div>
+        )}
+        {large && emp.email && (
+          <div className="flex items-center gap-1 mt-1">
+            <MailOpen className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[11px] text-muted-foreground truncate">{emp.email}</span>
+          </div>
+        )}
+        {large && emp.phone && (
+          <div className="flex items-center gap-1 mt-0.5">
+            <PhoneCall className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[11px] text-muted-foreground">{emp.phone}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

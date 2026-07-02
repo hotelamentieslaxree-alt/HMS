@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAppStore, AuthUser, ROLE_META } from "@/lib/store";
-import { Hotel, Shield, Eye, EyeOff, LogIn, ArrowRight, Star, Users, Sparkles, UtensilsCrossed, Wrench, DollarSign, BarChart3, UserCog, ChevronRight } from "lucide-react";
+import { Hotel, Shield, Eye, EyeOff, LogIn, ArrowRight, Star, Users, Sparkles, UtensilsCrossed, Wrench, DollarSign, BarChart3, UserCog, ChevronRight, TrendingUp, Megaphone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -19,9 +19,14 @@ const QUICK_LOGINS = [
   { email: "deepak.reddy@aurelian.com", role: "eng_mgr", icon: Wrench, color: "#DC2626", label: "Engineering Mgr", desc: "Maintenance & assets" },
   { email: "meera.joshi@aurelian.com", role: "rev_mgr", icon: BarChart3, color: "#7C3AED", label: "Revenue Mgr", desc: "Pricing & analytics" },
   { email: "sunita.pillai@aurelian.com", role: "hr_mgr", icon: UserCog, color: "#BE185D", label: "HR Manager", desc: "Staff & training" },
+  { email: "aditya.sharma@aurelian.com", role: "sales_mgr", icon: TrendingUp, color: "#EA580C", label: "Sales Manager", desc: "Leads & pipeline" },
+  { email: "kavita.menon@aurelian.com", role: "mkt_mgr", icon: Megaphone, color: "#7C3AED", label: "Marketing Mgr", desc: "Campaigns & social" },
   { email: "karthik.s@aurelian.com", role: "receptionist", icon: Users, color: "#0F766E", label: "Receptionist", desc: "Front desk operations" },
   { email: "lakshmi.d@aurelian.com", role: "hk_attendant", icon: Sparkles, color: "#0F766E", label: "HK Attendant", desc: "Cleaning tasks" },
   { email: "ravi.k@aurelian.com", role: "waiter", icon: UtensilsCrossed, color: "#0F766E", label: "Waiter", desc: "Order taking" },
+  { email: "imran.k@aurelian.com", role: "technician", icon: Wrench, color: "#6B7280", label: "Technician", desc: "Repairs & maintenance" },
+  { email: "pooja.b@aurelian.com", role: "sales_exec", icon: TrendingUp, color: "#F97316", label: "Sales Executive", desc: "Lead generation" },
+  { email: "rahul.m@aurelian.com", role: "mkt_exec", icon: Megaphone, color: "#8B5CF6", label: "Marketing Exec", desc: "Social & content" },
 ];
 
 export function LoginPage() {

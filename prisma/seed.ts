@@ -83,6 +83,8 @@ async function main() {
       { name: "Human Resources", code: "HR" },
       { name: "Finance", code: "FIN" },
       { name: "Security", code: "SEC" },
+      { name: "Sales", code: "SALES" },
+      { name: "Marketing", code: "MKT" },
     ].map((d) =>
       db.department.create({ data: { ...d, propertyId: property.id } })
     )
@@ -107,6 +109,10 @@ async function main() {
     { first: "Ravi", last: "Kumar", role: "waiter", level: 4, dept: "FB", email: "ravi.k@aurelian.com", code: "FBS01" },
     { first: "Fatima", last: "Sheikh", role: "waiter", level: 4, dept: "FB", email: "fatima.s@aurelian.com", code: "FBS02" },
     { first: "Imran", last: "Khan", role: "technician", level: 4, dept: "ENG", email: "imran.k@aurelian.com", code: "ENG02" },
+    { first: "Aditya", last: "Sharma", role: "sales_mgr", level: 3, dept: "SALES", email: "aditya.sharma@aurelian.com", code: "SLM01" },
+    { first: "Pooja", last: "Bansal", role: "sales_exec", level: 4, dept: "SALES", email: "pooja.b@aurelian.com", code: "SLS01" },
+    { first: "Kavita", last: "Menon", role: "mkt_mgr", level: 3, dept: "MKT", email: "kavita.menon@aurelian.com", code: "MKM01" },
+    { first: "Rahul", last: "Mehra", role: "mkt_exec", level: 4, dept: "MKT", email: "rahul.m@aurelian.com", code: "MKS01" },
   ];
 
   const users = await Promise.all(

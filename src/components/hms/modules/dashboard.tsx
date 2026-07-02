@@ -37,6 +37,8 @@ export function DashboardModule() {
     role === "eng_mgr" || role === "technician" ? "engineering" :
     role === "rev_mgr" ? "revenue" :
     role === "hr_mgr" ? "hr" :
+    role === "sales_mgr" || role === "sales_exec" ? "sales" :
+    role === "mkt_mgr" || role === "mkt_exec" ? "marketing" :
     "gm"; // fallback
 
   switch (roleLevel) {
@@ -49,6 +51,8 @@ export function DashboardModule() {
     case "engineering": return <EngineeringDashboard />;
     case "revenue": return <RevenueDashboard />;
     case "hr": return <HRDashboard />;
+    case "sales": return <SalesDashboard />;
+    case "marketing": return <MarketingDashboard />;
     default: return <GMDashboard />;
   }
 }
@@ -999,5 +1003,165 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 function Divider() { return <div className="h-8 w-px bg-white/20" />; }
+
+// ─── SALES DASHBOARD ─────────────────────────────────────────────
+function SalesDashboard() {
+  const { data, loading } = useDashboardData();
+  if (loading || !data) return <Skeleton className="h-96" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-2xl font-bold">Sales Dashboard</h2>
+          <p className="text-sm text-muted-foreground">Pipeline performance & deal tracking</p>
+        </div>
+        <Badge className="bg-[#EA580C] text-white border-0">Sales Department</Badge>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Pipeline Value" value="₹24.5L" icon={TrendingUp} accent="warning" delta={18} deltaLabel="vs last month" />
+        <KpiCard label="Won This Month" value="₹8.2L" icon={DollarSign} accent="success" delta={24} deltaLabel="vs last month" />
+        <KpiCard label="Win Rate" value="42%" icon={Percent} accent="navy" delta={5} deltaLabel="improvement" />
+        <KpiCard label="Active Leads" value="38" icon={Users} accent="gold" delta={12} deltaLabel="new this week" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Pipeline by Stage</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { stage: "New", value: 8, fill: "#0369A1" },
+                { stage: "Contacted", value: 12, fill: "#0F766E" },
+                { stage: "Qualified", value: 6, fill: "#C9952A" },
+                { stage: "Proposal", value: 5, fill: "#EA580C" },
+                { stage: "Negotiation", value: 4, fill: "#1B3A6B" },
+                { stage: "Won", value: 3, fill: "#16A34A" },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="stage" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Monthly Revenue</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={[
+                { month: "Oct", revenue: 680000 },
+                { month: "Nov", revenue: 720000 },
+                { month: "Dec", revenue: 950000 },
+                { month: "Jan", revenue: 820000 },
+                { month: "Feb", revenue: 880000 },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip formatter={(v: number) => fmtINR(v)} />
+                <Area type="monotone" dataKey="revenue" stroke="#EA580C" fill="#EA580C" fillOpacity={0.15} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {[
+          { icon: TrendingUp, label: "View Pipeline", desc: "Manage leads & deals" },
+          { icon: Users, label: "Lead Database", desc: "38 active prospects" },
+          { icon: BarChart3, label: "Sales Reports", desc: "Performance analytics" },
+        ].map((a, i) => (
+          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── MARKETING DASHBOARD ─────────────────────────────────────────
+function MarketingDashboard() {
+  const { data, loading } = useDashboardData();
+  if (loading || !data) return <Skeleton className="h-96" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-2xl font-bold">Marketing Dashboard</h2>
+          <p className="text-sm text-muted-foreground">Campaign performance & social analytics</p>
+        </div>
+        <Badge className="bg-[#7C3AED] text-white border-0">Marketing Department</Badge>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Total Spend" value="₹74K" icon={DollarSign} accent="warning" delta={-14.6} deltaLabel="vs last month" />
+        <KpiCard label="ROAS" value="5.88x" icon={TrendingUp} accent="success" delta={11.2} deltaLabel="improvement" />
+        <KpiCard label="Total Followers" value="180K" icon={Users} accent="navy" delta={12.4} deltaLabel="growth" />
+        <KpiCard label="Conversions" value="9.2K" icon={Percent} accent="gold" delta={8.3} deltaLabel="vs last month" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Channel Performance</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { channel: "Instagram", roas: 4.86, fill: "#E4405F" },
+                { channel: "Facebook", roas: 8.28, fill: "#1877F2" },
+                { channel: "Google", roas: 3.49, fill: "#EA4335" },
+                { channel: "LinkedIn", roas: 15.43, fill: "#0A66C2" },
+                { channel: "YouTube", roas: 5.33, fill: "#FF0000" },
+                { channel: "Email", roas: 13.39, fill: "#16A34A" },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="channel" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="roas" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Social Growth</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={[
+                { month: "Oct", followers: 142000 },
+                { month: "Nov", followers: 148000 },
+                { month: "Dec", followers: 158000 },
+                { month: "Jan", followers: 168000 },
+                { month: "Feb", followers: 180000 },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip formatter={(v: number) => `${(v/1000).toFixed(0)}K`} />
+                <Area type="monotone" dataKey="followers" stroke="#7C3AED" fill="#7C3AED" fillOpacity={0.15} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {[
+          { icon: BarChart3, label: "Campaign Manager", desc: "8 active campaigns" },
+          { icon: Users, label: "Social Accounts", desc: "5 connected platforms" },
+          { icon: TrendingUp, label: "Analytics", desc: "Performance reports" },
+        ].map((a, i) => (
+          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 

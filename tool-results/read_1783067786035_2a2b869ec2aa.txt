@@ -1,0 +1,896 @@
+     1→// ARIA HMS — Staff Directory Module
+     2→"use client";
+     3→
+     4→import { useState, useMemo } from "react";
+     5→import { cn } from "@/lib/utils";
+     6→import { useApi, apiPost, apiPut } from "@/lib/api";
+     7→import { useAppStore } from "@/lib/store";
+     8→import { KpiCard, fmtINR, fmtDate, fmtDateTime, timeAgo } from "../shared";
+     9→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Badge } from "@/components/ui/badge";
+    12→import { Input } from "@/components/ui/input";
+    13→import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+    14→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+    15→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    16→import { Skeleton } from "@/components/ui/skeleton";
+    17→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+    18→import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+    19→import { Separator } from "@/components/ui/separator";
+    20→import { ScrollArea } from "@/components/ui/scroll-area";
+    21→import {
+    22→  Users, UserCheck, Search, Building2, Phone, Mail,
+    23→  MapPin, Filter, ChevronRight, ChevronDown, UserCircle,
+    24→  Briefcase, GitBranch, PhoneCall, MailOpen,
+    25→} from "lucide-react";
+    26→import {
+    27→  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+    28→} from "recharts";
+    29→
+    30→// ─── CONSTANTS ──────────────────────────────────────────────────────
+    31→const NAVY = "#1B3A6B";
+    32→const GOLD = "#C9952A";
+    33→const SUCCESS = "#16A34A";
+    34→const CHART_COLORS = [NAVY, GOLD, SUCCESS, "#0369A1", "#D97706", "#7C3AED", "#BE185D", "#0F766E"];
+    35→
+    36→const ROLE_LABEL: Record<string, string> = {
+    37→  owner: "Owner/CEO",
+    38→  gm: "General Manager",
+    39→  fom: "Front Office Mgr",
+    40→  receptionist: "Receptionist",
+    41→  hk_mgr: "Housekeeping Mgr",
+    42→  hk_attendant: "HK Attendant",
+    43→  fb_mgr: "F&B Manager",
+    44→  waiter: "Waiter",
+    45→  rev_mgr: "Revenue Mgr",
+    46→  fin_mgr: "Finance Mgr",
+    47→  eng_mgr: "Engineering Mgr",
+    48→  technician: "Technician",
+    49→  hr_mgr: "HR Manager",
+    50→  sales_mgr: "Sales Manager",
+    51→  sales_exec: "Sales Executive",
+    52→  mkt_mgr: "Marketing Manager",
+    53→  mkt_exec: "Marketing Executive",
+    54→};
+    55→
+    56→const ROLE_LEVEL: Record<string, number> = {
+    57→  owner: 1, gm: 2,
+    58→  fom: 3, hk_mgr: 3, fb_mgr: 3, rev_mgr: 3, fin_mgr: 3, eng_mgr: 3, hr_mgr: 3, sales_mgr: 3, mkt_mgr: 3,
+    59→  receptionist: 4, hk_attendant: 4, waiter: 4, technician: 4, sales_exec: 4, mkt_exec: 4,
+    60→};
+    61→
+    62→const ROLE_DEPT: Record<string, string> = {
+    63→  owner: "Management", gm: "Management",
+    64→  fom: "Front Office", receptionist: "Front Office", rev_mgr: "Front Office",
+    65→  hk_mgr: "Housekeeping", hk_attendant: "Housekeeping",
+    66→  fb_mgr: "Food & Beverage", waiter: "Food & Beverage",
+    67→  fin_mgr: "Finance",
+    68→  eng_mgr: "Engineering", technician: "Engineering",
+    69→  hr_mgr: "Human Resources",
+    70→  sales_mgr: "Sales", sales_exec: "Sales",
+    71→  mkt_mgr: "Marketing", mkt_exec: "Marketing",
+    72→};
+    73→
+    74→const DEPT_ICONS: Record<string, any> = {
+    75→  Management: Briefcase,
+    76→  "Front Office": UserCheck,
+    77→  Housekeeping: Building2,
+    78→  "Food & Beverage": Users,
+    79→  Finance: Briefcase,
+    80→  Engineering: Building2,
+    81→  "Human Resources": Users,
+    82→  Sales: Briefcase,
+    83→  Marketing: Briefcase,
+    84→};
+    85→
+    86→const STATUS_META: Record<string, { label: string; cls: string }> = {
+    87→  active: { label: "Active", cls: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]" },
+    88→  inactive: { label: "Inactive", cls: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]" },
+    89→  on_leave: { label: "On Leave", cls: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]" },
+    90→};
+    91→
+    92→// ─── HELPERS ────────────────────────────────────────────────────────
+    93→function getInitials(firstName?: string, lastName?: string): string {
+    94→  const f = firstName?.trim()?.[0] ?? "";
+    95→  const l = lastName?.trim()?.[0] ?? "";
+    96→  return (f + l).toUpperCase() || "?";
+    97→}
+    98→
+    99→function getDepartment(emp: any): string {
+   100→  if (emp.department?.name) return emp.department.name;
+   101→  if (emp.departmentCode) return emp.departmentCode;
+   102→  return ROLE_DEPT[emp.role] || "Unassigned";
+   103→}
+   104→
+   105→function getRoleLabel(role: string): string {
+   106→  return ROLE_LABEL[role] || role?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Staff";
+   107→}
+   108→
+   109→function getStatus(emp: any): string {
+   110→  if (emp.isActive === false) return "inactive";
+   111→  if (emp.isOnLeave) return "on_leave";
+   112→  return "active";
+   113→}
+   114→
+   115→// ─── EMPLOYEE DETAIL DIALOG ────────────────────────────────────────
+   116→function EmployeeDetailDialog({ employee, open, onClose }: { employee: any | null; open: boolean; onClose: () => void }) {
+   117→  if (!employee) return null;
+   118→  const status = getStatus(employee);
+   119→  const statusMeta = STATUS_META[status] || STATUS_META.active;
+   120→  const dept = getDepartment(employee);
+   121→
+   122→  return (
+   123→    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+   124→      <DialogContent className="sm:max-w-lg">
+   125→        <DialogHeader>
+   126→          <DialogTitle className="flex items-center gap-3">
+   127→            <Avatar className="h-14 w-14 border-2 border-[#1B3A6B]">
+   128→              {employee.avatarUrl ? <AvatarImage src={employee.avatarUrl} alt={employee.firstName} /> : null}
+   129→              <AvatarFallback className="bg-[#1B3A6B] text-white text-lg font-bold">
+   130→                {getInitials(employee.firstName, employee.lastName)}
+   131→              </AvatarFallback>
+   132→            </Avatar>
+   133→            <div>
+   134→              <p className="text-lg font-semibold">{employee.firstName} {employee.lastName}</p>
+   135→              <p className="text-sm text-muted-foreground">{getRoleLabel(employee.role)}</p>
+   136→            </div>
+   137→          </DialogTitle>
+   138→        </DialogHeader>
+   139→        <div className="space-y-4 py-2">
+   140→          <div className="flex items-center gap-2">
+   141→            <Badge className={cn("text-xs border", statusMeta.cls)}>{statusMeta.label}</Badge>
+   142→            {employee.employeeCode && <Badge variant="outline" className="text-xs">{employee.employeeCode}</Badge>}
+   143→          </div>
+   144→          <Separator />
+   145→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+   146→            <div className="flex items-center gap-2">
+   147→              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+   148→              <span className="text-muted-foreground">Department:</span>
+   149→              <span className="font-medium">{dept}</span>
+   150→            </div>
+   151→            <div className="flex items-center gap-2">
+   152→              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+   153→              <span className="text-muted-foreground">Email:</span>
+   154→              <span className="font-medium truncate">{employee.email || "—"}</span>
+   155→            </div>
+   156→            <div className="flex items-center gap-2">
+   157→              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+   158→              <span className="text-muted-foreground">Phone:</span>
+   159→              <span className="font-medium">{employee.phone || "—"}</span>
+   160→            </div>
+   161→            <div className="flex items-center gap-2">
+   162→              <Briefcase className="h-4 w-4 text-muted-foreground shrink-0" />
+   163→              <span className="text-muted-foreground">Joined:</span>
+   164→              <span className="font-medium">{employee.joinDate ? fmtDate(employee.joinDate) : "—"}</span>
+   165→            </div>
+   166→          </div>
+   167→          {employee.property?.name && (
+   168→            <>
+   169→              <Separator />
+   170→              <div className="flex items-center gap-2 text-sm">
+   171→                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+   172→                <span className="text-muted-foreground">Property:</span>
+   173→                <span className="font-medium">{employee.property.name}</span>
+   174→              </div>
+   175→            </>
+   176→          )}
+   177→        </div>
+   178→        <DialogFooter>
+   179→          <Button variant="outline" onClick={onClose}>Close</Button>
+   180→        </DialogFooter>
+   181→      </DialogContent>
+   182→    </Dialog>
+   183→  );
+   184→}
+   185→
+   186→// ─── SKELETON LOADER ───────────────────────────────────────────────
+   187→function SkeletonGrid() {
+   188→  return (
+   189→    <div className="space-y-5">
+   190→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   191→        {[1, 2, 3, 4].map((i) => (
+   192→          <Skeleton key={i} className="h-24 rounded-xl" />
+   193→        ))}
+   194→      </div>
+   195→      <Skeleton className="h-80 rounded-xl" />
+   196→    </div>
+   197→  );
+   198→}
+   199→
+   200→// ─── MAIN COMPONENT ────────────────────────────────────────────────
+   201→export function StaffModule() {
+   202→  const [tab, setTab] = useState("directory");
+   203→  return (
+   204→    <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+   205→      <TabsList className="flex-wrap">
+   206→        <TabsTrigger value="directory">Directory</TabsTrigger>
+   207→        <TabsTrigger value="departments">Departments</TabsTrigger>
+   208→        <TabsTrigger value="orgchart">Org Chart</TabsTrigger>
+   209→      </TabsList>
+   210→      <TabsContent value="directory"><DirectoryTab /></TabsContent>
+   211→      <TabsContent value="departments"><DepartmentsTab /></TabsContent>
+   212→      <TabsContent value="orgchart"><OrgChartTab /></TabsContent>
+   213→    </Tabs>
+   214→  );
+   215→}
+   216→
+   217→// ─── TAB 1: DIRECTORY ──────────────────────────────────────────────
+   218→function DirectoryTab() {
+   219→  const { data: empData, loading, error } = useApi<any>("/api/hr/employees?isActive=all", []);
+   220→  const [search, setSearch] = useState("");
+   221→  const [deptFilter, setDeptFilter] = useState("all");
+   222→  const [statusFilter, setStatusFilter] = useState("all");
+   223→  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+   224→  const [detailOpen, setDetailOpen] = useState(false);
+   225→
+   226→  const employees: any[] = useMemo(() => {
+   227→    if (!empData) return [];
+   228→    return Array.isArray(empData) ? empData : [];
+   229→  }, [empData]);
+   230→
+   231→  // Derive department list from data
+   232→  const departments = useMemo(() => {
+   233→    const set = new Set<string>();
+   234→    employees.forEach((e) => set.add(getDepartment(e)));
+   235→    return Array.from(set).sort();
+   236→  }, [employees]);
+   237→
+   238→  // Filtered list
+   239→  const filtered = useMemo(() => {
+   240→    let list = [...employees];
+   241→    if (search.trim()) {
+   242→      const q = search.toLowerCase();
+   243→      list = list.filter(
+   244→        (e) =>
+   245→          `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+   246→          (e.email || "").toLowerCase().includes(q) ||
+   247→          (e.phone || "").includes(q) ||
+   248→          (e.employeeCode || "").toLowerCase().includes(q) ||
+   249→          getRoleLabel(e.role).toLowerCase().includes(q) ||
+   250→          getDepartment(e).toLowerCase().includes(q)
+   251→      );
+   252→    }
+   253→    if (deptFilter !== "all") {
+   254→      list = list.filter((e) => getDepartment(e) === deptFilter);
+   255→    }
+   256→    if (statusFilter !== "all") {
+   257→      if (statusFilter === "active") list = list.filter((e) => getStatus(e) === "active");
+   258→      else if (statusFilter === "inactive") list = list.filter((e) => getStatus(e) === "inactive");
+   259→      else if (statusFilter === "on_leave") list = list.filter((e) => getStatus(e) === "on_leave");
+   260→    }
+   261→    // Sort: active first, then by role level, then name
+   262→    list.sort((a, b) => {
+   263→      const sa = getStatus(a) === "active" ? 0 : getStatus(a) === "on_leave" ? 1 : 2;
+   264→      const sb = getStatus(b) === "active" ? 0 : getStatus(b) === "on_leave" ? 1 : 2;
+   265→      if (sa !== sb) return sa - sb;
+   266→      const la = ROLE_LEVEL[a.role] ?? 9;
+   267→      const lb = ROLE_LEVEL[b.role] ?? 9;
+   268→      if (la !== lb) return la - lb;
+   269→      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+   270→    });
+   271→    return list;
+   272→  }, [employees, search, deptFilter, statusFilter]);
+   273→
+   274→  // KPI stats
+   275→  const totalStaff = employees.length;
+   276→  const activeStaff = employees.filter((e) => getStatus(e) === "active").length;
+   277→  const onLeave = employees.filter((e) => getStatus(e) === "on_leave").length;
+   278→  const deptCount = departments.length;
+   279→
+   280→  const openDetail = (emp: any) => {
+   281→    setSelectedEmp(emp);
+   282→    setDetailOpen(true);
+   283→  };
+   284→
+   285→  if (loading) return <SkeletonGrid />;
+   286→
+   287→  return (
+   288→    <div className="space-y-5">
+   289→      {/* KPI Cards */}
+   290→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   291→        <KpiCard label="Total Staff" value={totalStaff} icon={Users} accent="navy" />
+   292→        <KpiCard label="Active" value={activeStaff} icon={UserCheck} accent="success" />
+   293→        <KpiCard label="On Leave" value={onLeave} icon={MapPin} accent="warning" />
+   294→        <KpiCard label="Departments" value={deptCount} icon={Building2} accent="gold" />
+   295→      </div>
+   296→
+   297→      {/* Search & Filters */}
+   298→      <Card>
+   299→        <CardContent className="p-4">
+   300→          <div className="flex flex-col sm:flex-row gap-3">
+   301→            <div className="relative flex-1">
+   302→              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+   303→              <Input
+   304→                placeholder="Search by name, email, role, department..."
+   305→                className="pl-9"
+   306→                value={search}
+   307→                onChange={(e) => setSearch(e.target.value)}
+   308→              />
+   309→            </div>
+   310→            <Select value={deptFilter} onValueChange={setDeptFilter}>
+   311→              <SelectTrigger className="w-full sm:w-[180px]">
+   312→                <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+   313→                <SelectValue placeholder="Department" />
+   314→              </SelectTrigger>
+   315→              <SelectContent>
+   316→                <SelectItem value="all">All Departments</SelectItem>
+   317→                {departments.map((d) => (
+   318→                  <SelectItem key={d} value={d}>{d}</SelectItem>
+   319→                ))}
+   320→              </SelectContent>
+   321→            </Select>
+   322→            <Select value={statusFilter} onValueChange={setStatusFilter}>
+   323→              <SelectTrigger className="w-full sm:w-[140px]">
+   324→                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+   325→                <SelectValue placeholder="Status" />
+   326→              </SelectTrigger>
+   327→              <SelectContent>
+   328→                <SelectItem value="all">All Status</SelectItem>
+   329→                <SelectItem value="active">Active</SelectItem>
+   330→                <SelectItem value="on_leave">On Leave</SelectItem>
+   331→                <SelectItem value="inactive">Inactive</SelectItem>
+   332→              </SelectContent>
+   333→            </Select>
+   334→          </div>
+   335→        </CardContent>
+   336→      </Card>
+   337→
+   338→      {/* Staff Table */}
+   339→      <Card>
+   340→        <CardHeader className="pb-3">
+   341→          <CardTitle className="font-display text-base">Staff Directory</CardTitle>
+   342→          <CardDescription className="text-xs">
+   343→            Showing {filtered.length} of {totalStaff} employees
+   344→          </CardDescription>
+   345→        </CardHeader>
+   346→        <CardContent className="p-0">
+   347→          {filtered.length === 0 ? (
+   348→            <div className="flex flex-col items-center justify-center py-16 text-center">
+   349→              <Users className="h-12 w-12 text-muted-foreground/30 mb-3" />
+   350→              <p className="text-sm text-muted-foreground">No employees found</p>
+   351→              <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filters</p>
+   352→            </div>
+   353→          ) : (
+   354→            <div className="overflow-x-auto">
+   355→              <Table>
+   356→                <TableHeader>
+   357→                  <TableRow className="hover:bg-transparent">
+   358→                    <TableHead className="w-[280px]">Employee</TableHead>
+   359→                    <TableHead>Role</TableHead>
+   360→                    <TableHead className="hidden md:table-cell">Department</TableHead>
+   361→                    <TableHead className="hidden lg:table-cell">Email</TableHead>
+   362→                    <TableHead className="hidden lg:table-cell">Phone</TableHead>
+   363→                    <TableHead className="w-[100px]">Status</TableHead>
+   364→                  </TableRow>
+   365→                </TableHeader>
+   366→                <TableBody>
+   367→                  {filtered.map((emp) => {
+   368→                    const status = getStatus(emp);
+   369→                    const statusMeta = STATUS_META[status] || STATUS_META.active;
+   370→                    const dept = getDepartment(emp);
+   371→                    return (
+   372→                      <TableRow
+   373→                        key={emp.id}
+   374→                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+   375→                        onClick={() => openDetail(emp)}
+   376→                      >
+   377→                        <TableCell>
+   378→                          <div className="flex items-center gap-3">
+   379→                            <Avatar className="h-9 w-9 border border-border">
+   380→                              {emp.avatarUrl ? <AvatarImage src={emp.avatarUrl} alt={emp.firstName} /> : null}
+   381→                              <AvatarFallback
+   382→                                className="text-xs font-bold"
+   383→                                style={{
+   384→                                  backgroundColor: NAVY,
+   385→                                  color: "white",
+   386→                                }}
+   387→                              >
+   388→                                {getInitials(emp.firstName, emp.lastName)}
+   389→                              </AvatarFallback>
+   390→                            </Avatar>
+   391→                            <div className="min-w-0">
+   392→                              <p className="text-sm font-semibold truncate">
+   393→                                {emp.firstName} {emp.lastName}
+   394→                              </p>
+   395→                              <p className="text-[11px] text-muted-foreground truncate">
+   396→                                {emp.employeeCode || "—"}
+   397→                              </p>
+   398→                            </div>
+   399→                          </div>
+   400→                        </TableCell>
+   401→                        <TableCell>
+   402→                          <span className="text-sm">{getRoleLabel(emp.role)}</span>
+   403→                        </TableCell>
+   404→                        <TableCell className="hidden md:table-cell">
+   405→                          <span className="text-sm text-muted-foreground">{dept}</span>
+   406→                        </TableCell>
+   407→                        <TableCell className="hidden lg:table-cell">
+   408→                          <span className="text-sm text-muted-foreground truncate max-w-[180px] block">
+   409→                            {emp.email || "—"}
+   410→                          </span>
+   411→                        </TableCell>
+   412→                        <TableCell className="hidden lg:table-cell">
+   413→                          <span className="text-sm text-muted-foreground">{emp.phone || "—"}</span>
+   414→                        </TableCell>
+   415→                        <TableCell>
+   416→                          <Badge className={cn("text-[10px] border", statusMeta.cls)}>
+   417→                            {statusMeta.label}
+   418→                          </Badge>
+   419→                        </TableCell>
+   420→                      </TableRow>
+   421→                    );
+   422→                  })}
+   423→                </TableBody>
+   424→              </Table>
+   425→            </div>
+   426→          )}
+   427→        </CardContent>
+   428→      </Card>
+   429→
+   430→      {/* Employee Detail Dialog */}
+   431→      <EmployeeDetailDialog
+   432→        employee={selectedEmp}
+   433→        open={detailOpen}
+   434→        onClose={() => setDetailOpen(false)}
+   435→      />
+   436→    </div>
+   437→  );
+   438→}
+   439→
+   440→// ─── TAB 2: DEPARTMENTS ────────────────────────────────────────────
+   441→function DepartmentsTab() {
+   442→  const { data: empData, loading } = useApi<any>("/api/hr/employees?isActive=all", []);
+   443→
+   444→  const employees: any[] = useMemo(() => {
+   445→    if (!empData) return [];
+   446→    return Array.isArray(empData) ? empData : [];
+   447→  }, [empData]);
+   448→
+   449→  // Group by department
+   450→  const deptGroups = useMemo(() => {
+   451→    const map = new Map<string, any[]>();
+   452→    employees.forEach((emp) => {
+   453→      const dept = getDepartment(emp);
+   454→      if (!map.has(dept)) map.set(dept, []);
+   455→      map.get(dept)!.push(emp);
+   456→    });
+   457→    // Sort employees within each department by role level
+   458→    map.forEach((emps) => {
+   459→      emps.sort((a, b) => (ROLE_LEVEL[a.role] ?? 9) - (ROLE_LEVEL[b.role] ?? 9));
+   460→    });
+   461→    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+   462→  }, [employees]);
+   463→
+   464→  // Pie chart data
+   465→  const pieData = useMemo(
+   466→    () => deptGroups.map(([name, emps]) => ({ name, value: emps.length })),
+   467→    [deptGroups]
+   468→  );
+   469→
+   470→  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+   471→  const [detailOpen, setDetailOpen] = useState(false);
+   472→
+   473→  const openDetail = (emp: any) => {
+   474→    setSelectedEmp(emp);
+   475→    setDetailOpen(true);
+   476→  };
+   477→
+   478→  if (loading) return <SkeletonGrid />;
+   479→
+   480→  return (
+   481→    <div className="space-y-5">
+   482→      {/* Department Distribution Chart */}
+   483→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   484→        <Card>
+   485→          <CardHeader className="pb-2">
+   486→            <CardTitle className="font-display text-sm">Department Distribution</CardTitle>
+   487→          </CardHeader>
+   488→          <CardContent>
+   489→            {pieData.length > 0 ? (
+   490→              <ResponsiveContainer width="100%" height={280}>
+   491→                <PieChart>
+   492→                  <Pie
+   493→                    data={pieData}
+   494→                    dataKey="value"
+   495→                    nameKey="name"
+   496→                    cx="50%"
+   497→                    cy="50%"
+   498→                    outerRadius={100}
+   499→                    innerRadius={50}
+   500→                    paddingAngle={3}
+   501→                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+   502→                    labelLine={true}
+   503→                  >
+   504→                    {pieData.map((_, i) => (
+   505→                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+   506→                    ))}
+   507→                  </Pie>
+   508→                  <Tooltip
+   509→                    formatter={(value: number, name: string) => [`${value} employees`, name]}
+   510→                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
+   511→                  />
+   512→                  <Legend />
+   513→                </PieChart>
+   514→              </ResponsiveContainer>
+   515→            ) : (
+   516→              <div className="flex items-center justify-center h-[280px] text-sm text-muted-foreground">
+   517→                No department data available
+   518→              </div>
+   519→            )}
+   520→          </CardContent>
+   521→        </Card>
+   522→
+   523→        <Card>
+   524→          <CardHeader className="pb-2">
+   525→            <CardTitle className="font-display text-sm">Department Summary</CardTitle>
+   526→          </CardHeader>
+   527→          <CardContent>
+   528→            {deptGroups.length === 0 ? (
+   529→              <p className="text-sm text-muted-foreground text-center py-10">No departments found</p>
+   530→            ) : (
+   531→              <div className="space-y-2">
+   532→                {deptGroups.map(([dept, emps], idx) => {
+   533→                  const activeCount = emps.filter((e) => getStatus(e) === "active").length;
+   534→                  const color = CHART_COLORS[idx % CHART_COLORS.length];
+   535→                  return (
+   536→                    <div
+   537→                      key={dept}
+   538→                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors"
+   539→                    >
+   540→                      <div
+   541→                        className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
+   542→                        style={{ backgroundColor: color + "18" }}
+   543→                      >
+   544→                        <Building2 className="h-5 w-5" style={{ color }} />
+   545→                      </div>
+   546→                      <div className="min-w-0 flex-1">
+   547→                        <p className="text-sm font-semibold">{dept}</p>
+   548→                        <p className="text-xs text-muted-foreground">
+   549→                          {emps.length} member{emps.length !== 1 ? "s" : ""} &middot; {activeCount} active
+   550→                        </p>
+   551→                      </div>
+   552→                      <div className="text-right">
+   553→                        <p className="text-lg font-bold" style={{ color }}>
+   554→                          {emps.length}
+   555→                        </p>
+   556→                      </div>
+   557→                    </div>
+   558→                  );
+   559→                })}
+   560→              </div>
+   561→            )}
+   562→          </CardContent>
+   563→        </Card>
+   564→      </div>
+   565→
+   566→      {/* Department Cards */}
+   567→      <div className="space-y-4">
+   568→        {deptGroups.map(([dept, emps], idx) => {
+   569→          const color = CHART_COLORS[idx % CHART_COLORS.length];
+   570→          const head = emps.find((e) => ROLE_LEVEL[e.role] <= 3);
+   571→          return (
+   572→            <Card key={dept} className="overflow-hidden">
+   573→              <div className="h-1.5" style={{ backgroundColor: color }} />
+   574→              <CardHeader className="pb-3">
+   575→                <div className="flex items-center justify-between">
+   576→                  <div className="flex items-center gap-3">
+   577→                    <div
+   578→                      className="h-10 w-10 rounded-lg flex items-center justify-center"
+   579→                      style={{ backgroundColor: color + "18" }}
+   580→                    >
+   581→                      <Building2 className="h-5 w-5" style={{ color }} />
+   582→                    </div>
+   583→                    <div>
+   584→                      <CardTitle className="font-display text-base">{dept}</CardTitle>
+   585→                      <CardDescription className="text-xs">
+   586→                        {emps.length} member{emps.length !== 1 ? "s" : ""}
+   587→                        {head ? ` · Head: ${head.firstName} ${head.lastName}` : ""}
+   588→                      </CardDescription>
+   589→                    </div>
+   590→                  </div>
+   591→                  <Badge variant="outline" className="text-xs" style={{ borderColor: color, color }}>
+   592→                    {emps.length}
+   593→                  </Badge>
+   594→                </div>
+   595→              </CardHeader>
+   596→              <CardContent className="pb-4">
+   597→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+   598→                  {emps.map((emp) => {
+   599→                    const status = getStatus(emp);
+   600→                    const statusMeta = STATUS_META[status] || STATUS_META.active;
+   601→                    return (
+   602→                      <div
+   603→                        key={emp.id}
+   604→                        className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 cursor-pointer transition-colors"
+   605→                        onClick={() => openDetail(emp)}
+   606→                      >
+   607→                        <Avatar className="h-10 w-10 border shrink-0" style={{ borderColor: color }}>
+   608→                          {emp.avatarUrl ? <AvatarImage src={emp.avatarUrl} alt={emp.firstName} /> : null}
+   609→                          <AvatarFallback className="text-xs font-bold" style={{ backgroundColor: color, color: "white" }}>
+   610→                            {getInitials(emp.firstName, emp.lastName)}
+   611→                          </AvatarFallback>
+   612→                        </Avatar>
+   613→                        <div className="min-w-0 flex-1">
+   614→                          <p className="text-sm font-semibold truncate">{emp.firstName} {emp.lastName}</p>
+   615→                          <p className="text-[11px] text-muted-foreground truncate">{getRoleLabel(emp.role)}</p>
+   616→                          <Badge className={cn("text-[9px] border mt-1 px-1.5 py-0", statusMeta.cls)}>
+   617→                            {statusMeta.label}
+   618→                          </Badge>
+   619→                        </div>
+   620→                      </div>
+   621→                    );
+   622→                  })}
+   623→                </div>
+   624→              </CardContent>
+   625→            </Card>
+   626→          );
+   627→        })}
+   628→      </div>
+   629→
+   630→      {/* Employee Detail Dialog */}
+   631→      <EmployeeDetailDialog
+   632→        employee={selectedEmp}
+   633→        open={detailOpen}
+   634→        onClose={() => setDetailOpen(false)}
+   635→      />
+   636→    </div>
+   637→  );
+   638→}
+   639→
+   640→// ─── TAB 3: ORG CHART ──────────────────────────────────────────────
+   641→function OrgChartTab() {
+   642→  const { data: empData, loading } = useApi<any>("/api/hr/employees?isActive=all", []);
+   643→
+   644→  const employees: any[] = useMemo(() => {
+   645→    if (!empData) return [];
+   646→    return Array.isArray(empData) ? empData : [];
+   647→  }, [empData]);
+   648→
+   649→  // Build hierarchy: group by role level, then by department
+   650→  const hierarchy = useMemo(() => {
+   651→    const levels = new Map<number, Map<string, any[]>>();
+   652→
+   653→    employees.forEach((emp) => {
+   654→      const level = ROLE_LEVEL[emp.role] ?? 9;
+   655→      const dept = getDepartment(emp);
+   656→
+   657→      if (!levels.has(level)) levels.set(level, new Map());
+   658→      const deptMap = levels.get(level)!;
+   659→      if (!deptMap.has(dept)) deptMap.set(dept, []);
+   660→      deptMap.get(dept)!.push(emp);
+   661→    });
+   662→
+   663→    // Sort each level's employees by name
+   664→    levels.forEach((deptMap) => {
+   665→      deptMap.forEach((emps) => {
+   666→        emps.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+   667→      });
+   668→    });
+   669→
+   670→    return Array.from(levels.entries()).sort(([a], [b]) => a - b);
+   671→  }, [employees]);
+   672→
+   673→  const LEVEL_LABELS: Record<number, string> = {
+   674→    1: "Executive Leadership",
+   675→    2: "General Management",
+   676→    3: "Department Heads",
+   677→    4: "Team Members",
+   678→  };
+   679→
+   680→  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+   681→  const [detailOpen, setDetailOpen] = useState(false);
+   682→  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+   683→
+   684→  const toggleDept = (key: string) => {
+   685→    setExpandedDepts((prev) => {
+   686→      const next = new Set(prev);
+   687→      if (next.has(key)) next.delete(key);
+   688→      else next.add(key);
+   689→      return next;
+   690→    });
+   691→  };
+   692→
+   693→  const openDetail = (emp: any) => {
+   694→    setSelectedEmp(emp);
+   695→    setDetailOpen(true);
+   696→  };
+   697→
+   698→  if (loading) return <SkeletonGrid />;
+   699→
+   700→  return (
+   701→    <div className="space-y-5">
+   702→      {/* Org Overview KPIs */}
+   703→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   704→        <KpiCard
+   705→          label="Leadership"
+   706→          value={employees.filter((e) => (ROLE_LEVEL[e.role] ?? 9) <= 2).length}
+   707→          icon={GitBranch}
+   708→          accent="navy"
+   709→        />
+   710→        <KpiCard
+   711→          label="Dept Heads"
+   712→          value={employees.filter((e) => (ROLE_LEVEL[e.role] ?? 9) === 3).length}
+   713→          icon={Briefcase}
+   714→          accent="gold"
+   715→        />
+   716→        <KpiCard
+   717→          label="Team Members"
+   718→          value={employees.filter((e) => (ROLE_LEVEL[e.role] ?? 9) >= 4).length}
+   719→          icon={Users}
+   720→          accent="success"
+   721→        />
+   722→        <KpiCard
+   723→          label="Departments"
+   724→          value={new Set(employees.map((e) => getDepartment(e))).size}
+   725→          icon={Building2}
+   726→          accent="info"
+   727→        />
+   728→      </div>
+   729→
+   730→      {/* Hierarchy Cards */}
+   731→      <div className="space-y-6">
+   732→        {hierarchy.map(([level, deptMap]) => {
+   733→          const levelLabel = LEVEL_LABELS[level] || `Level ${level}`;
+   734→          const isExecutive = level <= 2;
+   735→          const isHead = level === 3;
+   736→          const accentColor = isExecutive ? NAVY : isHead ? GOLD : SUCCESS;
+   737→
+   738→          return (
+   739→            <div key={level}>
+   740→              {/* Level Header */}
+   741→              <div className="flex items-center gap-3 mb-3">
+   742→                <div
+   743→                  className="h-8 w-1.5 rounded-full"
+   744→                  style={{ backgroundColor: accentColor }}
+   745→                />
+   746→                <h3 className="font-display text-base font-semibold" style={{ color: accentColor }}>
+   747→                  {levelLabel}
+   748→                </h3>
+   749→                <div className="flex-1 border-b border-dashed" />
+   750→                <Badge variant="outline" className="text-xs">
+   751→                  {Array.from(deptMap.values()).reduce((sum, emps) => sum + emps.length, 0)} people
+   752→                </Badge>
+   753→              </div>
+   754→
+   755→              {/* Executive / GM — special centered layout */}
+   756→              {isExecutive ? (
+   757→                <div className="flex flex-wrap justify-center gap-4">
+   758→                  {Array.from(deptMap.values())
+   759→                    .flat()
+   760→                    .map((emp) => (
+   761→                      <OrgPersonCard
+   762→                        key={emp.id}
+   763→                        emp={emp}
+   764→                        accentColor={accentColor}
+   765→                        large
+   766→                        onClick={() => openDetail(emp)}
+   767→                      />
+   768→                    ))}
+   769→                </div>
+   770→              ) : (
+   771→                /* Department Heads & Members — grouped by department */
+   772→                <div className="space-y-3 ml-4">
+   773→                  {Array.from(deptMap.entries()).map(([dept, emps]) => {
+   774→                    const deptKey = `${level}-${dept}`;
+   775→                    const isExpanded = expandedDepts.has(deptKey);
+   776→                    const deptColor = CHART_COLORS[
+   777→                      Array.from(
+   778→                        new Set(employees.map((e) => getDepartment(e)))
+   779→                      ).indexOf(dept) % CHART_COLORS.length
+   780→                    ] || SUCCESS;
+   781→
+   782→                    return (
+   783→                      <Card key={dept} className="overflow-hidden">
+   784→                        <div
+   785→                          className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/30 transition-colors"
+   786→                          onClick={() => toggleDept(deptKey)}
+   787→                        >
+   788→                          {isExpanded ? (
+   789→                            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+   790→                          ) : (
+   791→                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+   792→                          )}
+   793→                          <div
+   794→                            className="h-6 w-1.5 rounded-full"
+   795→                            style={{ backgroundColor: deptColor }}
+   796→                          />
+   797→                          <span className="text-sm font-semibold">{dept}</span>
+   798→                          <Badge variant="outline" className="text-[10px] ml-auto">
+   799→                            {emps.length}
+   800→                          </Badge>
+   801→                        </div>
+   802→                        {isExpanded && (
+   803→                          <CardContent className="pt-0 pb-3 px-3">
+   804→                            <div className="flex flex-wrap gap-3 ml-6">
+   805→                              {emps.map((emp) => (
+   806→                                <OrgPersonCard
+   807→                                  key={emp.id}
+   808→                                  emp={emp}
+   809→                                  accentColor={deptColor}
+   810→                                  onClick={() => openDetail(emp)}
+   811→                                />
+   812→                              ))}
+   813→                            </div>
+   814→                          </CardContent>
+   815→                        )}
+   816→                      </Card>
+   817→                    );
+   818→                  })}
+   819→                </div>
+   820→              )}
+   821→            </div>
+   822→          );
+   823→        })}
+   824→      </div>
+   825→
+   826→      {/* Employee Detail Dialog */}
+   827→      <EmployeeDetailDialog
+   828→        employee={selectedEmp}
+   829→        open={detailOpen}
+   830→        onClose={() => setDetailOpen(false)}
+   831→      />
+   832→    </div>
+   833→  );
+   834→}
+   835→
+   836→// ─── ORG PERSON CARD ───────────────────────────────────────────────
+   837→function OrgPersonCard({
+   838→  emp,
+   839→  accentColor,
+   840→  large = false,
+   841→  onClick,
+   842→}: {
+   843→  emp: any;
+   844→  accentColor: string;
+   845→  large?: boolean;
+   846→  onClick: () => void;
+   847→}) {
+   848→  const status = getStatus(emp);
+   849→  const statusMeta = STATUS_META[status] || STATUS_META.active;
+   850→  const dept = getDepartment(emp);
+   851→
+   852→  return (
+   853→    <div
+   854→      className={cn(
+   855→        "flex items-center gap-3 rounded-xl border bg-card hover:shadow-md cursor-pointer transition-all",
+   856→        large ? "p-4 min-w-[240px]" : "p-3"
+   857→      )}
+   858→      onClick={onClick}
+   859→    >
+   860→      <Avatar className={cn("border-2 shrink-0", large ? "h-14 w-14" : "h-10 w-10")} style={{ borderColor: accentColor }}>
+   861→        {emp.avatarUrl ? <AvatarImage src={emp.avatarUrl} alt={emp.firstName} /> : null}
+   862→        <AvatarFallback
+   863→          className={cn("font-bold", large ? "text-base" : "text-xs")}
+   864→          style={{ backgroundColor: accentColor, color: "white" }}
+   865→        >
+   866→          {getInitials(emp.firstName, emp.lastName)}
+   867→        </AvatarFallback>
+   868→      </Avatar>
+   869→      <div className="min-w-0">
+   870→        <p className={cn("font-semibold truncate", large ? "text-base" : "text-sm")}>
+   871→          {emp.firstName} {emp.lastName}
+   872→        </p>
+   873→        <p className="text-xs text-muted-foreground truncate">{getRoleLabel(emp.role)}</p>
+   874→        {large && (
+   875→          <div className="flex items-center gap-2 mt-1.5">
+   876→            <Badge className={cn("text-[9px] border px-1.5 py-0", statusMeta.cls)}>{statusMeta.label}</Badge>
+   877→            <span className="text-[11px] text-muted-foreground">{dept}</span>
+   878→          </div>
+   879→        )}
+   880→        {large && emp.email && (
+   881→          <div className="flex items-center gap-1 mt-1">
+   882→            <MailOpen className="h-3 w-3 text-muted-foreground" />
+   883→            <span className="text-[11px] text-muted-foreground truncate">{emp.email}</span>
+   884→          </div>
+   885→        )}
+   886→        {large && emp.phone && (
+   887→          <div className="flex items-center gap-1 mt-0.5">
+   888→            <PhoneCall className="h-3 w-3 text-muted-foreground" />
+   889→            <span className="text-[11px] text-muted-foreground">{emp.phone}</span>
+   890→          </div>
+   891→        )}
+   892→      </div>
+   893→    </div>
+   894→  );
+   895→}
+   896→

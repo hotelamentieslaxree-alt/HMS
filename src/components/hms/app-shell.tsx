@@ -16,8 +16,13 @@ import { FoliosModule } from "./modules/folios";
 import { ReportsModule } from "./modules/reports";
 import { NightAuditModule } from "./modules/night-audit";
 import { StaffModule } from "./modules/staff";
+import { HRModule } from "./modules/hr";
 import { MaintenanceModule } from "./modules/maintenance";
 import { AuditModule } from "./modules/audit";
+import { AttendanceModule } from "./modules/attendance";
+import { ScorecardModule } from "./modules/scorecard";
+import { MarketingModule } from "./modules/marketing";
+import { SalesModule } from "./modules/sales";
 import { useApi } from "@/lib/api";
 import { Hotel, Globe, ShieldCheck, Cpu } from "lucide-react";
 import { useEffect } from "react";
@@ -33,8 +38,13 @@ const MODULE_COMPONENTS: Record<ModuleKey, React.FC> = {
   reports: ReportsModule,
   "night-audit": NightAuditModule,
   staff: StaffModule,
+  hr: HRModule,
   maintenance: MaintenanceModule,
   audit: AuditModule,
+  attendance: AttendanceModule,
+  scorecard: ScorecardModule,
+  marketing: MarketingModule,
+  sales: SalesModule,
 };
 
 export function AppShell() {

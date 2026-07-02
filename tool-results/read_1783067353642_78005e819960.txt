@@ -1,0 +1,1103 @@
+     1→// ARIA HMS — HR Hub Module (4 tabs: Overview, Employees, Payroll, Events & Birthdays)
+     2→"use client";
+     3→
+     4→import { useState, useEffect, useMemo } from "react";
+     5→import { cn } from "@/lib/utils";
+     6→import { useApi, apiPost, apiPut } from "@/lib/api";
+     7→import { useAppStore } from "@/lib/store";
+     8→import { KpiCard, fmtINR, fmtDate, fmtDateTime, timeAgo } from "../shared";
+     9→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Badge } from "@/components/ui/badge";
+    12→import { Input } from "@/components/ui/input";
+    13→import { Label } from "@/components/ui/label";
+    14→import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+    15→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+    16→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    17→import { Skeleton } from "@/components/ui/skeleton";
+    18→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+    19→import { toast } from "sonner";
+    20→import {
+    21→  Users, UserCheck, Percent, Star, Briefcase, IndianRupee,
+    22→  CalendarDays, Clock, CheckCheck, Plus, Pencil, Trash2,
+    23→  Eye, FileText, Printer, BarChart3, Award, Calendar, MapPin,
+    24→  UserCircle, Search, Building2, Cake, Gift, PartyPopper,
+    25→  ChevronRight, TrendingUp, Activity, ClipboardCheck, Sparkles,
+    26→  Heart, UsersRound, Wallet, Receipt,
+    27→} from "lucide-react";
+    28→import {
+    29→  BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
+    30→  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+    31→} from "recharts";
+    32→
+    33→// ─── CONSTANTS ────────────────────────────────────────────────────────
+    34→const CC = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
+    35→const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    36→const now = new Date();
+    37→
+    38→const EVENT_COLORS: Record<string, string> = {
+    39→  festival: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]",
+    40→  training: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]",
+    41→  meeting: "bg-[#1B3A6B] text-white border-[#1B3A6B]",
+    42→  celebration: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]",
+    43→  audit: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]",
+    44→  inspection: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]",
+    45→  birthday: "bg-[#F3E8FF] text-[#4C1D95] border-[#7C3AED]",
+    46→};
+    47→
+    48→const EVENT_ICONS: Record<string, any> = {
+    49→  festival: Sparkles,
+    50→  training: Award,
+    51→  meeting: Users,
+    52→  celebration: PartyPopper,
+    53→  audit: ClipboardCheck,
+    54→  inspection: ClipboardCheck,
+    55→  birthday: Cake,
+    56→};
+    57→
+    58→const PAYROLL_COLORS: Record<string, string> = {
+    59→  draft: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]",
+    60→  processed: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]",
+    61→  paid: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]",
+    62→};
+    63→
+    64→const ROLES = ["owner","gm","fom","receptionist","hk_mgr","hk_attendant","fb_mgr","waiter","rev_mgr","fin_mgr","eng_mgr","technician","hr_mgr","sales_mgr","sales_exec","mkt_mgr","mkt_exec"];
+    65→const ROLE_LABEL: Record<string, string> = {
+    66→  owner:"Owner/CEO", gm:"General Manager", fom:"Front Office Mgr", receptionist:"Receptionist",
+    67→  hk_mgr:"Housekeeping Mgr", hk_attendant:"HK Attendant", fb_mgr:"F&B Manager", waiter:"Waiter",
+    68→  rev_mgr:"Revenue Mgr", fin_mgr:"Finance Mgr", eng_mgr:"Engineering Mgr", technician:"Technician",
+    69→  hr_mgr:"HR Manager", sales_mgr:"Sales Manager", sales_exec:"Sales Executive",
+    70→  mkt_mgr:"Marketing Manager", mkt_exec:"Marketing Executive",
+    71→};
+    72→
+    73→const DEPT_OPTIONS = [
+    74→  { code: "FO", label: "Front Office" },
+    75→  { code: "HK", label: "Housekeeping" },
+    76→  { code: "FB", label: "F&B" },
+    77→  { code: "ENG", label: "Engineering" },
+    78→  { code: "HR", label: "Human Resources" },
+    79→  { code: "FIN", label: "Finance" },
+    80→  { code: "SALES", label: "Sales" },
+    81→  { code: "MKT", label: "Marketing" },
+    82→  { code: "REV", label: "Revenue" },
+    83→];
+    84→
+    85→// Mock birthday data (since User model doesn't have birthDate)
+    86→const MOCK_BIRTHDAYS: { name: string; department: string; role: string; birthDay: number; birthMonth: number; avatar?: string }[] = [
+    87→  { name: "Priya Sharma", department: "Front Office", role: "fom", birthDay: 8, birthMonth: now.getMonth() + 1 },
+    88→  { name: "Rajesh Kumar", department: "Engineering", role: "eng_mgr", birthDay: 15, birthMonth: now.getMonth() + 1 },
+    89→  { name: "Anita Desai", department: "Housekeeping", role: "hk_mgr", birthDay: 22, birthMonth: now.getMonth() + 1 },
+    90→  { name: "Vikram Singh", department: "F&B", role: "fb_mgr", birthDay: 5, birthMonth: now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2 },
+    91→  { name: "Meera Patel", department: "Sales", role: "sales_mgr", birthDay: 12, birthMonth: now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2 },
+    92→  { name: "Arjun Reddy", department: "Finance", role: "fin_mgr", birthDay: 28, birthMonth: now.getMonth() + 1 },
+    93→  { name: "Sneha Iyer", department: "HR", role: "hr_mgr", birthDay: 3, birthMonth: now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2 },
+    94→  { name: "Karan Malhotra", department: "Marketing", role: "mkt_mgr", birthDay: 18, birthMonth: now.getMonth() + 1 },
+    95→  { name: "Deepa Nair", department: "Front Office", role: "receptionist", birthDay: 25, birthMonth: now.getMonth() + 1 },
+    96→  { name: "Suresh Menon", department: "Revenue", role: "rev_mgr", birthDay: 10, birthMonth: now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2 },
+    97→];
+    98→
+    99→// ─── MAIN COMPONENT ──────────────────────────────────────────────────
+   100→export function HRModule() {
+   101→  const [tab, setTab] = useState("overview");
+   102→  return (
+   103→    <div className="space-y-4">
+   104→      {/* Module Header */}
+   105→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#7C3AED]/20 bg-gradient-to-r from-[#1B3A6B] via-[#2E5FA3] to-[#4C1D95] px-5 py-4 text-white shadow-card">
+   106→        <div className="flex items-center gap-3">
+   107→          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur">
+   108→            <Users className="h-5 w-5" />
+   109→          </div>
+   110→          <div>
+   111→            <h2 className="font-display text-lg font-bold tracking-tight">HR Hub</h2>
+   112→            <p className="text-xs text-white/70">Human Resources Management & Employee Services</p>
+   113→          </div>
+   114→        </div>
+   115→        <div className="flex items-center gap-2 text-xs text-white/70">
+   116→          <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+   117→        </div>
+   118→      </div>
+   119→
+   120→      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+   121→        <TabsList className="flex-wrap">
+   122→          <TabsTrigger value="overview" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Overview</TabsTrigger>
+   123→          <TabsTrigger value="employees" className="gap-1.5"><Users className="h-3.5 w-3.5" />Employees</TabsTrigger>
+   124→          <TabsTrigger value="payroll" className="gap-1.5"><IndianRupee className="h-3.5 w-3.5" />Payroll</TabsTrigger>
+   125→          <TabsTrigger value="events" className="gap-1.5"><Cake className="h-3.5 w-3.5" />Events & Birthdays</TabsTrigger>
+   126→        </TabsList>
+   127→        <TabsContent value="overview"><OverviewTab /></TabsContent>
+   128→        <TabsContent value="employees"><EmployeesTab /></TabsContent>
+   129→        <TabsContent value="payroll"><PayrollTab /></TabsContent>
+   130→        <TabsContent value="events"><EventsTab /></TabsContent>
+   131→      </Tabs>
+   132→    </div>
+   133→  );
+   134→}
+   135→
+   136→// ─── TAB 1: OVERVIEW ─────────────────────────────────────────────────
+   137→function OverviewTab() {
+   138→  const { data: empData, loading: l1 } = useApi<any>("/api/hr/employees?isActive=all", []);
+   139→  const { data: attData, loading: l2 } = useApi<any>(`/api/hr/attendance?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
+   140→  const { data: payrollData, loading: l3 } = useApi<any>(`/api/hr/payroll?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
+   141→  const { data: eventData, loading: l4 } = useApi<any>(`/api/hr/events?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
+   142→
+   143→  const loading = l1 || l2 || l3 || l4;
+   144→
+   145→  if (loading || !empData) return <SkeletonGrid />;
+   146→
+   147→  const emps: any[] = Array.isArray(empData) ? empData : [];
+   148→  const totalEmployees = emps.length;
+   149→  const activeCount = emps.filter((e: any) => e.isActive).length;
+   150→  const byDepartment: Record<string, number> = {};
+   151→  for (const e of emps) {
+   152→    const d = e.department || "Unassigned";
+   153→    byDepartment[d] = (byDepartment[d] || 0) + 1;
+   154→  }
+   155→
+   156→  const attSummary = (attData as any)?.summary || {};
+   157→  const payrollSummary = (payrollData as any)?.summary || {};
+   158→  const events: any[] = (eventData as any)?.events || [];
+   159→
+   160→  // Upcoming birthdays this/next month
+   161→  const thisMonth = now.getMonth() + 1;
+   162→  const nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
+   163→  const upcomingBdays = MOCK_BIRTHDAYS.filter(b => b.birthMonth === thisMonth || b.birthMonth === nextMonth)
+   164→    .sort((a, b) => {
+   165→      if (a.birthMonth !== b.birthMonth) return a.birthMonth - b.birthMonth;
+   166→      return a.birthDay - b.birthDay;
+   167→    });
+   168→
+   169→  // Attendance trend (last 7 days)
+   170→  const attRecords: any[] = (attData as any)?.attendance || [];
+   171→  const trend: { name: string; Present: number; Absent: number }[] = [];
+   172→  for (let i = 6; i >= 0; i--) {
+   173→    const d = new Date(); d.setDate(d.getDate() - i);
+   174→    const ds = d.toISOString().slice(0, 10);
+   175→    const dayRecs = attRecords.filter((r: any) => new Date(r.date).toISOString().slice(0, 10) === ds);
+   176→    trend.push({
+   177→      name: d.toLocaleDateString("en-IN", { weekday: "short" }),
+   178→      Present: dayRecs.filter((r: any) => r.status === "present" || r.status === "late").length,
+   179→      Absent: dayRecs.filter((r: any) => r.status === "absent").length,
+   180→    });
+   181→  }
+   182→
+   183→  const deptPie = Object.entries(byDepartment).map(([name, value]) => ({ name, value: value as number }));
+   184→
+   185→  // Estimate monthly payroll
+   186→  const avgSalary = 45000;
+   187→  const estPayroll = (payrollSummary.totalNetPay as number) || activeCount * avgSalary;
+   188→
+   189→  return (
+   190→    <div className="space-y-5">
+   191→      {/* KPI Row */}
+   192→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+   193→        <KpiCard label="Total Employees" value={totalEmployees} icon={Users} accent="navy" />
+   194→        <KpiCard label="Attendance Rate" value={attSummary.attendanceRate ?? 92} unit="%" icon={UserCheck} accent="success" />
+   195→        <KpiCard label="Payroll This Month" value={fmtINR(estPayroll)} icon={IndianRupee} accent="gold" />
+   196→        <KpiCard label="Upcoming Events" value={events.length} icon={CalendarDays} accent="info" />
+   197→        <KpiCard label="Upcoming Birthdays" value={upcomingBdays.length} icon={Cake} accent="error" hint="This & next month" />
+   198→        <KpiCard label="Avg Scorecard" value={78.5} icon={Star} accent="warning" />
+   199→      </div>
+   200→
+   201→      {/* Charts Row */}
+   202→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   203→        <Card>
+   204→          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Attendance Trend (7 days)</CardTitle></CardHeader>
+   205→          <CardContent>
+   206→            <ResponsiveContainer width="100%" height={220}>
+   207→              <BarChart data={trend}>
+   208→                <CartesianGrid strokeDasharray="3 3" />
+   209→                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+   210→                <YAxis tick={{ fontSize: 11 }} />
+   211→                <Tooltip />
+   212→                <Legend />
+   213→                <Bar dataKey="Present" fill={CC[2]} radius={[4,4,0,0]} />
+   214→                <Bar dataKey="Absent" fill={CC[4]} radius={[4,4,0,0]} />
+   215→              </BarChart>
+   216→            </ResponsiveContainer>
+   217→          </CardContent>
+   218→        </Card>
+   219→        <Card>
+   220→          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Department Distribution</CardTitle></CardHeader>
+   221→          <CardContent>
+   222→            {deptPie.length > 0 ? (
+   223→              <ResponsiveContainer width="100%" height={220}>
+   224→                <PieChart>
+   225→                  <Pie data={deptPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
+   226→                    label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+   227→                    {deptPie.map((_, i) => <Cell key={i} fill={CC[i % CC.length]} />)}
+   228→                  </Pie>
+   229→                  <Tooltip />
+   230→                </PieChart>
+   231→              </ResponsiveContainer>
+   232→            ) : (
+   233→              <p className="text-sm text-muted-foreground text-center py-10">No department data</p>
+   234→            )}
+   235→          </CardContent>
+   236→        </Card>
+   237→      </div>
+   238→
+   239→      {/* Events + Birthdays Row */}
+   240→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   241→        {/* Recent Events */}
+   242→        <Card>
+   243→          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Recent Events</CardTitle></CardHeader>
+   244→          <CardContent className="max-h-64 overflow-y-auto">
+   245→            {events.length === 0 ? (
+   246→              <p className="text-sm text-muted-foreground">No events this month</p>
+   247→            ) : (
+   248→              events.slice(0, 8).map((e: any, idx: number) => {
+   249→                const IconComp = EVENT_ICONS[e.type] || Calendar;
+   250→                return (
+   251→                  <div key={e.id || idx} className="flex items-center gap-3 py-2 border-b last:border-0">
+   252→                    <Badge className={cn("text-[10px] border", EVENT_COLORS[e.type] || "bg-muted")}>{e.type}</Badge>
+   253→                    <div className="min-w-0 flex-1">
+   254→                      <p className="text-sm font-medium truncate">{e.title}</p>
+   255→                      <p className="text-xs text-muted-foreground">{fmtDate(e.eventDate)}</p>
+   256→                    </div>
+   257→                  </div>
+   258→                );
+   259→              })
+   260→            )}
+   261→          </CardContent>
+   262→        </Card>
+   263→
+   264→        {/* Upcoming Birthdays */}
+   265→        <Card className="border-[#7C3AED]/20">
+   266→          <CardHeader className="pb-2">
+   267→            <div className="flex items-center justify-between">
+   268→              <CardTitle className="font-display text-sm flex items-center gap-2">
+   269→                <Cake className="h-4 w-4 text-[#7C3AED]" /> Upcoming Birthdays
+   270→              </CardTitle>
+   271→              <Badge className="bg-[#F3E8FF] text-[#4C1D95] border-[#7C3AED] text-[10px]">{upcomingBdays.length} upcoming</Badge>
+   272→            </div>
+   273→          </CardHeader>
+   274→          <CardContent className="max-h-64 overflow-y-auto">
+   275→            {upcomingBdays.length === 0 ? (
+   276→              <p className="text-sm text-muted-foreground">No upcoming birthdays</p>
+   277→            ) : (
+   278→              upcomingBdays.map((b, idx) => {
+   279→                const isThisMonth = b.birthMonth === thisMonth;
+   280→                const bDate = new Date(now.getFullYear(), b.birthMonth - 1, b.birthDay);
+   281→                const isToday = b.birthDay === now.getDate() && b.birthMonth === thisMonth;
+   282→                const daysUntil = Math.ceil((bDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+   283→                const daysLabel = isToday ? "Today! 🎉" : daysUntil < 0 ? "Passed" : daysUntil === 0 ? "Today!" : `${daysUntil}d away`;
+   284→                return (
+   285→                  <div key={idx} className={cn("flex items-center gap-3 py-2 border-b last:border-0", isToday && "bg-[#F3E8FF]/50 -mx-4 px-4 rounded-lg")}>
+   286→                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#F3E8FF] to-[#E9D5FF] text-[#7C3AED] text-sm font-bold border-2 border-[#7C3AED]/30">
+   287→                      {b.name.split(" ").map(n => n[0]).join("")}
+   288→                    </div>
+   289→                    <div className="min-w-0 flex-1">
+   290→                      <p className="text-sm font-medium truncate">{b.name}</p>
+   291→                      <p className="text-[11px] text-muted-foreground">{b.department} · {b.birthDay} {MONTHS[b.birthMonth - 1]}</p>
+   292→                    </div>
+   293→                    <div className="text-right shrink-0">
+   294→                      <p className={cn("text-[11px] font-medium", isToday ? "text-[#7C3AED]" : "text-muted-foreground")}>{daysLabel}</p>
+   295→                      {isThisMonth && <Badge className="bg-[#F3E8FF] text-[#4C1D95] text-[9px] h-4 mt-0.5">This Month</Badge>}
+   296→                    </div>
+   297→                  </div>
+   298→                );
+   299→              })
+   300→            )}
+   301→          </CardContent>
+   302→        </Card>
+   303→      </div>
+   304→
+   305→      {/* Quick Actions */}
+   306→      <Card>
+   307→        <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Quick Actions</CardTitle></CardHeader>
+   308→        <CardContent>
+   309→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   310→            {[
+   311→              { icon: Plus, label: "Add Employee", desc: "Onboard new staff", color: "bg-[#1B3A6B]" },
+   312→              { icon: CalendarDays, label: "Schedule Event", desc: "Create event/training", color: "bg-[#0369A1]" },
+   313→              { icon: IndianRupee, label: "Run Payroll", desc: "Generate salary slips", color: "bg-[#16A34A]" },
+   314→              { icon: Cake, label: "Plan Birthday", desc: "Celebrate team member", color: "bg-[#7C3AED]" },
+   315→            ].map(({ icon: Ic, label, desc, color }) => (
+   316→              <button key={label} className="flex items-center gap-3 rounded-lg border p-3 text-left hover:bg-accent/50 transition-colors">
+   317→                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white", color)}>
+   318→                  <Ic className="h-4 w-4" />
+   319→                </div>
+   320→                <div>
+   321→                  <p className="text-sm font-medium">{label}</p>
+   322→                  <p className="text-[11px] text-muted-foreground">{desc}</p>
+   323→                </div>
+   324→              </button>
+   325→            ))}
+   326→          </div>
+   327→        </CardContent>
+   328→      </Card>
+   329→    </div>
+   330→  );
+   331→}
+   332→
+   333→// ─── TAB 2: EMPLOYEES ────────────────────────────────────────────────
+   334→function EmployeesTab() {
+   335→  const [search, setSearch] = useState("");
+   336→  const [deptFilter, setDeptFilter] = useState("all");
+   337→  const [roleFilter, setRoleFilter] = useState("all");
+   338→  const [statusFilter, setStatusFilter] = useState("all");
+   339→  const [addOpen, setAddOpen] = useState(false);
+   340→  const [editItem, setEditItem] = useState<any>(null);
+   341→  const [form, setForm] = useState({
+   342→    firstName: "", lastName: "", email: "", role: "", department: "", phone: "",
+   343→  });
+   344→
+   345→  const queryParams = new URLSearchParams({ isActive: statusFilter });
+   346→  if (search) queryParams.set("search", search);
+   347→  if (deptFilter !== "all") queryParams.set("department", deptFilter);
+   348→  if (roleFilter !== "all") queryParams.set("role", roleFilter);
+   349→
+   350→  const { data, loading, reload } = useApi<any>(`/api/hr/employees?${queryParams.toString()}`, [search, deptFilter, roleFilter, statusFilter]);
+   351→  const { triggerRefresh } = useAppStore();
+   352→
+   353→  const employees: any[] = Array.isArray(data) ? data : [];
+   354→  const summary = (data as any)?.summary || {};
+   355→  const departments: string[] = Object.keys(summary.byDepartment || {});
+   356→
+   357→  const resetForm = () => setForm({ firstName: "", lastName: "", email: "", role: "", department: "", phone: "" });
+   358→
+   359→  const handleSave = async () => {
+   360→    try {
+   361→      const body = { ...form, departmentId: form.department || undefined };
+   362→      if (editItem) {
+   363→        await apiPut("/api/hr/employees", { id: editItem.id, ...body });
+   364→        toast.success("Employee updated");
+   365→      } else {
+   366→        await apiPost("/api/hr/employees", body);
+   367→        toast.success("Employee added");
+   368→      }
+   369→      setAddOpen(false); setEditItem(null); resetForm(); reload(); triggerRefresh();
+   370→    } catch (e: any) { toast.error(e.message); }
+   371→  };
+   372→
+   373→  const handleDelete = async (id: string) => {
+   374→    try {
+   375→      await apiPut("/api/hr/employees", { id, isActive: false });
+   376→      toast.success("Employee deactivated"); reload(); triggerRefresh();
+   377→    } catch (e: any) { toast.error(e.message); }
+   378→  };
+   379→
+   380→  if (loading || !data) return <SkeletonGrid />;
+   381→
+   382→  return (
+   383→    <div className="space-y-4">
+   384→      {/* Filters */}
+   385→      <div className="flex flex-wrap items-center gap-2">
+   386→        <div className="relative flex-1 min-w-[200px]">
+   387→          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+   388→          <Input className="pl-9" placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
+   389→        </div>
+   390→        <Select value={deptFilter} onValueChange={setDeptFilter}>
+   391→          <SelectTrigger className="w-40"><SelectValue placeholder="Department" /></SelectTrigger>
+   392→          <SelectContent>
+   393→            <SelectItem value="all">All Departments</SelectItem>
+   394→            {DEPT_OPTIONS.map(d => <SelectItem key={d.code} value={d.code}>{d.label}</SelectItem>)}
+   395→            {departments.filter(d => !DEPT_OPTIONS.some(opt => opt.code === d)).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+   396→          </SelectContent>
+   397→        </Select>
+   398→        <Select value={roleFilter} onValueChange={setRoleFilter}>
+   399→          <SelectTrigger className="w-40"><SelectValue placeholder="Role" /></SelectTrigger>
+   400→          <SelectContent>
+   401→            <SelectItem value="all">All Roles</SelectItem>
+   402→            {ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
+   403→          </SelectContent>
+   404→        </Select>
+   405→        <Select value={statusFilter} onValueChange={setStatusFilter}>
+   406→          <SelectTrigger className="w-28"><SelectValue placeholder="Status" /></SelectTrigger>
+   407→          <SelectContent>
+   408→            <SelectItem value="all">All Status</SelectItem>
+   409→            <SelectItem value="true">Active</SelectItem>
+   410→            <SelectItem value="false">Inactive</SelectItem>
+   411→          </SelectContent>
+   412→        </Select>
+   413→        <Button size="sm" onClick={() => { resetForm(); setEditItem(null); setAddOpen(true); }}>
+   414→          <Plus className="h-3.5 w-3.5 mr-1" />Add Employee
+   415→        </Button>
+   416→      </div>
+   417→
+   418→      {/* Mini stats */}
+   419→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   420→        <KpiCard label="Total" value={employees.length} icon={Users} accent="navy" />
+   421→        <KpiCard label="Active" value={employees.filter(e => e.isActive).length} icon={UserCheck} accent="success" />
+   422→        <KpiCard label="Departments" value={departments.length || DEPT_OPTIONS.length} icon={Building2} accent="info" />
+   423→        <KpiCard label="Open Positions" value={3} icon={Briefcase} accent="warning" hint="Chef, FOM, HK" />
+   424→      </div>
+   425→
+   426→      {/* Table */}
+   427→      <div className="overflow-x-auto rounded-lg border">
+   428→        <Table>
+   429→          <TableHeader>
+   430→            <TableRow>
+   431→              <TableHead>Photo</TableHead>
+   432→              <TableHead>Name</TableHead>
+   433→              <TableHead>Code</TableHead>
+   434→              <TableHead>Department</TableHead>
+   435→              <TableHead>Role</TableHead>
+   436→              <TableHead>Phone</TableHead>
+   437→              <TableHead>Email</TableHead>
+   438→              <TableHead>Status</TableHead>
+   439→              <TableHead>Actions</TableHead>
+   440→            </TableRow>
+   441→          </TableHeader>
+   442→          <TableBody>
+   443→            {employees.length === 0 ? (
+   444→              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No employees found</TableCell></TableRow>
+   445→            ) : employees.map((e: any) => (
+   446→              <TableRow key={e.id} className="hover:bg-accent/30 transition-colors">
+   447→                <TableCell>
+   448→                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#1B3A6B] to-[#2E5FA3] text-white text-xs font-bold">
+   449→                    {e.firstName?.[0]}{e.lastName?.[0]}
+   450→                  </div>
+   451→                </TableCell>
+   452→                <TableCell className="font-medium">{e.fullName || `${e.firstName} ${e.lastName}`}</TableCell>
+   453→                <TableCell className="font-mono text-xs">{e.employeeCode}</TableCell>
+   454→                <TableCell className="text-xs">{e.department || "—"}</TableCell>
+   455→                <TableCell className="text-xs">{ROLE_LABEL[e.role] || e.role}</TableCell>
+   456→                <TableCell className="text-xs">{e.phone || "—"}</TableCell>
+   457→                <TableCell className="text-xs truncate max-w-[180px]">{e.email}</TableCell>
+   458→                <TableCell>
+   459→                  <Badge className={cn("text-[10px]", e.isActive ? "bg-[#DCFCE7] text-[#14532D]" : "bg-muted text-muted-foreground")}>
+   460→                    {e.isActive ? "Active" : "Inactive"}
+   461→                  </Badge>
+   462→                </TableCell>
+   463→                <TableCell>
+   464→                  <div className="flex gap-1">
+   465→                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+   466→                      setForm({
+   467→                        firstName: e.firstName, lastName: e.lastName, email: e.email,
+   468→                        role: e.role, department: e.departmentCode || "", phone: e.phone || "",
+   469→                      });
+   470→                      setEditItem(e);
+   471→                      setAddOpen(true);
+   472→                    }}>
+   473→                      <Pencil className="h-3 w-3" />
+   474→                    </Button>
+   475→                    <Button size="icon" variant="ghost" className="h-7 w-7 text-[#DC2626]" onClick={() => handleDelete(e.id)}>
+   476→                      <Trash2 className="h-3 w-3" />
+   477→                    </Button>
+   478→                  </div>
+   479→                </TableCell>
+   480→              </TableRow>
+   481→            ))}
+   482→          </TableBody>
+   483→        </Table>
+   484→      </div>
+   485→
+   486→      {/* Add/Edit Dialog */}
+   487→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   488→        <DialogContent>
+   489→          <DialogHeader>
+   490→            <DialogTitle className="font-display">{editItem ? "Edit Employee" : "Add Employee"}</DialogTitle>
+   491→          </DialogHeader>
+   492→          <div className="grid grid-cols-2 gap-3">
+   493→            <div><Label>First Name</Label><Input value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} /></div>
+   494→            <div><Label>Last Name</Label><Input value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} /></div>
+   495→            <div className="col-span-2"><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+   496→            <div>
+   497→              <Label>Role</Label>
+   498→              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+   499→                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+   500→                <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}</SelectContent>
+   501→              </Select>
+   502→            </div>
+   503→            <div>
+   504→              <Label>Department</Label>
+   505→              <Select value={form.department} onValueChange={v => setForm(f => ({ ...f, department: v }))}>
+   506→                <SelectTrigger><SelectValue placeholder="Select dept" /></SelectTrigger>
+   507→                <SelectContent>
+   508→                  {DEPT_OPTIONS.map(d => <SelectItem key={d.code} value={d.code}>{d.label}</SelectItem>)}
+   509→                  {departments.filter(d => !DEPT_OPTIONS.some(opt => opt.code === d)).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+   510→                </SelectContent>
+   511→              </Select>
+   512→            </div>
+   513→            <div className="col-span-2"><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+   514→          </div>
+   515→          <DialogFooter>
+   516→            <Button variant="outline" onClick={() => { setAddOpen(false); setEditItem(null); }}>Cancel</Button>
+   517→            <Button onClick={handleSave}>{editItem ? "Update" : "Add"}</Button>
+   518→          </DialogFooter>
+   519→        </DialogContent>
+   520→      </Dialog>
+   521→    </div>
+   522→  );
+   523→}
+   524→
+   525→// ─── TAB 3: PAYROLL ──────────────────────────────────────────────────
+   526→function PayrollTab() {
+   527→  const [month, setMonth] = useState(String(now.getMonth() + 1));
+   528→  const [year, setYear] = useState(String(now.getFullYear()));
+   529→  const [statusFilter, setStatusFilter] = useState("all");
+   530→  const [slipItem, setSlipItem] = useState<any>(null);
+   531→
+   532→  const { data, loading, reload } = useApi<any>(
+   533→    `/api/hr/payroll?month=${month}&year=${year}${statusFilter !== "all" ? `&status=${statusFilter}` : ""}`,
+   534→    [month, year, statusFilter]
+   535→  );
+   536→  const { triggerRefresh } = useAppStore();
+   537→
+   538→  const summary = data?.summary || {};
+   539→  const records: any[] = data?.records || [];
+   540→
+   541→  const handleAction = async (action: string) => {
+   542→    try {
+   543→      const res: any = await apiPost("/api/hr/payroll", { action, month: Number(month), year: Number(year) });
+   544→      toast.success(res.message || `${action} done`); reload(); triggerRefresh();
+   545→    } catch (e: any) { toast.error(e.message); }
+   546→  };
+   547→
+   548→  if (loading || !data) return <SkeletonGrid />;
+   549→
+   550→  return (
+   551→    <div className="space-y-4">
+   552→      {/* Controls */}
+   553→      <div className="flex flex-wrap items-center gap-2">
+   554→        <Select value={month} onValueChange={setMonth}>
+   555→          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+   556→          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+   557→        </Select>
+   558→        <Input className="w-24" value={year} onChange={e => setYear(e.target.value)} placeholder="Year" />
+   559→        <div className="flex gap-1">
+   560→          {[
+   561→            { v: "all", l: "All" },
+   562→            { v: "draft", l: "Draft" },
+   563→            { v: "processed", l: "Processed" },
+   564→            { v: "paid", l: "Paid" },
+   565→          ].map(({ v, l }) => (
+   566→            <Button key={v} size="sm" variant={statusFilter === v ? "default" : "outline"} onClick={() => setStatusFilter(v)}>{l}</Button>
+   567→          ))}
+   568→        </div>
+   569→        <div className="ml-auto flex gap-2">
+   570→          <Button size="sm" variant="outline" onClick={() => handleAction("generate")}>
+   571→            <FileText className="h-3.5 w-3.5 mr-1" />Generate
+   572→          </Button>
+   573→          <Button size="sm" variant="outline" onClick={() => handleAction("process")}>
+   574→            <CheckCheck className="h-3.5 w-3.5 mr-1" />Process All
+   575→          </Button>
+   576→          <Button size="sm" onClick={() => handleAction("pay")}>
+   577→            <IndianRupee className="h-3.5 w-3.5 mr-1" />Mark Paid
+   578→          </Button>
+   579→        </div>
+   580→      </div>
+   581→
+   582→      {/* Payroll KPIs */}
+   583→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   584→        <KpiCard label="Total Gross" value={fmtINR(summary.totalGrossEarnings ?? 0)} icon={Wallet} accent="navy" />
+   585→        <KpiCard label="Total Deductions" value={fmtINR(summary.totalDeductions ?? 0)} icon={Receipt} accent="error" />
+   586→        <KpiCard label="Total Net Pay" value={fmtINR(summary.totalNetPay ?? 0)} icon={IndianRupee} accent="success" />
+   587→        <KpiCard label="Employees" value={summary.employeeCount ?? 0} icon={Users} accent="gold" />
+   588→      </div>
+   589→
+   590→      {/* Workflow Progress */}
+   591→      <Card>
+   592→        <CardHeader className="pb-2">
+   593→          <CardTitle className="font-display text-sm">Payroll Workflow — {MONTHS[Number(month) - 1]} {year}</CardTitle>
+   594→        </CardHeader>
+   595→        <CardContent>
+   596→          <div className="flex items-center gap-2">
+   597→            {[
+   598→              { step: "generate", label: "Generate", icon: FileText, color: "bg-[#D97706]" },
+   599→              { step: "process", label: "Process", icon: CheckCheck, color: "bg-[#0369A1]" },
+   600→              { step: "pay", label: "Pay", icon: IndianRupee, color: "bg-[#16A34A]" },
+   601→            ].map(({ step, label, icon: Ic, color }, idx) => {
+   602→              const statuses = records.map(r => r.status);
+   603→              const isDone = statuses.some(s => step === "generate" ? s !== "draft" : step === "process" ? s === "paid" : false) || (step === "generate" && records.length > 0);
+   604→              return (
+   605→                <div key={step} className="flex items-center gap-2 flex-1">
+   606→                  <div className={cn("flex items-center gap-2 rounded-lg px-4 py-2.5 flex-1", isDone ? `${color} text-white` : "bg-muted text-muted-foreground")}>
+   607→                    <Ic className="h-4 w-4" />
+   608→                    <span className="text-sm font-medium">{label}</span>
+   609→                  </div>
+   610→                  {idx < 2 && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+   611→                </div>
+   612→              );
+   613→            })}
+   614→          </div>
+   615→        </CardContent>
+   616→      </Card>
+   617→
+   618→      {/* Payroll Table */}
+   619→      <div className="overflow-x-auto rounded-lg border">
+   620→        <Table>
+   621→          <TableHeader>
+   622→            <TableRow>
+   623→              <TableHead>Employee</TableHead>
+   624→              <TableHead>Basic</TableHead>
+   625→              <TableHead>HRA</TableHead>
+   626→              <TableHead>DA</TableHead>
+   627→              <TableHead>Convey.</TableHead>
+   628→              <TableHead>Medical</TableHead>
+   629→              <TableHead>Special</TableHead>
+   630→              <TableHead>Gross</TableHead>
+   631→              <TableHead>PF</TableHead>
+   632→              <TableHead>ESI</TableHead>
+   633→              <TableHead>PT</TableHead>
+   634→              <TableHead>Total Ded.</TableHead>
+   635→              <TableHead>Net Pay</TableHead>
+   636→              <TableHead>Status</TableHead>
+   637→              <TableHead>Action</TableHead>
+   638→            </TableRow>
+   639→          </TableHeader>
+   640→          <TableBody>
+   641→            {records.length === 0 ? (
+   642→              <TableRow><TableCell colSpan={15} className="text-center text-muted-foreground py-8">No payroll records. Click Generate to create.</TableCell></TableRow>
+   643→            ) : records.map((r: any) => (
+   644→              <TableRow key={r.id} className="hover:bg-accent/30 transition-colors">
+   645→                <TableCell className="font-medium">
+   646→                  {r.user?.fullName || r.userName}
+   647→                  <p className="text-[10px] text-muted-foreground">{r.user?.employeeCode || r.employeeCode}</p>
+   648→                </TableCell>
+   649→                <TableCell className="font-mono text-xs">{fmtINR(r.basicSalary)}</TableCell>
+   650→                <TableCell className="font-mono text-xs">{fmtINR(r.hra)}</TableCell>
+   651→                <TableCell className="font-mono text-xs">{fmtINR(r.da)}</TableCell>
+   652→                <TableCell className="font-mono text-xs">{fmtINR(r.conveyance)}</TableCell>
+   653→                <TableCell className="font-mono text-xs">{fmtINR(r.medical)}</TableCell>
+   654→                <TableCell className="font-mono text-xs">{fmtINR(r.specialAllow)}</TableCell>
+   655→                <TableCell className="font-mono text-xs font-semibold">{fmtINR(r.grossEarnings)}</TableCell>
+   656→                <TableCell className="font-mono text-xs text-[#DC2626]">{fmtINR(r.pf)}</TableCell>
+   657→                <TableCell className="font-mono text-xs text-[#DC2626]">{fmtINR(r.esi)}</TableCell>
+   658→                <TableCell className="font-mono text-xs text-[#DC2626]">{fmtINR(r.pt)}</TableCell>
+   659→                <TableCell className="font-mono text-xs text-[#DC2626] font-semibold">{fmtINR(r.totalDeductions)}</TableCell>
+   660→                <TableCell className="font-mono text-xs font-bold text-[#16A34A]">{fmtINR(r.netPay)}</TableCell>
+   661→                <TableCell>
+   662→                  <Badge className={cn("text-[10px] border", PAYROLL_COLORS[r.status] || "")}>{r.status}</Badge>
+   663→                </TableCell>
+   664→                <TableCell>
+   665→                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setSlipItem(r)}>
+   666→                    <Eye className="h-3 w-3" />
+   667→                  </Button>
+   668→                </TableCell>
+   669→              </TableRow>
+   670→            ))}
+   671→          </TableBody>
+   672→        </Table>
+   673→      </div>
+   674→
+   675→      {/* Salary Slip Dialog */}
+   676→      <Dialog open={!!slipItem} onOpenChange={() => setSlipItem(null)}>
+   677→        <DialogContent className="max-w-lg">
+   678→          <DialogHeader>
+   679→            <DialogTitle className="font-display text-center">The Aurelian Grand — Salary Slip</DialogTitle>
+   680→          </DialogHeader>
+   681→          {slipItem && (
+   682→            <div className="space-y-4 text-sm">
+   683→              <div className="grid grid-cols-2 gap-2 border-b pb-3">
+   684→                <p><span className="text-muted-foreground">Name:</span> <strong>{slipItem.user?.fullName || slipItem.userName}</strong></p>
+   685→                <p><span className="text-muted-foreground">Code:</span> {slipItem.user?.employeeCode || slipItem.employeeCode}</p>
+   686→                <p><span className="text-muted-foreground">Department:</span> {slipItem.user?.department || slipItem.department || "—"}</p>
+   687→                <p><span className="text-muted-foreground">Period:</span> {MONTHS[(slipItem.month||1)-1]} {slipItem.year}</p>
+   688→              </div>
+   689→              <div className="grid grid-cols-2 gap-4">
+   690→                <div>
+   691→                  <p className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Earnings</p>
+   692→                  {[
+   693→                    ["Basic Salary", slipItem.basicSalary], ["HRA", slipItem.hra], ["DA", slipItem.da],
+   694→                    ["Conveyance", slipItem.conveyance], ["Medical", slipItem.medical], ["Special Allow.", slipItem.specialAllow],
+   695→                    ["Overtime", slipItem.overtime], ["Bonus", slipItem.bonus],
+   696→                  ].map(([l, v]) => (
+   697→                    <div key={l as string} className="flex justify-between py-0.5">
+   698→                      <span className="text-muted-foreground">{l}</span>
+   699→                      <span className="font-mono">{fmtINR(v as number)}</span>
+   700→                    </div>
+   701→                  ))}
+   702→                  <div className="flex justify-between border-t pt-1 mt-1 font-bold">
+   703→                    <span>Gross Earnings</span>
+   704→                    <span className="font-mono">{fmtINR(slipItem.grossEarnings)}</span>
+   705→                  </div>
+   706→                </div>
+   707→                <div>
+   708→                  <p className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Deductions</p>
+   709→                  {[
+   710→                    ["Provident Fund", slipItem.pf], ["ESI", slipItem.esi], ["Tax (TDS)", slipItem.tax],
+   711→                    ["Prof. Tax", slipItem.pt], ["Loan Deduction", slipItem.loanDeduction], ["Other Ded.", slipItem.otherDeductions],
+   712→                  ].map(([l, v]) => (
+   713→                    <div key={l as string} className="flex justify-between py-0.5">
+   714→                      <span className="text-muted-foreground">{l}</span>
+   715→                      <span className="font-mono text-[#DC2626]">{fmtINR(v as number)}</span>
+   716→                    </div>
+   717→                  ))}
+   718→                  <div className="flex justify-between border-t pt-1 mt-1 font-bold">
+   719→                    <span>Total Ded.</span>
+   720→                    <span className="font-mono text-[#DC2626]">{fmtINR(slipItem.totalDeductions)}</span>
+   721→                  </div>
+   722→                </div>
+   723→              </div>
+   724→              <div className="rounded-xl bg-gradient-to-r from-[#1B3A6B] to-[#2E5FA3] text-white p-4 text-center shadow-card">
+   725→                <p className="text-xs uppercase tracking-wider text-white/70">Net Pay</p>
+   726→                <p className="font-display text-3xl font-bold font-mono">{fmtINR(slipItem.netPay)}</p>
+   727→                <p className="text-[10px] text-white/60 mt-1">Indian Rupees · {MONTHS[(slipItem.month||1)-1]} {slipItem.year}</p>
+   728→              </div>
+   729→            </div>
+   730→          )}
+   731→          <DialogFooter>
+   732→            <Button variant="outline" onClick={() => toast.info("Print functionality coming soon")}>
+   733→              <Printer className="h-3.5 w-3.5 mr-1" />Print
+   734→            </Button>
+   735→          </DialogFooter>
+   736→        </DialogContent>
+   737→      </Dialog>
+   738→    </div>
+   739→  );
+   740→}
+   741→
+   742→// ─── TAB 4: EVENTS & BIRTHDAYS ───────────────────────────────────────
+   743→function EventsTab() {
+   744→  const [month, setMonth] = useState(String(now.getMonth() + 1));
+   745→  const [year, setYear] = useState(String(now.getFullYear()));
+   746→  const [addOpen, setAddOpen] = useState(false);
+   747→  const [editEvent, setEditEvent] = useState<any>(null);
+   748→  const [form, setForm] = useState({
+   749→    title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "",
+   750→  });
+   751→  const [birthdayEventOpen, setBirthdayEventOpen] = useState(false);
+   752→  const [birthdayForm, setBirthdayForm] = useState({ personName: "", birthDay: "", birthMonth: "" });
+   753→
+   754→  const { data, loading, reload } = useApi<any>(`/api/hr/events?month=${month}&year=${year}`, [month, year]);
+   755→  const { triggerRefresh } = useAppStore();
+   756→
+   757→  const events: any[] = data?.events || [];
+   758→
+   759→  // Upcoming birthdays
+   760→  const thisMonth = now.getMonth() + 1;
+   761→  const nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
+   762→  const upcomingBdays = useMemo(() =>
+   763→    MOCK_BIRTHDAYS
+   764→      .filter(b => b.birthMonth === thisMonth || b.birthMonth === nextMonth)
+   765→      .sort((a, b) => {
+   766→        if (a.birthMonth !== b.birthMonth) return a.birthMonth - b.birthMonth;
+   767→        return a.birthDay - b.birthDay;
+   768→      }),
+   769→    [thisMonth, nextMonth]
+   770→  );
+   771→
+   772→  const handleSave = async () => {
+   773→    try {
+   774→      if (editEvent) {
+   775→        await apiPut("/api/hr/events", { id: editEvent.id, ...form });
+   776→        toast.success("Event updated");
+   777→      } else {
+   778→        await apiPost("/api/hr/events", form);
+   779→        toast.success("Event created");
+   780→      }
+   781→      setAddOpen(false); setEditEvent(null);
+   782→      setForm({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" });
+   783→      reload(); triggerRefresh();
+   784→    } catch (e: any) { toast.error(e.message); }
+   785→  };
+   786→
+   787→  const handleDeleteEvent = async (id: string) => {
+   788→    try {
+   789→      await apiPut("/api/hr/events", { id, status: "cancelled" });
+   790→      toast.success("Event cancelled"); reload(); triggerRefresh();
+   791→    } catch (e: any) { toast.error(e.message); }
+   792→  };
+   793→
+   794→  const handleCreateBirthdayEvent = (b: typeof MOCK_BIRTHDAYS[0]) => {
+   795→    const bDate = new Date(now.getFullYear(), b.birthMonth - 1, b.birthDay);
+   796→    // If birthday already passed this year, use next year
+   797→    if (bDate < now) bDate.setFullYear(bDate.getFullYear() + 1);
+   798→    setBirthdayForm({
+   799→      personName: b.name,
+   800→      birthDay: String(b.birthDay),
+   801→      birthMonth: String(b.birthMonth),
+   802→    });
+   803→    setBirthdayEventOpen(true);
+   804→  };
+   805→
+   806→  const handleBirthdayEventSave = async () => {
+   807→    try {
+   808→      const bDate = new Date(now.getFullYear(), Number(birthdayForm.birthMonth) - 1, Number(birthdayForm.birthDay));
+   809→      if (bDate < now) bDate.setFullYear(bDate.getFullYear() + 1);
+   810→      const eventBody = {
+   811→        title: `🎂 Birthday Celebration — ${birthdayForm.personName}`,
+   812→        type: "birthday",
+   813→        eventDate: bDate.toISOString().slice(0, 10),
+   814→        endDate: bDate.toISOString().slice(0, 10),
+   815→        venue: "Hotel Lobby / Cafeteria",
+   816→        description: `Birthday celebration for ${birthdayForm.personName}. Cake cutting ceremony and team gathering.`,
+   817→      };
+   818→      await apiPost("/api/hr/events", eventBody);
+   819→      toast.success("Birthday celebration event created!");
+   820→      setBirthdayEventOpen(false);
+   821→      reload(); triggerRefresh();
+   822→    } catch (e: any) { toast.error(e.message); }
+   823→  };
+   824→
+   825→  const resetForm = () => setForm({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" });
+   826→
+   827→  if (loading || !data) return <SkeletonGrid />;
+   828→
+   829→  return (
+   830→    <div className="space-y-5">
+   831→      {/* Events Controls */}
+   832→      <div className="flex flex-wrap items-center gap-2">
+   833→        <Select value={month} onValueChange={setMonth}>
+   834→          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+   835→          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+   836→        </Select>
+   837→        <Input className="w-24" value={year} onChange={e => setYear(e.target.value)} placeholder="Year" />
+   838→        <div className="ml-auto flex gap-2">
+   839→          <Button size="sm" onClick={() => { resetForm(); setEditEvent(null); setAddOpen(true); }}>
+   840→            <Plus className="h-3.5 w-3.5 mr-1" />Add Event
+   841→          </Button>
+   842→        </div>
+   843→      </div>
+   844→
+   845→      {/* Upcoming Birthdays Section */}
+   846→      <Card className="border-[#7C3AED]/20 overflow-hidden">
+   847→        <div className="bg-gradient-to-r from-[#F3E8FF] via-[#E9D5FF] to-[#DDD6FE] px-5 py-3">
+   848→          <div className="flex items-center justify-between">
+   849→            <div className="flex items-center gap-2">
+   850→              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#7C3AED] text-white">
+   851→                <Cake className="h-4 w-4" />
+   852→              </div>
+   853→              <div>
+   854→                <h3 className="font-display text-sm font-bold text-[#4C1D95]">Upcoming Birthdays</h3>
+   855→                <p className="text-[11px] text-[#7C3AED]/70">{upcomingBdays.length} birthdays this & next month</p>
+   856→              </div>
+   857→            </div>
+   858→            <Badge className="bg-[#7C3AED] text-white border-[#7C3AED] text-[10px]">
+   859→              <Gift className="h-3 w-3 mr-1" /> Celebrate!
+   860→            </Badge>
+   861→          </div>
+   862→        </div>
+   863→        <CardContent className="p-4">
+   864→          {upcomingBdays.length === 0 ? (
+   865→            <p className="text-sm text-muted-foreground text-center py-4">No upcoming birthdays</p>
+   866→          ) : (
+   867→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[320px] overflow-y-auto">
+   868→              {upcomingBdays.map((b, idx) => {
+   869→                const bDate = new Date(now.getFullYear(), b.birthMonth - 1, b.birthDay);
+   870→                const isToday = b.birthDay === now.getDate() && b.birthMonth === thisMonth;
+   871→                const daysUntil = Math.ceil((bDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+   872→                const daysLabel = isToday ? "Today! 🎉" : daysUntil < 0 ? `Next year` : daysUntil === 0 ? "Today!" : `${daysUntil}d away`;
+   873→                return (
+   874→                  <div
+   875→                    key={idx}
+   876→                    className={cn(
+   877→                      "relative rounded-xl border-2 p-3 transition-all hover:shadow-card-lg",
+   878→                      isToday ? "border-[#7C3AED] bg-[#F3E8FF]/40" : "border-[#7C3AED]/20 bg-card hover:border-[#7C3AED]/40"
+   879→                    )}
+   880→                  >
+   881→                    {isToday && (
+   882→                      <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#7C3AED] text-white text-xs">
+   883→                        🎂
+   884→                      </div>
+   885→                    )}
+   886→                    <div className="flex items-start gap-3">
+   887→                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#F3E8FF] to-[#DDD6FE] text-[#7C3AED] text-sm font-bold border-2 border-[#7C3AED]/30">
+   888→                        {b.name.split(" ").map(n => n[0]).join("")}
+   889→                      </div>
+   890→                      <div className="min-w-0 flex-1">
+   891→                        <p className="text-sm font-semibold truncate">{b.name}</p>
+   892→                        <p className="text-[11px] text-muted-foreground">{b.department}</p>
+   893→                        <p className="text-[11px] text-[#7C3AED]">{b.birthDay} {MONTHS[b.birthMonth - 1]}</p>
+   894→                      </div>
+   895→                    </div>
+   896→                    <div className="mt-2 flex items-center justify-between">
+   897→                      <span className={cn("text-[10px] font-medium", isToday ? "text-[#7C3AED]" : "text-muted-foreground")}>{daysLabel}</span>
+   898→                      <Button
+   899→                        size="sm"
+   900→                        variant="outline"
+   901→                        className="h-6 text-[10px] border-[#7C3AED]/30 text-[#7C3AED] hover:bg-[#F3E8FF] hover:text-[#4C1D95]"
+   902→                        onClick={() => handleCreateBirthdayEvent(b)}
+   903→                      >
+   904→                        <PartyPopper className="h-3 w-3 mr-1" />Plan
+   905→                      </Button>
+   906→                    </div>
+   907→                  </div>
+   908→                );
+   909→              })}
+   910→            </div>
+   911→          )}
+   912→        </CardContent>
+   913→      </Card>
+   914→
+   915→      {/* Events List */}
+   916→      <div>
+   917→        <div className="flex items-center justify-between mb-3">
+   918→          <h3 className="font-display text-sm font-semibold">Company Events — {MONTHS[Number(month) - 1]} {year}</h3>
+   919→          <div className="flex items-center gap-1.5 flex-wrap">
+   920→            {Object.entries(EVENT_COLORS).map(([type, cls]) => {
+   921→              const IconComp = EVENT_ICONS[type] || Calendar;
+   922→              const isActive = events.some(e => e.type === type);
+   923→              return (
+   924→                <span key={type} className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-medium", cls, !isActive && "opacity-40")}>
+   925→                  <IconComp className="h-2.5 w-2.5" />{type}
+   926→                </span>
+   927→              );
+   928→            })}
+   929→          </div>
+   930→        </div>
+   931→
+   932→        {events.length === 0 ? (
+   933→          <div className="text-center py-16 text-muted-foreground">
+   934→            <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
+   935→            <p>No events this month</p>
+   936→            <p className="text-xs mt-1">Click &quot;Add Event&quot; to create one</p>
+   937→          </div>
+   938→        ) : (
+   939→          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto">
+   940→            {events.map((e: any) => {
+   941→              const IconComp = EVENT_ICONS[e.type] || Calendar;
+   942→              const isBirthday = e.type === "birthday";
+   943→              return (
+   944→                <Card
+   945→                  key={e.id}
+   946→                  className={cn(
+   947→                    "hover:shadow-card-lg transition-all group",
+   948→                    isBirthday && "border-[#7C3AED]/30"
+   949→                  )}
+   950→                >
+   951→                  <CardContent className="p-4">
+   952→                    <div className="flex items-start justify-between gap-2">
+   953→                      <div className="flex items-start gap-2 min-w-0">
+   954→                        <div className={cn(
+   955→                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+   956→                          isBirthday ? "bg-[#F3E8FF] text-[#7C3AED]" : "bg-muted text-muted-foreground"
+   957→                        )}>
+   958→                          <IconComp className="h-4 w-4" />
+   959→                        </div>
+   960→                        <div className="min-w-0">
+   961→                          <p className="font-semibold truncate text-sm">{e.title}</p>
+   962→                          <Badge className={cn("mt-1 text-[10px] border", EVENT_COLORS[e.type] || "bg-muted")}>{e.type}</Badge>
+   963→                        </div>
+   964→                      </div>
+   965→                      <Badge variant="outline" className="text-[10px] shrink-0">{e.status}</Badge>
+   966→                    </div>
+   967→                    <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+   968→                      <p className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{fmtDate(e.eventDate)}{e.endDate && e.endDate !== e.eventDate ? ` — ${fmtDate(e.endDate)}` : ""}</p>
+   969→                      {e.venue && <p className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{e.venue}</p>}
+   970→                      {e.organizerName && <p className="flex items-center gap-1.5"><UserCircle className="h-3 w-3" />{e.organizerName}</p>}
+   971→                      {e.description && <p className="text-muted-foreground/70 line-clamp-2 mt-1">{e.description}</p>}
+   972→                    </div>
+   973→                    <div className="mt-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   974→                      <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => {
+   975→                        setForm({
+   976→                          title: e.title, type: e.type, eventDate: e.eventDate?.slice(0,10) || "",
+   977→                          endDate: e.endDate?.slice(0,10) || "", venue: e.venue || "", description: e.description || "",
+   978→                        });
+   979→                        setEditEvent(e);
+   980→                        setAddOpen(true);
+   981→                      }}>
+   982→                        <Pencil className="h-3 w-3 mr-1" />Edit
+   983→                      </Button>
+   984→                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-[#DC2626]" onClick={() => handleDeleteEvent(e.id)}>
+   985→                        <Trash2 className="h-3 w-3 mr-1" />Cancel
+   986→                      </Button>
+   987→                    </div>
+   988→                  </CardContent>
+   989→                </Card>
+   990→              );
+   991→            })}
+   992→          </div>
+   993→        )}
+   994→      </div>
+   995→
+   996→      {/* Add/Edit Event Dialog */}
+   997→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   998→        <DialogContent>
+   999→          <DialogHeader>
+  1000→            <DialogTitle className="font-display">{editEvent ? "Edit Event" : "Add Event"}</DialogTitle>
+  1001→          </DialogHeader>
+  1002→          <div className="space-y-3">
+  1003→            <div><Label>Title</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+  1004→            <div>
+  1005→              <Label>Type</Label>
+  1006→              <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+  1007→                <SelectTrigger><SelectValue /></SelectTrigger>
+  1008→                <SelectContent>
+  1009→                  {["festival","training","meeting","celebration","audit","inspection","birthday"].map(t => {
+  1010→                    const IconComp = EVENT_ICONS[t] || Calendar;
+  1011→                    return (
+  1012→                      <SelectItem key={t} value={t}>
+  1013→                        <span className="flex items-center gap-2">
+  1014→                          <IconComp className="h-3 w-3" />{t.charAt(0).toUpperCase() + t.slice(1)}
+  1015→                        </span>
+  1016→                      </SelectItem>
+  1017→                    );
+  1018→                  })}
+  1019→                </SelectContent>
+  1020→              </Select>
+  1021→            </div>
+  1022→            <div className="grid grid-cols-2 gap-3">
+  1023→              <div><Label>Start Date</Label><Input type="date" value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} /></div>
+  1024→              <div><Label>End Date</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
+  1025→            </div>
+  1026→            <div><Label>Venue</Label><Input value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} /></div>
+  1027→            <div><Label>Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+  1028→          </div>
+  1029→          <DialogFooter>
+  1030→            <Button variant="outline" onClick={() => { setAddOpen(false); setEditEvent(null); }}>Cancel</Button>
+  1031→            <Button onClick={handleSave}>{editEvent ? "Update" : "Create"}</Button>
+  1032→          </DialogFooter>
+  1033→        </DialogContent>
+  1034→      </Dialog>
+  1035→
+  1036→      {/* Birthday Event Planning Dialog */}
+  1037→      <Dialog open={birthdayEventOpen} onOpenChange={setBirthdayEventOpen}>
+  1038→        <DialogContent>
+  1039→          <DialogHeader>
+  1040→            <DialogTitle className="font-display flex items-center gap-2">
+  1041→              <Cake className="h-5 w-5 text-[#7C3AED]" />Plan Birthday Celebration
+  1042→            </DialogTitle>
+  1043→          </DialogHeader>
+  1044→          <div className="space-y-4">
+  1045→            <div className="rounded-xl bg-gradient-to-r from-[#F3E8FF] to-[#E9D5FF] p-4 text-center">
+  1046→              <p className="text-[#4C1D95] font-semibold text-lg">{birthdayForm.personName}</p>
+  1047→              <p className="text-[#7C3AED] text-sm">{birthdayForm.birthDay} {MONTHS[Number(birthdayForm.birthMonth) - 1]}</p>
+  1048→            </div>
+  1049→            <div className="space-y-3">
+  1050→              <div>
+  1051→                <Label>Venue</Label>
+  1052→                <Select defaultValue="lobby" onValueChange={() => {}}>
+  1053→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1054→                  <SelectContent>
+  1055→                    <SelectItem value="lobby">Hotel Lobby</SelectItem>
+  1056→                    <SelectItem value="cafeteria">Staff Cafeteria</SelectItem>
+  1057→                    <SelectItem value="conference">Conference Room</SelectItem>
+  1058→                    <SelectItem value="garden">Garden Terrace</SelectItem>
+  1059→                  </SelectContent>
+  1060→                </Select>
+  1061→              </div>
+  1062→              <div><Label>Budget</Label><Input type="number" placeholder="e.g., 5000" defaultValue="3000" /></div>
+  1063→              <div className="flex items-center gap-2">
+  1064→                <input type="checkbox" id="cake" defaultChecked className="rounded" />
+  1065→                <Label htmlFor="cake" className="text-sm">Order Birthday Cake</Label>
+  1066→              </div>
+  1067→              <div className="flex items-center gap-2">
+  1068→                <input type="checkbox" id="decor" defaultChecked className="rounded" />
+  1069→                <Label htmlFor="decor" className="text-sm">Decorations</Label>
+  1070→              </div>
+  1071→              <div className="flex items-center gap-2">
+  1072→                <input type="checkbox" id="team-lunch" className="rounded" />
+  1073→                <Label htmlFor="team-lunch" className="text-sm">Team Lunch/Dinner</Label>
+  1074→              </div>
+  1075→            </div>
+  1076→          </div>
+  1077→          <DialogFooter>
+  1078→            <Button variant="outline" onClick={() => setBirthdayEventOpen(false)}>Cancel</Button>
+  1079→            <Button className="bg-[#7C3AED] hover:bg-[#6D28D9]" onClick={handleBirthdayEventSave}>
+  1080→              <PartyPopper className="h-3.5 w-3.5 mr-1" />Create Celebration
+  1081→            </Button>
+  1082→          </DialogFooter>
+  1083→        </DialogContent>
+  1084→      </Dialog>
+  1085→    </div>
+  1086→  );
+  1087→}
+  1088→
+  1089→// ─── HELPERS ──────────────────────────────────────────────────────────
+  1090→function SkeletonGrid() {
+  1091→  return (
+  1092→    <div className="space-y-4">
+  1093→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+  1094→        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+  1095→      </div>
+  1096→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1097→        <Skeleton className="h-64 rounded-xl" />
+  1098→        <Skeleton className="h-64 rounded-xl" />
+  1099→      </div>
+  1100→    </div>
+  1101→  );
+  1102→}
+  1103→

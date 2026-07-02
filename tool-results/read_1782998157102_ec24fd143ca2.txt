@@ -1,0 +1,518 @@
+   200→   200→   200→}
+   201→   201→   201→
+   202→   202→   202→// ─── TAB 2: ATTENDANCE ─────────────────────────────────────────────
+   203→   203→   203→function AttendanceTab() {
+   204→   204→   204→  const [month, setMonth] = useState(String(now.getMonth() + 1));
+   205→   205→   205→  const [year, setYear] = useState(String(now.getFullYear()));
+   206→   206→   206→  const [view, setView] = useState("monthly");
+   207→   207→   207→  const [markOpen, setMarkOpen] = useState(false);
+   208→   208→   208→  const [form, setForm] = useState({ userId: "", date: "", checkIn: "", checkOut: "", status: "present" });
+   209→   209→   209→  const { data: empData } = useApi<any>("/api/hr/employees?isActive=true", []);
+   210→   210→   210→  const { data, loading, reload } = useApi<any>(`/api/hr/attendance?month=${month}&year=${year}&view=${view}`, [month, year, view]);
+   211→   211→   211→  const { triggerRefresh } = useAppStore();
+   212→   212→   212→
+   213→   213→   213→  const employees: any[] = Array.isArray(empData) ? empData : [];
+   214→   214→   214→  const summary = data?.summary || {};
+   215→   215→   215→  const records: any[] = data?.attendance || data?.todayAttendance || [];
+   216→   216→   216→
+   217→   217→   217→  const handleMark = async () => {
+   218→   218→   218→    try {
+   219→   219→   219→      await apiPost("/api/hr/attendance", { ...form, source: "manual" });
+   220→   220→   220→      toast.success("Attendance recorded"); setMarkOpen(false); reload(); triggerRefresh();
+   221→   221→   221→    } catch (e: any) { toast.error(e.message); }
+   222→   222→   222→  };
+   223→   223→   223→
+   224→   224→   224→  const markAllPresent = async () => {
+   225→   225→   225→    try {
+   226→   226→   226→      const recs = employees.map((e: any) => ({ userId: e.id, date: new Date().toISOString().slice(0, 10), status: "present" as const }));
+   227→   227→   227→      await apiPut("/api/hr/attendance", { records: recs });
+   228→   228→   228→      toast.success(`Marked ${recs.length} present`); reload(); triggerRefresh();
+   229→   229→   229→    } catch (e: any) { toast.error(e.message); }
+   230→   230→   230→  };
+   231→   231→   231→
+   232→   232→   232→  if (loading || !data) return <SkeletonGrid />;
+   233→   233→   233→
+   234→   234→   234→  return (
+   235→   235→   235→    <div className="space-y-4">
+   236→   236→   236→      <div className="flex flex-wrap items-center gap-2">
+   237→   237→   237→        <Select value={month} onValueChange={setMonth}>
+   238→   238→   238→          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+   239→   239→   239→          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+   240→   240→   240→        </Select>
+   241→   241→   241→        <Input className="w-24" value={year} onChange={(e) => setYear(e.target.value)} placeholder="Year" />
+   242→   242→   242→        <div className="flex gap-1">
+   243→   243→   243→          {["daily","weekly","monthly"].map(v => (
+   244→   244→   244→            <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{v.charAt(0).toUpperCase()+v.slice(1)}</Button>
+   245→   245→   245→          ))}
+   246→   246→   246→        </div>
+   247→   247→   247→        <div className="ml-auto flex gap-2">
+   248→   248→   248→          <Button size="sm" variant="outline" onClick={markAllPresent}><CheckCheck className="h-3.5 w-3.5 mr-1" />Mark All Present</Button>
+   249→   249→   249→          <Button size="sm" variant="outline" onClick={() => toast.info("Excel upload coming soon")}><Upload className="h-3.5 w-3.5 mr-1" />Upload Excel</Button>
+   250→   250→   250→          <Button size="sm" onClick={() => setMarkOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" />Mark Attendance</Button>
+   251→   251→   251→        </div>
+   252→   252→   252→      </div>
+   253→   253→   253→
+   254→   254→   254→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+   255→   255→   255→        <KpiCard label="Present" value={summary.totalPresent ?? 0} icon={UserCheck} accent="success" />
+   256→   256→   256→        <KpiCard label="Absent" value={summary.totalAbsent ?? 0} icon={Users} accent="error" />
+   257→   257→   257→        <KpiCard label="Late" value={summary.totalLate ?? 0} icon={Clock} accent="warning" />
+   258→   258→   258→        <KpiCard label="Half Day" value={summary.totalHalfDay ?? 0} icon={Percent} accent="info" />
+   259→   259→   259→        <KpiCard label="On Leave" value={summary.totalOnLeave ?? 0} icon={CalendarDays} accent="navy" />
+   260→   260→   260→        <KpiCard label="Att. Rate" value={summary.attendanceRate ?? 0} unit="%" icon={BarChart3} accent="gold" />
+   261→   261→   261→      </div>
+   262→   262→   262→
+   263→   263→   263→      <div className="overflow-x-auto rounded-lg border">
+   264→   264→   264→        <Table>
+   265→   265→   265→          <TableHeader><TableRow>
+   266→   266→   266→            <TableHead>Employee</TableHead><TableHead>Date</TableHead><TableHead>Check-In</TableHead><TableHead>Check-Out</TableHead>
+   267→   267→   267→            <TableHead>Hours</TableHead><TableHead>Overtime</TableHead><TableHead>Status</TableHead><TableHead>Source</TableHead>
+   268→   268→   268→          </TableRow></TableHeader>
+   269→   269→   269→          <TableBody>
+   270→   270→   270→            {records.length === 0 ? (
+   271→   271→   271→              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No attendance records</TableCell></TableRow>
+   272→   272→   272→            ) : records.map((r: any) => (
+   273→   273→   273→              <TableRow key={r.id}>
+   274→   274→   274→                <TableCell className="font-medium">{r.user?.firstName} {r.user?.lastName}<p className="text-[10px] text-muted-foreground">{r.user?.employeeCode}</p></TableCell>
+   275→   275→   275→                <TableCell className="font-mono-num text-xs">{fmtDate(r.date)}</TableCell>
+   276→   276→   276→                <TableCell className="font-mono-num text-xs">{r.checkIn ? fmtDateTime(r.checkIn) : "—"}</TableCell>
+   277→   277→   277→                <TableCell className="font-mono-num text-xs">{r.checkOut ? fmtDateTime(r.checkOut) : "—"}</TableCell>
+   278→   278→   278→                <TableCell className="font-mono-num text-xs">{r.workHours ?? "—"}</TableCell>
+   279→   279→   279→                <TableCell className="font-mono-num text-xs">{r.overtimeHours || "—"}</TableCell>
+   280→   280→   280→                <TableCell><Badge className={cn("text-[10px] border", ATTENDANCE_COLORS[r.status] || "")}>{r.status?.replace("_"," ")}</Badge></TableCell>
+   281→   281→   281→                <TableCell className="text-xs capitalize">{r.source}</TableCell>
+   282→   282→   282→              </TableRow>
+   283→   283→   283→            ))}
+   284→   284→   284→          </TableBody>
+   285→   285→   285→        </Table>
+   286→   286→   286→      </div>
+   287→   287→   287→
+   288→   288→   288→      <Dialog open={markOpen} onOpenChange={setMarkOpen}>
+   289→   289→   289→        <DialogContent><DialogHeader><DialogTitle>Mark Attendance</DialogTitle></DialogHeader>
+   290→   290→   290→          <div className="space-y-3">
+   291→   291→   291→            <div><Label>Employee</Label><Select value={form.userId} onValueChange={v => setForm(f => ({ ...f, userId: v }))}>
+   292→   292→   292→              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+   293→   293→   293→              <SelectContent>{employees.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.fullName}</SelectItem>)}</SelectContent>
+   294→   294→   294→            </Select></div>
+   295→   295→   295→            <div><Label>Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+   296→   296→   296→            <div className="grid grid-cols-2 gap-3">
+   297→   297→   297→              <div><Label>Check-In</Label><Input type="time" value={form.checkIn} onChange={e => setForm(f => ({ ...f, checkIn: e.target.value }))} /></div>
+   298→   298→   298→              <div><Label>Check-Out</Label><Input type="time" value={form.checkOut} onChange={e => setForm(f => ({ ...f, checkOut: e.target.value }))} /></div>
+   299→   299→   299→            </div>
+   300→   300→   300→            <div><Label>Status</Label><Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+   301→   301→   301→              <SelectTrigger><SelectValue /></SelectTrigger>
+   302→   302→   302→              <SelectContent>{["present","absent","late","half_day","on_leave"].map(s => <SelectItem key={s} value={s}>{s.replace("_"," ")}</SelectItem>)}</SelectContent>
+   303→   303→   303→            </Select></div>
+   304→   304→   304→          </div>
+   305→   305→   305→          <DialogFooter><Button variant="outline" onClick={() => setMarkOpen(false)}>Cancel</Button><Button onClick={handleMark}>Save</Button></DialogFooter>
+   306→   306→   306→        </DialogContent>
+   307→   307→   307→      </Dialog>
+   308→   308→   308→    </div>
+   309→   309→   309→  );
+   310→   310→   310→}
+   311→   311→   311→
+   312→   312→   312→// ─── TAB 3: EMPLOYEES ──────────────────────────────────────────────
+   313→   313→   313→function EmployeesTab() {
+   314→   314→   314→  const [search, setSearch] = useState("");
+   315→   315→   315→  const [deptFilter, setDeptFilter] = useState("all");
+   316→   316→   316→  const [addOpen, setAddOpen] = useState(false);
+   317→   317→   317→  const [editItem, setEditItem] = useState<any>(null);
+   318→   318→   318→  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", role: "", department: "", phone: "" });
+   319→   319→   319→  const { data, loading, reload } = useApi<any>(`/api/hr/employees?isActive=all${search ? `&search=${search}` : ""}${deptFilter !== "all" ? `&department=${deptFilter}` : ""}`, [search, deptFilter]);
+   320→   320→   320→  const { triggerRefresh } = useAppStore();
+   321→   321→   321→
+   322→   322→   322→  const employees: any[] = Array.isArray(data) ? data : [];
+   323→   323→   323→  const summary = (data as any)?.summary || {};
+   324→   324→   324→  const departments = Object.keys(summary.byDepartment || {});
+   325→   325→   325→
+   326→   326→   326→  const resetForm = () => setForm({ firstName: "", lastName: "", email: "", role: "", department: "", phone: "" });
+   327→   327→   327→
+   328→   328→   328→  const handleSave = async () => {
+   329→   329→   329→    try {
+   330→   330→   330→      const body = { ...form, departmentId: form.department || undefined };
+   331→   331→   331→      if (editItem) { await apiPut("/api/hr/employees", { id: editItem.id, ...body }); toast.success("Employee updated"); }
+   332→   332→   332→      else { await apiPost("/api/hr/employees", body); toast.success("Employee added"); }
+   333→   333→   333→      setAddOpen(false); setEditItem(null); resetForm(); reload(); triggerRefresh();
+   334→   334→   334→    } catch (e: any) { toast.error(e.message); }
+   335→   335→   335→  };
+   336→   336→   336→
+   337→   337→   337→  const handleDelete = async (id: string) => {
+   338→   338→   338→    try { await apiPut("/api/hr/employees", { id, isActive: false }); toast.success("Employee deactivated"); reload(); triggerRefresh(); }
+   339→   339→   339→    catch (e: any) { toast.error(e.message); }
+   340→   340→   340→  };
+   341→   341→   341→
+   342→   342→   342→  if (loading || !data) return <SkeletonGrid />;
+   343→   343→   343→
+   344→   344→   344→  return (
+   345→   345→   345→    <div className="space-y-4">
+   346→   346→   346→      <div className="flex flex-wrap items-center gap-2">
+   347→   347→   347→        <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} /></div>
+   348→   348→   348→        <Select value={deptFilter} onValueChange={setDeptFilter}>
+   349→   349→   349→          <SelectTrigger className="w-44"><SelectValue placeholder="Department" /></SelectTrigger>
+   350→   350→   350→          <SelectContent><SelectItem value="all">All Departments</SelectItem>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+   351→   351→   351→        </Select>
+   352→   352→   352→        <Button size="sm" onClick={() => { resetForm(); setEditItem(null); setAddOpen(true); }}><Plus className="h-3.5 w-3.5 mr-1" />Add Employee</Button>
+   353→   353→   353→      </div>
+   354→   354→   354→
+   355→   355→   355→      <div className="overflow-x-auto rounded-lg border">
+   356→   356→   356→        <Table>
+   357→   357→   357→          <TableHeader><TableRow>
+   358→   358→   358→            <TableHead>Photo</TableHead><TableHead>Name</TableHead><TableHead>Code</TableHead><TableHead>Department</TableHead>
+   359→   359→   359→            <TableHead>Role</TableHead><TableHead>Phone</TableHead><TableHead>Email</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead>
+   360→   360→   360→          </TableRow></TableHeader>
+   361→   361→   361→          <TableBody>
+   362→   362→   362→            {employees.length === 0 ? (
+   363→   363→   363→              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No employees found</TableCell></TableRow>
+   364→   364→   364→            ) : employees.map((e: any) => (
+   365→   365→   365→              <TableRow key={e.id}>
+   366→   366→   366→                <TableCell><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1B3A6B] text-white text-xs font-bold">{e.firstName?.[0]}{e.lastName?.[0]}</div></TableCell>
+   367→   367→   367→                <TableCell className="font-medium">{e.fullName}</TableCell>
+   368→   368→   368→                <TableCell className="font-mono-num text-xs">{e.employeeCode}</TableCell>
+   369→   369→   369→                <TableCell className="text-xs">{e.department || "—"}</TableCell>
+   370→   370→   370→                <TableCell className="text-xs">{ROLE_LABEL[e.role] || e.role}</TableCell>
+   371→   371→   371→                <TableCell className="text-xs">{e.phone || "—"}</TableCell>
+   372→   372→   372→                <TableCell className="text-xs truncate max-w-[180px]">{e.email}</TableCell>
+   373→   373→   373→                <TableCell><Badge className={cn("text-[10px]", e.isActive ? "bg-[#DCFCE7] text-[#14532D]" : "bg-muted text-muted-foreground")}>{e.isActive ? "Active" : "Inactive"}</Badge></TableCell>
+   374→   374→   374→                <TableCell>
+   375→   375→   375→                  <div className="flex gap-1">
+   376→   376→   376→                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setForm({ firstName: e.firstName, lastName: e.lastName, email: e.email, role: e.role, department: e.departmentCode || "", phone: e.phone || "" }); setEditItem(e); setAddOpen(true); }}><Pencil className="h-3 w-3" /></Button>
+   377→   377→   377→                    <Button size="icon" variant="ghost" className="h-7 w-7 text-[#DC2626]" onClick={() => handleDelete(e.id)}><Trash2 className="h-3 w-3" /></Button>
+   378→   378→   378→                  </div>
+   379→   379→   379→                </TableCell>
+   380→   380→   380→              </TableRow>
+   381→   381→   381→            ))}
+   382→   382→   382→          </TableBody>
+   383→   383→   383→        </Table>
+   384→   384→   384→      </div>
+   385→   385→   385→
+   386→   386→   386→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   387→   387→   387→        <DialogContent><DialogHeader><DialogTitle>{editItem ? "Edit Employee" : "Add Employee"}</DialogTitle></DialogHeader>
+   388→   388→   388→          <div className="grid grid-cols-2 gap-3">
+   389→   389→   389→            <div><Label>First Name</Label><Input value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} /></div>
+   390→   390→   390→            <div><Label>Last Name</Label><Input value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} /></div>
+   391→   391→   391→            <div className="col-span-2"><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+   392→   392→   392→            <div><Label>Role</Label><Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+   393→   393→   393→              <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+   394→   394→   394→              <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}</SelectContent>
+   395→   395→   395→            </Select></div>
+   396→   396→   396→            <div><Label>Department</Label><Select value={form.department} onValueChange={v => setForm(f => ({ ...f, department: v }))}>
+   397→   397→   397→              <SelectTrigger><SelectValue placeholder="Select dept" /></SelectTrigger>
+   398→   398→   398→              <SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+   399→   399→   399→            </Select></div>
+   400→   400→   400→            <div className="col-span-2"><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+   401→   401→   401→          </div>
+   402→   402→   402→          <DialogFooter><Button variant="outline" onClick={() => { setAddOpen(false); setEditItem(null); }}>Cancel</Button><Button onClick={handleSave}>{editItem ? "Update" : "Add"}</Button></DialogFooter>
+   403→   403→   403→        </DialogContent>
+   404→   404→   404→      </Dialog>
+   405→   405→   405→    </div>
+   406→   406→   406→  );
+   407→   407→   407→}
+   408→   408→   408→
+   409→   409→   409→// ─── TAB 4: PAYROLL ────────────────────────────────────────────────
+   410→   410→   410→function PayrollTab() {
+   411→   411→   411→  const [month, setMonth] = useState(String(now.getMonth() + 1));
+   412→   412→   412→  const [year, setYear] = useState(String(now.getFullYear()));
+   413→   413→   413→  const [statusFilter, setStatusFilter] = useState("all");
+   414→   414→   414→  const [slipItem, setSlipItem] = useState<any>(null);
+   415→   415→   415→  const { data, loading, reload } = useApi<any>(`/api/hr/payroll?month=${month}&year=${year}${statusFilter !== "all" ? `&status=${statusFilter}` : ""}`, [month, year, statusFilter]);
+   416→   416→   416→  const { triggerRefresh } = useAppStore();
+   417→   417→   417→
+   418→   418→   418→  const summary = data?.summary || {};
+   419→   419→   419→  const records: any[] = data?.records || [];
+   420→   420→   420→
+   421→   421→   421→  const handleAction = async (action: string) => {
+   422→   422→   422→    try {
+   423→   423→   423→      const res: any = await apiPost("/api/hr/payroll", { action, month: Number(month), year: Number(year) });
+   424→   424→   424→      toast.success(res.message || `${action} done`); reload(); triggerRefresh();
+   425→   425→   425→    } catch (e: any) { toast.error(e.message); }
+   426→   426→   426→  };
+   427→   427→   427→
+   428→   428→   428→  if (loading || !data) return <SkeletonGrid />;
+   429→   429→   429→
+   430→   430→   430→  return (
+   431→   431→   431→    <div className="space-y-4">
+   432→   432→   432→      <div className="flex flex-wrap items-center gap-2">
+   433→   433→   433→        <Select value={month} onValueChange={setMonth}>
+   434→   434→   434→          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+   435→   435→   435→          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+   436→   436→   436→        </Select>
+   437→   437→   437→        <Input className="w-24" value={year} onChange={e => setYear(e.target.value)} placeholder="Year" />
+   438→   438→   438→        <div className="flex gap-1">
+   439→   439→   439→          {[{ v: "all", l: "All" }, { v: "draft", l: "Draft" }, { v: "processed", l: "Processed" }, { v: "paid", l: "Paid" }].map(({ v, l }) => (
+   440→   440→   440→            <Button key={v} size="sm" variant={statusFilter === v ? "default" : "outline"} onClick={() => setStatusFilter(v)}>{l}</Button>
+   441→   441→   441→          ))}
+   442→   442→   442→        </div>
+   443→   443→   443→        <div className="ml-auto flex gap-2">
+   444→   444→   444→          <Button size="sm" variant="outline" onClick={() => handleAction("generate")}><FileText className="h-3.5 w-3.5 mr-1" />Generate</Button>
+   445→   445→   445→          <Button size="sm" variant="outline" onClick={() => handleAction("process")}><CheckCheck className="h-3.5 w-3.5 mr-1" />Process All</Button>
+   446→   446→   446→          <Button size="sm" onClick={() => handleAction("pay")}><IndianRupee className="h-3.5 w-3.5 mr-1" />Mark Paid</Button>
+   447→   447→   447→        </div>
+   448→   448→   448→      </div>
+   449→   449→   449→
+   450→   450→   450→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   451→   451→   451→        <KpiCard label="Total Gross" value={fmtINR(summary.totalGrossEarnings ?? 0)} icon={IndianRupee} accent="navy" />
+   452→   452→   452→        <KpiCard label="Total Deductions" value={fmtINR(summary.totalDeductions ?? 0)} icon={Percent} accent="error" />
+   453→   453→   453→        <KpiCard label="Total Net Pay" value={fmtINR(summary.totalNetPay ?? 0)} icon={IndianRupee} accent="success" />
+   454→   454→   454→        <KpiCard label="Employees" value={summary.employeeCount ?? 0} icon={Users} accent="gold" />
+   455→   455→   455→      </div>
+   456→   456→   456→
+   457→   457→   457→      <div className="overflow-x-auto rounded-lg border">
+   458→   458→   458→        <Table>
+   459→   459→   459→          <TableHeader><TableRow>
+   460→   460→   460→            <TableHead>Employee</TableHead><TableHead>Basic</TableHead><TableHead>HRA</TableHead><TableHead>Gross</TableHead>
+   461→   461→   461→            <TableHead>PF/ESI/PT</TableHead><TableHead>Deductions</TableHead><TableHead>Net Pay</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead>
+   462→   462→   462→          </TableRow></TableHeader>
+   463→   463→   463→          <TableBody>
+   464→   464→   464→            {records.length === 0 ? (
+   465→   465→   465→              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No payroll records. Click Generate to create.</TableCell></TableRow>
+   466→   466→   466→            ) : records.map((r: any) => (
+   467→   467→   467→              <TableRow key={r.id}>
+   468→   468→   468→                <TableCell className="font-medium">{r.user?.fullName}<p className="text-[10px] text-muted-foreground">{r.user?.employeeCode}</p></TableCell>
+   469→   469→   469→                <TableCell className="font-mono-num text-xs">{fmtINR(r.basicSalary)}</TableCell>
+   470→   470→   470→                <TableCell className="font-mono-num text-xs">{fmtINR(r.hra)}</TableCell>
+   471→   471→   471→                <TableCell className="font-mono-num text-xs">{fmtINR(r.grossEarnings)}</TableCell>
+   472→   472→   472→                <TableCell className="font-mono-num text-xs">{fmtINR(r.pf + r.esi + r.pt)}</TableCell>
+   473→   473→   473→                <TableCell className="font-mono-num text-xs">{fmtINR(r.totalDeductions)}</TableCell>
+   474→   474→   474→                <TableCell className="font-mono-num text-xs font-bold">{fmtINR(r.netPay)}</TableCell>
+   475→   475→   475→                <TableCell><Badge className={cn("text-[10px] border", PAYROLL_COLORS[r.status] || "")}>{r.status}</Badge></TableCell>
+   476→   476→   476→                <TableCell><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setSlipItem(r)}><Eye className="h-3 w-3" /></Button></TableCell>
+   477→   477→   477→              </TableRow>
+   478→   478→   478→            ))}
+   479→   479→   479→          </TableBody>
+   480→   480→   480→        </Table>
+   481→   481→   481→      </div>
+   482→   482→   482→
+   483→   483→   483→      {/* Salary Slip Dialog */}
+   484→   484→   484→      <Dialog open={!!slipItem} onOpenChange={() => setSlipItem(null)}>
+   485→   485→   485→        <DialogContent className="max-w-lg">
+   486→   486→   486→          <DialogHeader><DialogTitle className="font-display text-center">The Aurelian Grand — Salary Slip</DialogTitle></DialogHeader>
+   487→   487→   487→          {slipItem && (
+   488→   488→   488→            <div className="space-y-4 text-sm">
+   489→   489→   489→              <div className="grid grid-cols-2 gap-2 border-b pb-3">
+   490→   490→   490→                <p><span className="text-muted-foreground">Name:</span> <strong>{slipItem.user?.fullName}</strong></p>
+   491→   491→   491→                <p><span className="text-muted-foreground">Code:</span> {slipItem.user?.employeeCode}</p>
+   492→   492→   492→                <p><span className="text-muted-foreground">Department:</span> {slipItem.user?.department || "—"}</p>
+   493→   493→   493→                <p><span className="text-muted-foreground">Period:</span> {MONTHS[(slipItem.month||1)-1]} {slipItem.year}</p>
+   494→   494→   494→              </div>
+   495→   495→   495→              <div className="grid grid-cols-2 gap-4">
+   496→   496→   496→                <div>
+   497→   497→   497→                  <p className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Earnings</p>
+   498→   498→   498→                  {[["Basic", slipItem.basicSalary],["HRA", slipItem.hra],["DA", slipItem.da],["Conveyance", slipItem.conveyance],
+   499→   499→   499→                    ["Medical", slipItem.medical],["Special Allow", slipItem.specialAllow],["Overtime", slipItem.overtime],["Bonus", slipItem.bonus],
+   500→   500→   500→                  ].map(([l, v]) => <div key={l as string} className="flex justify-between py-0.5"><span className="text-muted-foreground">{l}</span><span className="font-mono-num">{fmtINR(v as number)}</span></div>)
+   501→   501→   501→                  }<div className="flex justify-between border-t pt-1 mt-1 font-bold"><span>Gross</span><span className="font-mono-num">{fmtINR(slipItem.grossEarnings)}</span></div>
+   502→   502→   502→                </div>
+   503→   503→   503→                <div>
+   504→   504→   504→                  <p className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Deductions</p>
+   505→   505→   505→                  {[["PF", slipItem.pf],["ESI", slipItem.esi],["Tax", slipItem.tax],["PT", slipItem.pt],
+   506→   506→   506→                    ["Loan", slipItem.loanDeduction],["Other", slipItem.otherDeductions],
+   507→   507→   507→                  ].map(([l, v]) => <div key={l as string} className="flex justify-between py-0.5"><span className="text-muted-foreground">{l}</span><span className="font-mono-num">{fmtINR(v as number)}</span></div>)
+   508→   508→   508→                  }<div className="flex justify-between border-t pt-1 mt-1 font-bold"><span>Total Ded.</span><span className="font-mono-num">{fmtINR(slipItem.totalDeductions)}</span></div>
+   509→   509→   509→                </div>
+   510→   510→   510→              </div>
+   511→   511→   511→              <div className="rounded-lg bg-[#1B3A6B] text-white p-3 text-center">
+   512→   512→   512→                <p className="text-xs uppercase tracking-wider">Net Pay</p>
+   513→   513→   513→                <p className="font-display text-2xl font-bold font-mono-num">{fmtINR(slipItem.netPay)}</p>
+   514→   514→   514→              </div>
+   515→   515→   515→            </div>
+   516→   516→   516→          )}
+   517→   517→   517→          <DialogFooter><Button variant="outline" onClick={() => toast.info("Print functionality coming soon")}><Printer className="h-3.5 w-3.5 mr-1" />Print</Button></DialogFooter>
+   518→   518→   518→        </DialogContent>
+   519→   519→   519→      </Dialog>
+   520→   520→   520→    </div>
+   521→   521→   521→  );
+   522→   522→   522→}
+   523→   523→   523→
+   524→   524→   524→// ─── TAB 5: EVENTS ─────────────────────────────────────────────────
+   525→   525→   525→function EventsTab() {
+   526→   526→   526→  const [month, setMonth] = useState(String(now.getMonth() + 1));
+   527→   527→   527→  const [year, setYear] = useState(String(now.getFullYear()));
+   528→   528→   528→  const [addOpen, setAddOpen] = useState(false);
+   529→   529→   529→  const [form, setForm] = useState({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" });
+   530→   530→   530→  const { data, loading, reload } = useApi<any>(`/api/hr/events?month=${month}&year=${year}`, [month, year]);
+   531→   531→   531→  const { triggerRefresh } = useAppStore();
+   532→   532→   532→
+   533→   533→   533→  const events: any[] = data?.events || [];
+   534→   534→   534→
+   535→   535→   535→  const handleSave = async () => {
+   536→   536→   536→    try {
+   537→   537→   537→      await apiPost("/api/hr/events", form);
+   538→   538→   538→      toast.success("Event created"); setAddOpen(false); setForm({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" }); reload(); triggerRefresh();
+   539→   539→   539→    } catch (e: any) { toast.error(e.message); }
+   540→   540→   540→  };
+   541→   541→   541→
+   542→   542→   542→  if (loading || !data) return <SkeletonGrid />;
+   543→   543→   543→
+   544→   544→   544→  return (
+   545→   545→   545→    <div className="space-y-4">
+   546→   546→   546→      <div className="flex flex-wrap items-center gap-2">
+   547→   547→   547→        <Select value={month} onValueChange={setMonth}>
+   548→   548→   548→          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+   549→   549→   549→          <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}</SelectContent>
+   550→   550→   550→        </Select>
+   551→   551→   551→        <Input className="w-24" value={year} onChange={e => setYear(e.target.value)} placeholder="Year" />
+   552→   552→   552→        <div className="ml-auto"><Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" />Add Event</Button></div>
+   553→   553→   553→      </div>
+   554→   554→   554→
+   555→   555→   555→      {events.length === 0 ? (
+   556→   556→   556→        <div className="text-center py-16 text-muted-foreground"><CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No events this month</p></div>
+   557→   557→   557→      ) : (
+   558→   558→   558→        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto">
+   559→   559→   559→          {events.map((e: any) => (
+   560→   560→   560→            <Card key={e.id} className="hover:shadow-card-lg transition-shadow">
+   561→   561→   561→              <CardContent className="p-4">
+   562→   562→   562→                <div className="flex items-start justify-between gap-2">
+   563→   563→   563→                  <div className="min-w-0">
+   564→   564→   564→                    <p className="font-semibold truncate">{e.title}</p>
+   565→   565→   565→                    <Badge className={cn("mt-1 text-[10px] border", EVENT_COLORS[e.type] || "bg-muted")}>{e.type}</Badge>
+   566→   566→   566→                  </div>
+   567→   567→   567→                  <Badge variant="outline" className="text-[10px] shrink-0">{e.status}</Badge>
+   568→   568→   568→                </div>
+   569→   569→   569→                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+   570→   570→   570→                  <p className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{fmtDate(e.eventDate)}{e.endDate ? ` — ${fmtDate(e.endDate)}` : ""}</p>
+   571→   571→   571→                  {e.venue && <p className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{e.venue}</p>}
+   572→   572→   572→                  {e.organizerName && <p className="flex items-center gap-1.5"><UserCircle className="h-3 w-3" />{e.organizerName}</p>}
+   573→   573→   573→                </div>
+   574→   574→   574→              </CardContent>
+   575→   575→   575→            </Card>
+   576→   576→   576→          ))}
+   577→   577→   577→        </div>
+   578→   578→   578→      )}
+   579→   579→   579→
+   580→   580→   580→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   581→   581→   581→        <DialogContent><DialogHeader><DialogTitle>Add Event</DialogTitle></DialogHeader>
+   582→   582→   582→          <div className="space-y-3">
+   583→   583→   583→            <div><Label>Title</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+   584→   584→   584→            <div><Label>Type</Label><Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+   585→   585→   585→              <SelectTrigger><SelectValue /></SelectTrigger>
+   586→   586→   586→              <SelectContent>{["festival","training","meeting","celebration","audit"].map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</SelectItem>)}</SelectContent>
+   587→   587→   587→            </Select></div>
+   588→   588→   588→            <div className="grid grid-cols-2 gap-3">
+   589→   589→   589→              <div><Label>Start Date</Label><Input type="date" value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} /></div>
+   590→   590→   590→              <div><Label>End Date</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
+   591→   591→   591→            </div>
+   592→   592→   592→            <div><Label>Venue</Label><Input value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} /></div>
+   593→   593→   593→            <div><Label>Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+   594→   594→   594→          </div>
+   595→   595→   595→          <DialogFooter><Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={handleSave}>Create</Button></DialogFooter>
+   596→   596→   596→        </DialogContent>
+   597→   597→   597→      </Dialog>
+   598→   598→   598→    </div>
+   599→   599→   599→  );
+   600→   600→   600→}
+   601→   601→   601→
+   602→   602→   602→// ─── TAB 6: SCORECARDS ─────────────────────────────────────────────
+   603→   603→   603→function ScorecardsTab() {
+   604→   604→   604→  const [period, setPeriod] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`);
+   605→   605→   605→  const [addOpen, setAddOpen] = useState(false);
+   606→   606→   606→  const { data: empData } = useApi<any>("/api/hr/employees?isActive=true", []);
+   607→   607→   607→  const { data, loading, reload } = useApi<any>(`/api/hr/scorecards?period=${period}`, [period]);
+   608→   608→   608→  const { triggerRefresh } = useAppStore();
+   609→   609→   609→  const [metrics, setMetrics] = useState({ userId: "", attendance: 90, punctuality: 8, taskCompletion: 85, guestFeedback: 8, teamwork: 7, initiative: 7, grooming: 9, communication: 8 });
+   610→   610→   610→
+   611→   611→   611→  const employees: any[] = Array.isArray(empData) ? empData : [];
+   612→   612→   612→  const overallStats = data?.overallStats || {};
+   613→   613→   613→  const deptAvgs = data?.departmentAverages || {};
+   614→   614→   614→  const scorecards: any[] = data?.scorecards || [];
+   615→   615→   615→
+   616→   616→   616→  const deptChartData = Object.entries(deptAvgs).map(([dept, d]: [string, any]) => ({ department: dept, average: d.average }));
+   617→   617→   617→
+   618→   618→   618→  const handleSave = async () => {
+   619→   619→   619→    try {
+   620→   620→   620→      await apiPost("/api/hr/scorecards", { ...metrics, period });
+   621→   621→   621→      toast.success("Scorecard saved"); setAddOpen(false); reload(); triggerRefresh();
+   622→   622→   622→    } catch (e: any) { toast.error(e.message); }
+   623→   623→   623→  };
+   624→   624→   624→
+   625→   625→   625→  if (loading || !data) return <SkeletonGrid />;
+   626→   626→   626→
+   627→   627→   627→  return (
+   628→   628→   628→    <div className="space-y-4">
+   629→   629→   629→      <div className="flex flex-wrap items-center gap-2">
+   630→   630→   630→        <Select value={period} onValueChange={setPeriod}>
+   631→   631→   631→          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+   632→   632→   632→          <SelectContent>
+   633→   633→   633→            {Array.from({ length: 12 }, (_, i) => { const m = now.getMonth() - i; const d = new Date(now.getFullYear(), m, 1); const p = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; return p; })
+   634→   634→   634→              .filter((v, i, a) => a.indexOf(v) === i).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+   635→   635→   635→          </SelectContent>
+   636→   636→   636→        </Select>
+   637→   637→   637→        <div className="ml-auto"><Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" />Add Scorecard</Button></div>
+   638→   638→   638→      </div>
+   639→   639→   639→
+   640→   640→   640→      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+   641→   641→   641→        <KpiCard label="Avg Score" value={overallStats.averageScore ?? 0} icon={Star} accent="gold" />
+   642→   642→   642→        <KpiCard label="A+ Count" value={(overallStats.byGrade || {})["A+"] ?? 0} icon={Award} accent="success" />
+   643→   643→   643→        <KpiCard label="Total Evaluated" value={overallStats.totalEmployees ?? 0} icon={Users} accent="navy" />
+   644→   644→   644→      </div>
+   645→   645→   645→
+   646→   646→   646→      {deptChartData.length > 0 && (
+   647→   647→   647→        <Card>
+   648→   648→   648→          <CardHeader className="pb-2"><CardTitle className="font-display text-sm">Department Averages</CardTitle></CardHeader>
+   649→   649→   649→          <CardContent>
+   650→   650→   650→            <ResponsiveContainer width="100%" height={200}>
+   651→   651→   651→              <BarChart data={deptChartData} layout="vertical"><CartesianGrid strokeDasharray="3 3" />
+   652→   652→   652→                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="department" tick={{ fontSize: 11 }} width={100} />
+   653→   653→   653→                <Tooltip /><Bar dataKey="average" fill={CC[0]} radius={[0, 4, 4, 0]} />
+   654→   654→   654→              </BarChart>
+   655→   655→   655→            </ResponsiveContainer>
+   656→   656→   656→          </CardContent>
+   657→   657→   657→        </Card>
+   658→   658→   658→      )}
+   659→   659→   659→
+   660→   660→   660→      <div className="overflow-x-auto rounded-lg border">
+   661→   661→   661→        <Table>
+   662→   662→   662→          <TableHeader><TableRow>
+   663→   663→   663→            <TableHead>Employee</TableHead><TableHead>Dept</TableHead><TableHead>Att%</TableHead><TableHead>Punct.</TableHead>
+   664→   664→   664→            <TableHead>Task%</TableHead><TableHead>Feedback</TableHead><TableHead>Team</TableHead><TableHead>Init.</TableHead>
+   665→   665→   665→            <TableHead>Groom.</TableHead><TableHead>Comm.</TableHead><TableHead>Overall</TableHead><TableHead>Grade</TableHead>
+   666→   666→   666→          </TableRow></TableHeader>
+   667→   667→   667→          <TableBody>
+   668→   668→   668→            {scorecards.length === 0 ? (
+   669→   669→   669→              <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">No scorecards for this period</TableCell></TableRow>
+   670→   670→   670→            ) : scorecards.map((sc: any) => (
+   671→   671→   671→              <TableRow key={sc.id}>
+   672→   672→   672→                <TableCell className="font-medium">{sc.userName}</TableCell>
+   673→   673→   673→                <TableCell className="text-xs">{sc.department || "—"}</TableCell>
+   674→   674→   674→                <TableCell className="font-mono-num text-xs">{sc.attendance}</TableCell>
+   675→   675→   675→                <TableCell className="font-mono-num text-xs">{sc.punctuality}</TableCell>
+   676→   676→   676→                <TableCell className="font-mono-num text-xs">{sc.taskCompletion}</TableCell>
+   677→   677→   677→                <TableCell className="font-mono-num text-xs">{sc.guestFeedback}</TableCell>
+   678→   678→   678→                <TableCell className="font-mono-num text-xs">{sc.teamwork}</TableCell>
+   679→   679→   679→                <TableCell className="font-mono-num text-xs">{sc.initiative}</TableCell>
+   680→   680→   680→                <TableCell className="font-mono-num text-xs">{sc.grooming}</TableCell>
+   681→   681→   681→                <TableCell className="font-mono-num text-xs">{sc.communication}</TableCell>
+   682→   682→   682→                <TableCell className="font-mono-num text-xs font-bold">{sc.overallScore}</TableCell>
+   683→   683→   683→                <TableCell><Badge className={cn("text-[10px]", GRADE_COLORS[sc.grade] || "")}>{sc.grade}</Badge></TableCell>
+   684→   684→   684→              </TableRow>
+   685→   685→   685→            ))}
+   686→   686→   686→          </TableBody>
+   687→   687→   687→        </Table>
+   688→   688→   688→      </div>
+   689→   689→   689→
+   690→   690→   690→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   691→   691→   691→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Add Scorecard</DialogTitle></DialogHeader>
+   692→   692→   692→          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+   693→   693→   693→            <div><Label>Employee</Label><Select value={metrics.userId} onValueChange={v => setMetrics(m => ({ ...m, userId: v }))}>
+   694→   694→   694→              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+   695→   695→   695→              <SelectContent>{employees.map((e: any) => <SelectItem key={e.id} value={e.id}>{e.fullName}</SelectItem>)}</SelectContent>
+   696→   696→   696→            </Select></div>
+   697→   697→   697→            {[
+   698→   698→   698→              { key: "attendance", label: "Attendance %", max: 100 }, { key: "punctuality", label: "Punctuality (0-10)", max: 10 },
+   699→   699→   699→              { key: "taskCompletion", label: "Task Completion %", max: 100 }, { key: "guestFeedback", label: "Guest Feedback (0-10)", max: 10 },
+   700→   700→   700→              { key: "teamwork", label: "Teamwork (0-10)", max: 10 }, { key: "initiative", label: "Initiative (0-10)", max: 10 },
+   701→   701→   701→              { key: "grooming", label: "Grooming (0-10)", max: 10 }, { key: "communication", label: "Communication (0-10)", max: 10 },
+   702→   702→   702→            ].map(({ key, label, max }) => (
+   703→   703→   703→              <div key={key}><Label className="text-xs">{label}</Label><Input type="number" min={0} max={max} value={(metrics as any)[key]} onChange={e => setMetrics(m => ({ ...m, [key]: Number(e.target.value) }))} /></div>
+   704→   704→   704→            ))}
+   705→   705→   705→          </div>
+   706→   706→   706→          <DialogFooter><Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></DialogFooter>
+   707→   707→   707→        </DialogContent>
+   708→   708→   708→      </Dialog>
+   709→   709→   709→    </div>
+   710→   710→   710→  );
+   711→   711→   711→}
+   712→   712→   712→
+   713→   713→   713→// ─── HELPERS ────────────────────────────────────────────────────────
+   714→   714→   714→function SkeletonGrid() {
+   715→   715→   715→  return <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
+   716→   716→   716→}
+   717→   717→   717→

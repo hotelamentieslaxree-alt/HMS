@@ -1,0 +1,1279 @@
+     1→// ARIA HMS — Sales Pipeline Module
+     2→"use client";
+     3→
+     4→import { useState, useMemo } from "react";
+     5→import { cn } from "@/lib/utils";
+     6→import { useApi, apiPost, apiPut } from "@/lib/api";
+     7→import { useAppStore } from "@/lib/store";
+     8→import { KpiCard, fmtINR, fmtDate, timeAgo } from "../shared";
+     9→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Badge } from "@/components/ui/badge";
+    12→import { Input } from "@/components/ui/input";
+    13→import { Label } from "@/components/ui/label";
+    14→import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+    15→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+    16→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    17→import { Skeleton } from "@/components/ui/skeleton";
+    18→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+    19→import { toast } from "sonner";
+    20→import {
+    21→  TrendingUp, Users, DollarSign, Target, Phone, Mail, Building2,
+    22→  Award, BarChart3, Plus, Search, ChevronRight, ChevronLeft,
+    23→  Filter, Trophy, XCircle, Clock, UserCircle,
+    24→  Briefcase, Percent, Handshake, CircleDot, Globe,
+    25→} from "lucide-react";
+    26→import {
+    27→  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
+    28→  ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid,
+    29→} from "recharts";
+    30→
+    31→// ─── Constants ────────────────────────────────────────────────────────────────
+    32→const NAVY = "#1B3A6B";
+    33→const GOLD = "#C9952A";
+    34→const SUCCESS = "#16A34A";
+    35→
+    36→const PIPELINE_STAGES = [
+    37→  { key: "new", label: "New", color: "#6366F1", bg: "#EEF2FF" },
+    38→  { key: "contacted", label: "Contacted", color: "#0284C7", bg: "#E0F2FE" },
+    39→  { key: "qualified", label: "Qualified", color: "#7C3AED", bg: "#F3E8FF" },
+    40→  { key: "proposal", label: "Proposal", color: "#D97706", bg: "#FEF3C7" },
+    41→  { key: "negotiation", label: "Negotiation", color: "#EA580C", bg: "#FFF7ED" },
+    42→  { key: "won", label: "Won", color: "#16A34A", bg: "#DCFCE7" },
+    43→  { key: "lost", label: "Lost", color: "#DC2626", bg: "#FFE4E6" },
+    44→] as const;
+    45→
+    46→const DEAL_STAGES = [
+    47→  { key: "prospecting", label: "Prospecting", color: "#6366F1" },
+    48→  { key: "qualification", label: "Qualification", color: "#0284C7" },
+    49→  { key: "proposal", label: "Proposal", color: "#7C3AED" },
+    50→  { key: "negotiation", label: "Negotiation", color: "#D97706" },
+    51→  { key: "closed_won", label: "Closed Won", color: "#16A34A" },
+    52→  { key: "closed_lost", label: "Closed Lost", color: "#DC2626" },
+    53→] as const;
+    54→
+    55→const SOURCE_META: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+    56→  direct: { label: "Direct", color: "#2563EB", bg: "#DBEAFE", icon: Phone },
+    57→  referral: { label: "Referral", color: "#16A34A", bg: "#DCFCE7", icon: Users },
+    58→  website: { label: "Website", color: "#7C3AED", bg: "#F3E8FF", icon: Globe },
+    59→  linkedin: { label: "LinkedIn", color: "#0A66C2", bg: "#E0F2FE", icon: Briefcase },
+    60→  expo: { label: "Expo", color: "#EA580C", bg: "#FFF7ED", icon: Award },
+    61→  cold_call: { label: "Cold Call", color: "#DC2626", bg: "#FFE4E6", icon: Phone },
+    62→  ota_partner: { label: "OTA Partner", color: "#0D9488", bg: "#CCFBF1", icon: Handshake },
+    63→};
+    64→
+    65→const STATUS_FLOW = ["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"] as const;
+    66→
+    67→const ASSIGNEES = ["Priya Nair", "Vikram Singh", "Arjun Mehta"];
+    68→
+    69→// ─── Types ────────────────────────────────────────────────────────────────────
+    70→interface Lead {
+    71→  id: string;
+    72→  company: string;
+    73→  contact: string;
+    74→  email: string;
+    75→  phone: string;
+    76→  source: string;
+    77→  status: string;
+    78→  estimatedValue: number;
+    79→  probability: number;
+    80→  assignedTo: string;
+    81→  lastContacted: string;
+    82→  notes: string;
+    83→}
+    84→
+    85→interface Deal {
+    86→  id: string;
+    87→  title: string;
+    88→  leadId: string;
+    89→  leadCompany: string;
+    90→  value: number;
+    91→  stage: string;
+    92→  probability: number;
+    93→  closeDate: string;
+    94→  assignedTo: string;
+    95→  createdAt: string;
+    96→}
+    97→
+    98→// ─── Custom Tooltip for Recharts ──────────────────────────────────────────────
+    99→function ChartTooltip({ active, payload, label }: any) {
+   100→  if (!active || !payload?.length) return null;
+   101→  return (
+   102→    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-card-lg text-xs">
+   103→      {label && <p className="font-semibold text-foreground mb-1">{label}</p>}
+   104→      {payload.map((p: any, i: number) => (
+   105→        <p key={i} style={{ color: p.color }} className="flex items-center gap-1.5">
+   106→          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+   107→          {p.name}: <span className="font-mono-num font-bold">{typeof p.value === "number" && p.value > 999 ? fmtINR(p.value) : p.value}</span>
+   108→        </p>
+   109→      ))}
+   110→    </div>
+   111→  );
+   112→}
+   113→
+   114→// ─── Source Badge ─────────────────────────────────────────────────────────────
+   115→function SourceBadge({ source }: { source: string }) {
+   116→  const meta = SOURCE_META[source];
+   117→  if (!meta) return <Badge variant="secondary" className="text-[10px]">{source}</Badge>;
+   118→  const Icon = meta.icon;
+   119→  return (
+   120→    <span
+   121→      className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold"
+   122→      style={{ color: meta.color, borderColor: meta.color + "40", backgroundColor: meta.bg }}
+   123→    >
+   124→      <Icon className="h-3 w-3" />
+   125→      {meta.label}
+   126→    </span>
+   127→  );
+   128→}
+   129→
+   130→// ─── Pipeline Column ──────────────────────────────────────────────────────────
+   131→function PipelineColumn({
+   132→  stage,
+   133→  leads,
+   134→  onMoveLead,
+   135→}: {
+   136→  stage: typeof PIPELINE_STAGES[number];
+   137→  leads: Lead[];
+   138→  onMoveLead: (id: string, newStatus: string) => void;
+   139→}) {
+   140→  const stageLeads = leads.filter((l) => l.status === stage.key);
+   141→  const totalValue = stageLeads.reduce((s, l) => s + l.estimatedValue, 0);
+   142→  const prevStage = STATUS_FLOW[STATUS_FLOW.indexOf(stage.key as any) - 1];
+   143→  const nextStage = STATUS_FLOW[STATUS_FLOW.indexOf(stage.key as any) + 1];
+   144→
+   145→  return (
+   146→    <div className="flex flex-col min-w-[260px] w-[260px] shrink-0">
+   147→      {/* Stage header */}
+   148→      <div className="flex items-center gap-2 mb-2 px-1">
+   149→        <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+   150→        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">{stage.label}</h3>
+   151→        <span className="ml-auto text-[10px] font-mono-num font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: stage.bg, color: stage.color }}>
+   152→          {stageLeads.length}
+   153→        </span>
+   154→      </div>
+   155→      <div className="mb-2 px-1">
+   156→        <p className="text-[10px] text-muted-foreground">Pipeline Value</p>
+   157→        <p className="text-sm font-mono-num font-bold" style={{ color: stage.color }}>{fmtINR(totalValue)}</p>
+   158→      </div>
+   159→
+   160→      {/* Lead cards */}
+   161→      <div className="flex-1 space-y-2 overflow-y-auto max-h-[calc(100vh-340px)] pr-1 scrollbar-thin">
+   162→        {stageLeads.length === 0 ? (
+   163→          <div className="flex items-center justify-center h-20 rounded-lg border border-dashed border-border text-[11px] text-muted-foreground">
+   164→            No leads
+   165→          </div>
+   166→        ) : (
+   167→          stageLeads.map((lead) => (
+   168→            <Card key={lead.id} className="group shadow-card hover:shadow-card-lg transition-all cursor-default">
+   169→              <CardContent className="p-3">
+   170→                <div className="flex items-start justify-between gap-1 mb-1.5">
+   171→                  <div className="min-w-0">
+   172→                    <p className="text-xs font-bold text-foreground truncate">{lead.company}</p>
+   173→                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+   174→                      <UserCircle className="h-3 w-3" /> {lead.contact}
+   175→                    </p>
+   176→                  </div>
+   177→                  <span className="text-[10px] font-mono-num font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: stage.bg, color: stage.color }}>
+   178→                    {lead.probability}%
+   179→                  </span>
+   180→                </div>
+   181→
+   182→                <div className="flex items-center justify-between mb-2">
+   183→                  <span className="text-xs font-mono-num font-bold" style={{ color: NAVY }}>{fmtINR(lead.estimatedValue)}</span>
+   184→                  <SourceBadge source={lead.source} />
+   185→                </div>
+   186→
+   187→                <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-2">
+   188→                  <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{timeAgo(lead.lastContacted)}</span>
+   189→                  <span>{lead.assignedTo.split(" ")[0]}</span>
+   190→                </div>
+   191→
+   192→                {/* Move buttons */}
+   193→                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   194→                  {prevStage && stage.key !== "won" && stage.key !== "lost" && (
+   195→                    <Button
+   196→                      size="sm"
+   197→                      variant="outline"
+   198→                      className="h-6 text-[10px] px-2 flex-1"
+   199→                      onClick={() => onMoveLead(lead.id, prevStage)}
+   200→                    >
+   201→                      <ChevronLeft className="h-3 w-3 mr-0.5" />
+   202→                      {PIPELINE_STAGES.find((s) => s.key === prevStage)?.label}
+   203→                    </Button>
+   204→                  )}
+   205→                  {nextStage && stage.key !== "won" && stage.key !== "lost" && (
+   206→                    <Button
+   207→                      size="sm"
+   208→                      variant="outline"
+   209→                      className="h-6 text-[10px] px-2 flex-1"
+   210→                      onClick={() => onMoveLead(lead.id, nextStage)}
+   211→                    >
+   212→                      {PIPELINE_STAGES.find((s) => s.key === nextStage)?.label}
+   213→                      <ChevronRight className="h-3 w-3 ml-0.5" />
+   214→                    </Button>
+   215→                  )}
+   216→                  {stage.key !== "won" && stage.key !== "lost" && (
+   217→                    <>
+   218→                      <Button
+   219→                        size="sm"
+   220→                        className="h-6 text-[10px] px-2 bg-[#16A34A] hover:bg-[#15803D] text-white"
+   221→                        onClick={() => onMoveLead(lead.id, "won")}
+   222→                      >
+   223→                        <Trophy className="h-3 w-3" />
+   224→                      </Button>
+   225→                      <Button
+   226→                        size="sm"
+   227→                        variant="outline"
+   228→                        className="h-6 text-[10px] px-2 text-[#DC2626] border-[#DC2626]/40 hover:bg-[#FFE4E6]"
+   229→                        onClick={() => onMoveLead(lead.id, "lost")}
+   230→                      >
+   231→                        <XCircle className="h-3 w-3" />
+   232→                      </Button>
+   233→                    </>
+   234→                  )}
+   235→                </div>
+   236→              </CardContent>
+   237→            </Card>
+   238→          ))
+   239→        )}
+   240→      </div>
+   241→    </div>
+   242→  );
+   243→}
+   244→
+   245→// ─── Lead Form Dialog ─────────────────────────────────────────────────────────
+   246→function LeadFormDialog({
+   247→  open,
+   248→  onClose,
+   249→  onSave,
+   250→  initial,
+   251→}: {
+   252→  open: boolean;
+   253→  onClose: () => void;
+   254→  onSave: (data: any) => void;
+   255→  initial?: Lead | null;
+   256→}) {
+   257→  const initVal = initial
+   258→    ? { company: initial.company, contact: initial.contact, email: initial.email, phone: initial.phone, source: initial.source, status: initial.status, estimatedValue: String(initial.estimatedValue), probability: String(initial.probability), assignedTo: initial.assignedTo, notes: initial.notes }
+   259→    : { company: "", contact: "", email: "", phone: "", source: "direct", status: "new", estimatedValue: "", probability: "10", assignedTo: "", notes: "" };
+   260→  const [form, setForm] = useState(initVal);
+   261→
+   262→  const handleSubmit = () => {
+   263→    if (!form.company.trim() || !form.contact.trim()) {
+   264→      toast.error("Company and Contact are required");
+   265→      return;
+   266→    }
+   267→    onSave({
+   268→      ...(initial ? { id: initial.id } : {}),
+   269→      company: form.company,
+   270→      contact: form.contact,
+   271→      email: form.email,
+   272→      phone: form.phone,
+   273→      source: form.source,
+   274→      status: form.status,
+   275→      estimatedValue: Number(form.estimatedValue) || 0,
+   276→      probability: Number(form.probability) || 10,
+   277→      assignedTo: form.assignedTo || "Unassigned",
+   278→      notes: form.notes,
+   279→    });
+   280→  };
+   281→
+   282→  return (
+   283→    <Dialog open={open} onOpenChange={onClose}>
+   284→      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+   285→        <DialogHeader>
+   286→          <DialogTitle className="text-navy font-display">
+   287→            {initial ? "Edit Lead" : "Add New Lead"}
+   288→          </DialogTitle>
+   289→        </DialogHeader>
+   290→        <div className="grid gap-4 py-2">
+   291→          <div className="grid grid-cols-2 gap-3">
+   292→            <div className="space-y-1.5">
+   293→              <Label className="text-xs font-medium">Company *</Label>
+   294→              <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Company name" />
+   295→            </div>
+   296→            <div className="space-y-1.5">
+   297→              <Label className="text-xs font-medium">Contact Person *</Label>
+   298→              <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Full name" />
+   299→            </div>
+   300→          </div>
+   301→          <div className="grid grid-cols-2 gap-3">
+   302→            <div className="space-y-1.5">
+   303→              <Label className="text-xs font-medium">Email</Label>
+   304→              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@company.com" />
+   305→            </div>
+   306→            <div className="space-y-1.5">
+   307→              <Label className="text-xs font-medium">Phone</Label>
+   308→              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91 98XXX XXXXX" />
+   309→            </div>
+   310→          </div>
+   311→          <div className="grid grid-cols-3 gap-3">
+   312→            <div className="space-y-1.5">
+   313→              <Label className="text-xs font-medium">Source</Label>
+   314→              <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v })}>
+   315→                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+   316→                <SelectContent>
+   317→                  {Object.entries(SOURCE_META).map(([k, m]) => (
+   318→                    <SelectItem key={k} value={k} className="text-xs">{m.label}</SelectItem>
+   319→                  ))}
+   320→                </SelectContent>
+   321→              </Select>
+   322→            </div>
+   323→            <div className="space-y-1.5">
+   324→              <Label className="text-xs font-medium">Status</Label>
+   325→              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+   326→                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+   327→                <SelectContent>
+   328→                  {STATUS_FLOW.map((s) => (
+   329→                    <SelectItem key={s} value={s} className="text-xs capitalize">{s.replace("_", " ")}</SelectItem>
+   330→                  ))}
+   331→                </SelectContent>
+   332→              </Select>
+   333→            </div>
+   334→            <div className="space-y-1.5">
+   335→              <Label className="text-xs font-medium">Assigned To</Label>
+   336→              <Select value={form.assignedTo} onValueChange={(v) => setForm({ ...form, assignedTo: v })}>
+   337→                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+   338→                <SelectContent>
+   339→                  {ASSIGNEES.map((a) => (
+   340→                    <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+   341→                  ))}
+   342→                </SelectContent>
+   343→              </Select>
+   344→            </div>
+   345→          </div>
+   346→          <div className="grid grid-cols-2 gap-3">
+   347→            <div className="space-y-1.5">
+   348→              <Label className="text-xs font-medium">Estimated Value (₹)</Label>
+   349→              <Input type="number" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} placeholder="0" />
+   350→            </div>
+   351→            <div className="space-y-1.5">
+   352→              <Label className="text-xs font-medium">Probability (%)</Label>
+   353→              <Input type="number" min="0" max="100" value={form.probability} onChange={(e) => setForm({ ...form, probability: e.target.value })} />
+   354→            </div>
+   355→          </div>
+   356→          <div className="space-y-1.5">
+   357→            <Label className="text-xs font-medium">Notes</Label>
+   358→            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." />
+   359→          </div>
+   360→        </div>
+   361→        <DialogFooter>
+   362→          <Button variant="outline" onClick={onClose}>Cancel</Button>
+   363→          <Button className="bg-navy hover:bg-navy/90 text-white" onClick={handleSubmit}>
+   364→            {initial ? "Update Lead" : "Create Lead"}
+   365→          </Button>
+   366→        </DialogFooter>
+   367→      </DialogContent>
+   368→    </Dialog>
+   369→  );
+   370→}
+   371→
+   372→// ─── Deal Form Dialog ─────────────────────────────────────────────────────────
+   373→function DealFormDialog({
+   374→  open,
+   375→  onClose,
+   376→  onSave,
+   377→  leads,
+   378→}: {
+   379→  open: boolean;
+   380→  onClose: () => void;
+   381→  onSave: (data: any) => void;
+   382→  leads: Lead[];
+   383→}) {
+   384→  const [form, setForm] = useState({
+   385→    title: "", leadId: "", value: "", stage: "prospecting",
+   386→    probability: "10", closeDate: "", assignedTo: "",
+   387→  });
+   388→
+   389→  const selectedLead = leads.find((l) => l.id === form.leadId);
+   390→
+   391→  const handleSubmit = () => {
+   392→    if (!form.title.trim()) {
+   393→      toast.error("Deal title is required");
+   394→      return;
+   395→    }
+   396→    onSave({
+   397→      title: form.title,
+   398→      leadId: form.leadId,
+   399→      leadCompany: selectedLead?.company || "",
+   400→      value: Number(form.value) || 0,
+   401→      stage: form.stage,
+   402→      probability: Number(form.probability) || 10,
+   403→      closeDate: form.closeDate || new Date(Date.now() + 30 * 86400000).toISOString(),
+   404→      assignedTo: form.assignedTo || "Unassigned",
+   405→    });
+   406→  };
+   407→
+   408→  return (
+   409→    <Dialog open={open} onOpenChange={onClose}>
+   410→      <DialogContent className="max-w-lg">
+   411→        <DialogHeader>
+   412→          <DialogTitle className="text-navy font-display">Add New Deal</DialogTitle>
+   413→        </DialogHeader>
+   414→        <div className="grid gap-4 py-2">
+   415→          <div className="space-y-1.5">
+   416→            <Label className="text-xs font-medium">Deal Title *</Label>
+   417→            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Deal title" />
+   418→          </div>
+   419→          <div className="grid grid-cols-2 gap-3">
+   420→            <div className="space-y-1.5">
+   421→              <Label className="text-xs font-medium">Associated Lead</Label>
+   422→              <Select value={form.leadId} onValueChange={(v) => {
+   423→                const lead = leads.find((l) => l.id === v);
+   424→                setForm({ ...form, leadId: v, value: lead ? String(lead.estimatedValue) : form.value });
+   425→              }}>
+   426→                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select lead" /></SelectTrigger>
+   427→                <SelectContent>
+   428→                  {leads.map((l) => (
+   429→                    <SelectItem key={l.id} value={l.id} className="text-xs">{l.company} — {l.contact}</SelectItem>
+   430→                  ))}
+   431→                </SelectContent>
+   432→              </Select>
+   433→            </div>
+   434→            <div className="space-y-1.5">
+   435→              <Label className="text-xs font-medium">Value (₹)</Label>
+   436→              <Input type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="0" />
+   437→            </div>
+   438→          </div>
+   439→          <div className="grid grid-cols-3 gap-3">
+   440→            <div className="space-y-1.5">
+   441→              <Label className="text-xs font-medium">Stage</Label>
+   442→              <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+   443→                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+   444→                <SelectContent>
+   445→                  {DEAL_STAGES.map((s) => (
+   446→                    <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>
+   447→                  ))}
+   448→                </SelectContent>
+   449→              </Select>
+   450→            </div>
+   451→            <div className="space-y-1.5">
+   452→              <Label className="text-xs font-medium">Probability (%)</Label>
+   453→              <Input type="number" min="0" max="100" value={form.probability} onChange={(e) => setForm({ ...form, probability: e.target.value })} />
+   454→            </div>
+   455→            <div className="space-y-1.5">
+   456→              <Label className="text-xs font-medium">Close Date</Label>
+   457→              <Input type="date" value={form.closeDate} onChange={(e) => setForm({ ...form, closeDate: e.target.value })} />
+   458→            </div>
+   459→          </div>
+   460→          <div className="space-y-1.5">
+   461→            <Label className="text-xs font-medium">Assigned To</Label>
+   462→            <Select value={form.assignedTo} onValueChange={(v) => setForm({ ...form, assignedTo: v })}>
+   463→              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+   464→              <SelectContent>
+   465→                {ASSIGNEES.map((a) => (
+   466→                  <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+   467→                ))}
+   468→              </SelectContent>
+   469→            </Select>
+   470→          </div>
+   471→        </div>
+   472→        <DialogFooter>
+   473→          <Button variant="outline" onClick={onClose}>Cancel</Button>
+   474→          <Button className="bg-navy hover:bg-navy/90 text-white" onClick={handleSubmit}>Create Deal</Button>
+   475→        </DialogFooter>
+   476→      </DialogContent>
+   477→    </Dialog>
+   478→  );
+   479→}
+   480→
+   481→// ─── Pipeline Tab ─────────────────────────────────────────────────────────────
+   482→function PipelineTab({ leads, onMoveLead }: { leads: Lead[]; onMoveLead: (id: string, status: string) => void }) {
+   483→  const [filterSource, setFilterSource] = useState("all");
+   484→  const [filterAssignee, setFilterAssignee] = useState("all");
+   485→
+   486→  const filtered = useMemo(() => {
+   487→    let result = [...leads];
+   488→    if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
+   489→    if (filterAssignee !== "all") result = result.filter((l) => l.assignedTo === filterAssignee);
+   490→    return result;
+   491→  }, [leads, filterSource, filterAssignee]);
+   492→
+   493→  const totalPipeline = filtered.reduce((s, l) => s + l.estimatedValue, 0);
+   494→  const weightedPipeline = filtered.reduce((s, l) => s + l.estimatedValue * (l.probability / 100), 0);
+   495→
+   496→  return (
+   497→    <div className="space-y-4">
+   498→      {/* Pipeline summary */}
+   499→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   500→        <KpiCard label="Total Pipeline" value={fmtINR(totalPipeline)} icon={DollarSign} accent="navy" />
+   501→        <KpiCard label="Weighted Value" value={fmtINR(Math.round(weightedPipeline))} icon={TrendingUp} accent="gold" hint="Value × Probability" />
+   502→        <KpiCard label="Active Leads" value={filtered.filter((l) => !["won", "lost"].includes(l.status)).length} icon={Users} accent="info" />
+   503→        <KpiCard label="Won This Month" value={filtered.filter((l) => l.status === "won").length} icon={Trophy} accent="success" />
+   504→      </div>
+   505→
+   506→      {/* Filters */}
+   507→      <div className="flex flex-wrap items-center gap-2">
+   508→        <Filter className="h-4 w-4 text-muted-foreground" />
+   509→        <Select value={filterSource} onValueChange={setFilterSource}>
+   510→          <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Source" /></SelectTrigger>
+   511→          <SelectContent>
+   512→            <SelectItem value="all" className="text-xs">All Sources</SelectItem>
+   513→            {Object.entries(SOURCE_META).map(([k, m]) => (
+   514→              <SelectItem key={k} value={k} className="text-xs">{m.label}</SelectItem>
+   515→            ))}
+   516→          </SelectContent>
+   517→        </Select>
+   518→        <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+   519→          <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="Assigned To" /></SelectTrigger>
+   520→          <SelectContent>
+   521→            <SelectItem value="all" className="text-xs">All Assignees</SelectItem>
+   522→            {ASSIGNEES.map((a) => (
+   523→              <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+   524→            ))}
+   525→          </SelectContent>
+   526→        </Select>
+   527→      </div>
+   528→
+   529→      {/* Kanban board */}
+   530→      <div className="overflow-x-auto pb-4 -mx-4 px-4">
+   531→        <div className="flex gap-4 min-w-max">
+   532→          {PIPELINE_STAGES.map((stage) => (
+   533→            <PipelineColumn key={stage.key} stage={stage} leads={filtered} onMoveLead={onMoveLead} />
+   534→          ))}
+   535→        </div>
+   536→      </div>
+   537→    </div>
+   538→  );
+   539→}
+   540→
+   541→// ─── Leads Tab ────────────────────────────────────────────────────────────────
+   542→function LeadsTab({ leads, loading, onEdit, onQuickAction, onAdd }: {
+   543→  leads: Lead[];
+   544→  loading: boolean;
+   545→  onEdit: (lead: Lead) => void;
+   546→  onQuickAction: (id: string, action: string) => void;
+   547→  onAdd: () => void;
+   548→}) {
+   549→  const [search, setSearch] = useState("");
+   550→  const [filterSource, setFilterSource] = useState("all");
+   551→  const [filterStatus, setFilterStatus] = useState("all");
+   552→
+   553→  const filtered = useMemo(() => {
+   554→    let result = [...leads];
+   555→    if (search) {
+   556→      const q = search.toLowerCase();
+   557→      result = result.filter(
+   558→        (l) => l.company.toLowerCase().includes(q) || l.contact.toLowerCase().includes(q) || l.email.toLowerCase().includes(q)
+   559→      );
+   560→    }
+   561→    if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
+   562→    if (filterStatus !== "all") result = result.filter((l) => l.status === filterStatus);
+   563→    return result;
+   564→  }, [leads, search, filterSource, filterStatus]);
+   565→
+   566→  const statusBadge = (status: string) => {
+   567→    const stage = PIPELINE_STAGES.find((s) => s.key === status);
+   568→    if (!stage) return <Badge variant="secondary" className="text-[10px] capitalize">{status}</Badge>;
+   569→    return (
+   570→      <span
+   571→        className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold capitalize"
+   572→        style={{ color: stage.color, borderColor: stage.color + "40", backgroundColor: stage.bg }}
+   573→      >
+   574→        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
+   575→        {stage.label}
+   576→      </span>
+   577→    );
+   578→  };
+   579→
+   580→  return (
+   581→    <div className="space-y-4">
+   582→      {/* Toolbar */}
+   583→      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+   584→        <div className="relative flex-1 min-w-[200px]">
+   585→          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+   586→          <Input placeholder="Search leads..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-xs" />
+   587→        </div>
+   588→        <div className="flex items-center gap-2">
+   589→          <Select value={filterSource} onValueChange={setFilterSource}>
+   590→            <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Source" /></SelectTrigger>
+   591→            <SelectContent>
+   592→              <SelectItem value="all" className="text-xs">All Sources</SelectItem>
+   593→              {Object.entries(SOURCE_META).map(([k, m]) => (
+   594→                <SelectItem key={k} value={k} className="text-xs">{m.label}</SelectItem>
+   595→              ))}
+   596→            </SelectContent>
+   597→          </Select>
+   598→          <Select value={filterStatus} onValueChange={setFilterStatus}>
+   599→            <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+   600→            <SelectContent>
+   601→              <SelectItem value="all" className="text-xs">All Statuses</SelectItem>
+   602→              {STATUS_FLOW.map((s) => (
+   603→                <SelectItem key={s} value={s} className="text-xs capitalize">{s.replace("_", " ")}</SelectItem>
+   604→              ))}
+   605→            </SelectContent>
+   606→          </Select>
+   607→          <Button size="sm" className="h-9 bg-navy hover:bg-navy/90 text-white" onClick={onAdd}>
+   608→            <Plus className="h-4 w-4 mr-1" /> Add Lead
+   609→          </Button>
+   610→        </div>
+   611→      </div>
+   612→
+   613→      {/* Table */}
+   614→      {loading ? (
+   615→        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+   616→      ) : (
+   617→        <div className="rounded-lg border border-border overflow-hidden">
+   618→          <div className="overflow-x-auto max-h-[calc(100vh-320px)]">
+   619→            <Table>
+   620→              <TableHeader>
+   621→                <TableRow className="bg-muted/50">
+   622→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap">Company</TableHead>
+   623→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap">Contact</TableHead>
+   624→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden md:table-cell">Email</TableHead>
+   625→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden lg:table-cell">Phone</TableHead>
+   626→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap">Source</TableHead>
+   627→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap">Status</TableHead>
+   628→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap text-right">Est. Value</TableHead>
+   629→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap text-center">Prob.</TableHead>
+   630→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden xl:table-cell">Assigned To</TableHead>
+   631→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden xl:table-cell">Last Contacted</TableHead>
+   632→                  <TableHead className="text-[11px] font-semibold whitespace-nowrap text-center">Actions</TableHead>
+   633→                </TableRow>
+   634→              </TableHeader>
+   635→              <TableBody>
+   636→                {filtered.length === 0 ? (
+   637→                  <TableRow>
+   638→                    <TableCell colSpan={11} className="text-center py-8 text-sm text-muted-foreground">
+   639→                      No leads found
+   640→                    </TableCell>
+   641→                  </TableRow>
+   642→                ) : (
+   643→                  filtered.map((lead) => (
+   644→                    <TableRow key={lead.id} className="group hover:bg-muted/30 cursor-pointer" onClick={() => onEdit(lead)}>
+   645→                      <TableCell className="text-xs font-semibold whitespace-nowrap">
+   646→                        <div className="flex items-center gap-1.5">
+   647→                          <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+   648→                          {lead.company}
+   649→                        </div>
+   650→                      </TableCell>
+   651→                      <TableCell className="text-xs whitespace-nowrap">{lead.contact}</TableCell>
+   652→                      <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">
+   653→                        <span className="flex items-center gap-1 text-muted-foreground">
+   654→                          <Mail className="h-3 w-3" /> {lead.email}
+   655→                        </span>
+   656→                      </TableCell>
+   657→                      <TableCell className="text-xs whitespace-nowrap hidden lg:table-cell">
+   658→                        <span className="flex items-center gap-1 text-muted-foreground">
+   659→                          <Phone className="h-3 w-3" /> {lead.phone}
+   660→                        </span>
+   661→                      </TableCell>
+   662→                      <TableCell className="whitespace-nowrap"><SourceBadge source={lead.source} /></TableCell>
+   663→                      <TableCell className="whitespace-nowrap">{statusBadge(lead.status)}</TableCell>
+   664→                      <TableCell className="text-xs font-mono-num font-bold text-right whitespace-nowrap">{fmtINR(lead.estimatedValue)}</TableCell>
+   665→                      <TableCell className="text-xs text-center whitespace-nowrap">
+   666→                        <span className="font-mono-num font-semibold" style={{ color: lead.probability >= 70 ? SUCCESS : lead.probability >= 40 ? GOLD : "#64748B" }}>
+   667→                          {lead.probability}%
+   668→                        </span>
+   669→                      </TableCell>
+   670→                      <TableCell className="text-xs whitespace-nowrap hidden xl:table-cell">{lead.assignedTo}</TableCell>
+   671→                      <TableCell className="text-[11px] text-muted-foreground whitespace-nowrap hidden xl:table-cell">{timeAgo(lead.lastContacted)}</TableCell>
+   672→                      <TableCell className="whitespace-nowrap">
+   673→                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+   674→                          {lead.status === "new" && (
+   675→                            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => onQuickAction(lead.id, "contacted")}>
+   676→                              <Phone className="h-3 w-3 mr-0.5" /> Contact
+   677→                            </Button>
+   678→                          )}
+   679→                          {(lead.status === "qualified" || lead.status === "contacted") && (
+   680→                            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => onQuickAction(lead.id, "proposal")}>
+   681→                              <Mail className="h-3 w-3 mr-0.5" /> Proposal
+   682→                            </Button>
+   683→                          )}
+   684→                          {lead.status !== "won" && lead.status !== "lost" && (
+   685→                            <>
+   686→                              <Button size="sm" className="h-6 text-[10px] px-2 bg-[#16A34A] hover:bg-[#15803D] text-white" onClick={() => onQuickAction(lead.id, "won")}>
+   687→                                <Trophy className="h-3 w-3" />
+   688→                              </Button>
+   689→                              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-[#DC2626] border-[#DC2626]/30 hover:bg-[#FFE4E6]" onClick={() => onQuickAction(lead.id, "lost")}>
+   690→                                <XCircle className="h-3 w-3" />
+   691→                              </Button>
+   692→                            </>
+   693→                          )}
+   694→                        </div>
+   695→                      </TableCell>
+   696→                    </TableRow>
+   697→                  ))
+   698→                )}
+   699→              </TableBody>
+   700→            </Table>
+   701→          </div>
+   702→        </div>
+   703→      )}
+   704→    </div>
+   705→  );
+   706→}
+   707→
+   708→// ─── Deals Tab ────────────────────────────────────────────────────────────────
+   709→function DealsTab({ deals, loading, onAdd, onStageChange }: {
+   710→  deals: Deal[];
+   711→  loading: boolean;
+   712→  onAdd: () => void;
+   713→  onStageChange: (id: string, stage: string) => void;
+   714→}) {
+   715→  const [filterStage, setFilterStage] = useState("all");
+   716→
+   717→  const filtered = useMemo(() => {
+   718→    let result = [...deals];
+   719→    if (filterStage !== "all") result = result.filter((d) => d.stage === filterStage);
+   720→    return result;
+   721→  }, [deals, filterStage]);
+   722→
+   723→  const totalValue = filtered.reduce((s, d) => s + d.value, 0);
+   724→  const weightedValue = filtered.reduce((s, d) => s + d.value * (d.probability / 100), 0);
+   725→  const wonDeals = deals.filter((d) => d.stage === "closed_won");
+   726→
+   727→  // Value distribution chart data
+   728→  const distributionData = useMemo(() => {
+   729→    return DEAL_STAGES.map((s) => ({
+   730→      name: s.label,
+   731→      value: deals.filter((d) => d.stage === s.key).reduce((sum, d) => sum + d.value, 0),
+   732→      weighted: deals.filter((d) => d.stage === s.key).reduce((sum, d) => sum + d.value * (d.probability / 100), 0),
+   733→      count: deals.filter((d) => d.stage === s.key).length,
+   734→      fill: s.color,
+   735→    }));
+   736→  }, [deals]);
+   737→
+   738→  const stageBadge = (stage: string) => {
+   739→    const s = DEAL_STAGES.find((st) => st.key === stage);
+   740→    if (!s) return <Badge variant="secondary" className="text-[10px]">{stage}</Badge>;
+   741→    return (
+   742→      <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold" style={{ color: s.color, borderColor: s.color + "40", backgroundColor: s.color + "15" }}>
+   743→        {s.label}
+   744→      </span>
+   745→    );
+   746→  };
+   747→
+   748→  return (
+   749→    <div className="space-y-4">
+   750→      {/* Summary KPIs */}
+   751→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   752→        <KpiCard label="Total Deal Value" value={fmtINR(totalValue)} icon={DollarSign} accent="navy" />
+   753→        <KpiCard label="Weighted Pipeline" value={fmtINR(Math.round(weightedValue))} icon={Target} accent="gold" hint="Value × Probability" />
+   754→        <KpiCard label="Active Deals" value={filtered.filter((d) => !["closed_won", "closed_lost"].includes(d.stage)).length} icon={Briefcase} accent="info" />
+   755→        <KpiCard label="Won Revenue" value={fmtINR(wonDeals.reduce((s, d) => s + d.value, 0))} icon={Trophy} accent="success" />
+   756→      </div>
+   757→
+   758→      {/* Distribution chart + deal list */}
+   759→      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+   760→        {/* Chart */}
+   761→        <Card className="xl:col-span-1">
+   762→          <CardHeader className="pb-2">
+   763→            <CardTitle className="text-sm font-bold text-navy flex items-center gap-2">
+   764→              <BarChart3 className="h-4 w-4 text-gold" /> Value by Stage
+   765→            </CardTitle>
+   766→          </CardHeader>
+   767→          <CardContent>
+   768→            <ResponsiveContainer width="100%" height={300}>
+   769→              <BarChart data={distributionData} margin={{ top: 8, right: 8, left: -10, bottom: 8 }}>
+   770→                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+   771→                <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} />
+   772→                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
+   773→                <Tooltip content={<ChartTooltip />} />
+   774→                <Bar dataKey="value" name="Total Value" radius={[4, 4, 0, 0]}>
+   775→                  {distributionData.map((entry, idx) => (
+   776→                    <Cell key={idx} fill={entry.fill} fillOpacity={0.85} />
+   777→                  ))}
+   778→                </Bar>
+   779→                <Bar dataKey="weighted" name="Weighted Value" radius={[4, 4, 0, 0]} fillOpacity={0.5}>
+   780→                  {distributionData.map((entry, idx) => (
+   781→                    <Cell key={idx} fill={entry.fill} />
+   782→                  ))}
+   783→                </Bar>
+   784→              </BarChart>
+   785→            </ResponsiveContainer>
+   786→          </CardContent>
+   787→        </Card>
+   788→
+   789→        {/* Deal list */}
+   790→        <Card className="xl:col-span-2">
+   791→          <CardHeader className="pb-2">
+   792→            <div className="flex items-center justify-between">
+   793→              <CardTitle className="text-sm font-bold text-navy">Deals</CardTitle>
+   794→              <div className="flex items-center gap-2">
+   795→                <Select value={filterStage} onValueChange={setFilterStage}>
+   796→                  <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Stage" /></SelectTrigger>
+   797→                  <SelectContent>
+   798→                    <SelectItem value="all" className="text-xs">All Stages</SelectItem>
+   799→                    {DEAL_STAGES.map((s) => (
+   800→                      <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>
+   801→                    ))}
+   802→                  </SelectContent>
+   803→                </Select>
+   804→                <Button size="sm" className="h-8 bg-navy hover:bg-navy/90 text-white text-xs" onClick={onAdd}>
+   805→                  <Plus className="h-3 w-3 mr-1" /> Deal
+   806→                </Button>
+   807→              </div>
+   808→            </div>
+   809→          </CardHeader>
+   810→          <CardContent>
+   811→            {loading ? (
+   812→              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+   813→            ) : (
+   814→              <div className="overflow-x-auto max-h-[360px]">
+   815→                <Table>
+   816→                  <TableHeader>
+   817→                    <TableRow className="bg-muted/50">
+   818→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap">Title</TableHead>
+   819→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden md:table-cell">Lead</TableHead>
+   820→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap text-right">Value</TableHead>
+   821→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap">Stage</TableHead>
+   822→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap text-center">Wtd.</TableHead>
+   823→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden lg:table-cell">Close Date</TableHead>
+   824→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap hidden xl:table-cell">Assigned To</TableHead>
+   825→                      <TableHead className="text-[11px] font-semibold whitespace-nowrap text-center">Move</TableHead>
+   826→                    </TableRow>
+   827→                  </TableHeader>
+   828→                  <TableBody>
+   829→                    {filtered.length === 0 ? (
+   830→                      <TableRow>
+   831→                        <TableCell colSpan={8} className="text-center py-6 text-sm text-muted-foreground">No deals found</TableCell>
+   832→                      </TableRow>
+   833→                    ) : (
+   834→                      filtered.map((deal) => {
+   835→                        const stageIdx = DEAL_STAGES.findIndex((s) => s.key === deal.stage);
+   836→                        const canMoveForward = stageIdx < DEAL_STAGES.length - 1 && deal.stage !== "closed_won" && deal.stage !== "closed_lost";
+   837→                        const canMoveBack = stageIdx > 0 && deal.stage !== "closed_won" && deal.stage !== "closed_lost";
+   838→                        return (
+   839→                          <TableRow key={deal.id} className="hover:bg-muted/30">
+   840→                            <TableCell className="text-xs font-semibold whitespace-nowrap max-w-[200px] truncate">{deal.title}</TableCell>
+   841→                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">{deal.leadCompany}</TableCell>
+   842→                            <TableCell className="text-xs font-mono-num font-bold text-right whitespace-nowrap">{fmtINR(deal.value)}</TableCell>
+   843→                            <TableCell className="whitespace-nowrap">{stageBadge(deal.stage)}</TableCell>
+   844→                            <TableCell className="text-xs font-mono-num text-center whitespace-nowrap text-muted-foreground">{fmtINR(Math.round(deal.value * deal.probability / 100))}</TableCell>
+   845→                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden lg:table-cell">{fmtDate(deal.closeDate)}</TableCell>
+   846→                            <TableCell className="text-xs whitespace-nowrap hidden xl:table-cell">{deal.assignedTo}</TableCell>
+   847→                            <TableCell className="whitespace-nowrap">
+   848→                              <div className="flex items-center justify-center gap-1">
+   849→                                {canMoveBack && (
+   850→                                  <Button size="sm" variant="outline" className="h-6 w-6 p-0" onClick={() => onStageChange(deal.id, DEAL_STAGES[stageIdx - 1].key)}>
+   851→                                    <ChevronLeft className="h-3 w-3" />
+   852→                                  </Button>
+   853→                                )}
+   854→                                {canMoveForward && (
+   855→                                  <Button size="sm" variant="outline" className="h-6 w-6 p-0" onClick={() => onStageChange(deal.id, DEAL_STAGES[stageIdx + 1].key)}>
+   856→                                    <ChevronRight className="h-3 w-3" />
+   857→                                  </Button>
+   858→                                )}
+   859→                                {deal.stage !== "closed_won" && deal.stage !== "closed_lost" && (
+   860→                                  <>
+   861→                                    <Button size="sm" className="h-6 w-6 p-0 bg-[#16A34A] hover:bg-[#15803D] text-white" onClick={() => onStageChange(deal.id, "closed_won")}>
+   862→                                      <Trophy className="h-3 w-3" />
+   863→                                    </Button>
+   864→                                    <Button size="sm" variant="outline" className="h-6 w-6 p-0 text-[#DC2626] border-[#DC2626]/30 hover:bg-[#FFE4E6]" onClick={() => onStageChange(deal.id, "closed_lost")}>
+   865→                                      <XCircle className="h-3 w-3" />
+   866→                                    </Button>
+   867→                                  </>
+   868→                                )}
+   869→                              </div>
+   870→                            </TableCell>
+   871→                          </TableRow>
+   872→                        );
+   873→                      })
+   874→                    )}
+   875→                  </TableBody>
+   876→                </Table>
+   877→              </div>
+   878→            )}
+   879→          </CardContent>
+   880→        </Card>
+   881→      </div>
+   882→    </div>
+   883→  );
+   884→}
+   885→
+   886→// ─── Analytics Tab ────────────────────────────────────────────────────────────
+   887→function AnalyticsTab({ leads, deals }: { leads: Lead[]; deals: Deal[] }) {
+   888→  // ─── KPIs
+   889→  const totalPipeline = leads.reduce((s, l) => s + l.estimatedValue, 0);
+   890→  const wonThisMonth = leads.filter((l) => l.status === "won");
+   891→  const wonValue = wonThisMonth.reduce((s, l) => s + l.estimatedValue, 0);
+   892→  const closedDeals = deals.filter((d) => d.stage === "closed_won" || d.stage === "closed_lost");
+   893→  const winRate = closedDeals.length > 0 ? Math.round((deals.filter((d) => d.stage === "closed_won").length / closedDeals.length) * 100) : 0;
+   894→  const avgDealSize = wonThisMonth.length > 0 ? Math.round(wonValue / wonThisMonth.length) : 0;
+   895→  const salesCycle = 18; // mock average days
+   896→  const targetAchievement = Math.round((wonValue / 25000000) * 100); // mock target ₹2.5 Cr
+   897→
+   898→  // ─── Pipeline by Stage (funnel data)
+   899→  const pipelineByStage = useMemo(() =>
+   900→    PIPELINE_STAGES.filter((s) => s.key !== "lost").map((stage) => ({
+   901→      name: stage.label,
+   902→      value: leads.filter((l) => l.status === stage.key).reduce((s, l) => s + l.estimatedValue, 0),
+   903→      count: leads.filter((l) => l.status === stage.key).length,
+   904→      fill: stage.color,
+   905→    }))
+   906→  , [leads]);
+   907→
+   908→  // ─── Monthly Revenue (mock area chart)
+   909→  const monthlyRevenue = useMemo(() => [
+   910→    { month: "Jan", revenue: 3200000, deals: 4 },
+   911→    { month: "Feb", revenue: 4100000, deals: 5 },
+   912→    { month: "Mar", revenue: 2800000, deals: 3 },
+   913→    { month: "Apr", revenue: 5600000, deals: 6 },
+   914→    { month: "May", revenue: 4800000, deals: 5 },
+   915→    { month: "Jun", revenue: 6200000, deals: 7 },
+   916→    { month: "Jul", revenue: wonValue + 1500000, deals: wonThisMonth.length + 2 },
+   917→  ], [wonValue, wonThisMonth.length]);
+   918→
+   919→  // ─── Win/Loss Analysis
+   920→  const winLossData = useMemo(() => [
+   921→    { name: "Won", value: deals.filter((d) => d.stage === "closed_won").length, fill: SUCCESS },
+   922→    { name: "Lost", value: deals.filter((d) => d.stage === "closed_lost").length, fill: "#DC2626" },
+   923→    { name: "In Progress", value: deals.filter((d) => !["closed_won", "closed_lost"].includes(d.stage)).length, fill: GOLD },
+   924→  ], [deals]);
+   925→
+   926→  // ─── Sales by Source
+   927→  const salesBySource = useMemo(() => {
+   928→    return Object.entries(SOURCE_META).map(([key, meta]) => ({
+   929→      name: meta.label,
+   930→      value: leads.filter((l) => l.source === key).reduce((s, l) => s + l.estimatedValue, 0),
+   931→      count: leads.filter((l) => l.source === key).length,
+   932→      fill: meta.color,
+   933→    })).filter((s) => s.value > 0).sort((a, b) => b.value - a.value);
+   934→  }, [leads]);
+   935→
+   936→  // ─── Top Performers
+   937→  const topPerformers = useMemo(() => {
+   938→    return ASSIGNEES.map((name) => {
+   939→      const wonLeads = leads.filter((l) => l.assignedTo === name && l.status === "won");
+   940→      const activeLeads = leads.filter((l) => l.assignedTo === name && !["won", "lost"].includes(l.status));
+   941→      const totalWonValue = wonLeads.reduce((s, l) => s + l.estimatedValue, 0);
+   942→      const totalActiveValue = activeLeads.reduce((s, l) => s + l.estimatedValue, 0);
+   943→      return { name, wonLeads: wonLeads.length, activeLeads: activeLeads.length, totalWonValue, totalActiveValue };
+   944→    }).sort((a, b) => b.totalWonValue - a.totalWonValue);
+   945→  }, [leads]);
+   946→
+   947→  return (
+   948→    <div className="space-y-4">
+   949→      {/* KPI Row */}
+   950→      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+   951→        <KpiCard label="Total Pipeline" value={fmtINR(totalPipeline)} icon={DollarSign} accent="navy" />
+   952→        <KpiCard label="Won This Month" value={fmtINR(wonValue)} icon={Trophy} accent="success" />
+   953→        <KpiCard label="Win Rate" value={`${winRate}%`} icon={Target} accent="gold" />
+   954→        <KpiCard label="Avg Deal Size" value={fmtINR(avgDealSize)} icon={BarChart3} accent="info" />
+   955→        <KpiCard label="Sales Cycle" value={`${salesCycle}d`} icon={Clock} accent="warning" />
+   956→        <KpiCard label="Target Achieved" value={`${Math.min(targetAchievement, 100)}%`} icon={Award} accent={targetAchievement >= 100 ? "success" : "warning"} hint="of ₹2.5 Cr target" />
+   957→      </div>
+   958→
+   959→      {/* Charts Row 1 */}
+   960→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   961→        {/* Pipeline by Stage */}
+   962→        <Card>
+   963→          <CardHeader className="pb-2">
+   964→            <CardTitle className="text-sm font-bold text-navy flex items-center gap-2">
+   965→              <CircleDot className="h-4 w-4 text-gold" /> Pipeline by Stage
+   966→            </CardTitle>
+   967→          </CardHeader>
+   968→          <CardContent>
+   969→            <ResponsiveContainer width="100%" height={280}>
+   970→              <BarChart data={pipelineByStage} layout="vertical" margin={{ top: 4, right: 16, left: 10, bottom: 4 }}>
+   971→                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
+   972→                <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
+   973→                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
+   974→                <Tooltip content={<ChartTooltip />} />
+   975→                <Bar dataKey="value" name="Pipeline Value" radius={[0, 6, 6, 0]} barSize={28}>
+   976→                  {pipelineByStage.map((entry, idx) => (
+   977→                    <Cell key={idx} fill={entry.fill} fillOpacity={0.85} />
+   978→                  ))}
+   979→                </Bar>
+   980→              </BarChart>
+   981→            </ResponsiveContainer>
+   982→          </CardContent>
+   983→        </Card>
+   984→
+   985→        {/* Monthly Revenue */}
+   986→        <Card>
+   987→          <CardHeader className="pb-2">
+   988→            <CardTitle className="text-sm font-bold text-navy flex items-center gap-2">
+   989→              <TrendingUp className="h-4 w-4 text-gold" /> Monthly Revenue
+   990→            </CardTitle>
+   991→          </CardHeader>
+   992→          <CardContent>
+   993→            <ResponsiveContainer width="100%" height={280}>
+   994→              <AreaChart data={monthlyRevenue} margin={{ top: 4, right: 16, left: -10, bottom: 4 }}>
+   995→                <defs>
+   996→                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+   997→                    <stop offset="5%" stopColor={NAVY} stopOpacity={0.25} />
+   998→                    <stop offset="95%" stopColor={NAVY} stopOpacity={0.02} />
+   999→                  </linearGradient>
+  1000→                </defs>
+  1001→                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+  1002→                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+  1003→                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
+  1004→                <Tooltip content={<ChartTooltip />} />
+  1005→                <Area type="monotone" dataKey="revenue" name="Revenue" stroke={NAVY} strokeWidth={2.5} fill="url(#revenueGrad)" />
+  1006→              </AreaChart>
+  1007→            </ResponsiveContainer>
+  1008→          </CardContent>
+  1009→        </Card>
+  1010→      </div>
+  1011→
+  1012→      {/* Charts Row 2 */}
+  1013→      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  1014→        {/* Win/Loss Analysis */}
+  1015→        <Card>
+  1016→          <CardHeader className="pb-2">
+  1017→            <CardTitle className="text-sm font-bold text-navy flex items-center gap-2">
+  1018→              <Percent className="h-4 w-4 text-gold" /> Win / Loss Analysis
+  1019→            </CardTitle>
+  1020→          </CardHeader>
+  1021→          <CardContent>
+  1022→            <ResponsiveContainer width="100%" height={240}>
+  1023→              <PieChart>
+  1024→                <Pie
+  1025→                  data={winLossData}
+  1026→                  cx="50%"
+  1027→                  cy="50%"
+  1028→                  innerRadius={55}
+  1029→                  outerRadius={85}
+  1030→                  paddingAngle={3}
+  1031→                  dataKey="value"
+  1032→                  label={({ name, value, percent }) => `${name} ${value} (${(percent * 100).toFixed(0)}%)`}
+  1033→                >
+  1034→                  {winLossData.map((entry, idx) => (
+  1035→                    <Cell key={idx} fill={entry.fill} />
+  1036→                  ))}
+  1037→                </Pie>
+  1038→                <Tooltip content={<ChartTooltip />} />
+  1039→              </PieChart>
+  1040→            </ResponsiveContainer>
+  1041→          </CardContent>
+  1042→        </Card>
+  1043→
+  1044→        {/* Sales by Source */}
+  1045→        <Card>
+  1046→          <CardHeader className="pb-2">
+  1047→            <CardTitle className="text-sm font-bold text-navy flex items-center gap-2">
+  1048→              <BarChart3 className="h-4 w-4 text-gold" /> Sales by Source
+  1049→            </CardTitle>
+  1050→          </CardHeader>
+  1051→          <CardContent>
+  1052→            <ResponsiveContainer width="100%" height={240}>
+  1053→              <BarChart data={salesBySource} layout="vertical" margin={{ top: 4, right: 16, left: 10, bottom: 4 }}>
+  1054→                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
+  1055→                <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
+  1056→                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
+  1057→                <Tooltip content={<ChartTooltip />} />
+  1058→                <Bar dataKey="value" name="Pipeline Value" radius={[0, 6, 6, 0]} barSize={20}>
+  1059→                  {salesBySource.map((entry, idx) => (
+  1060→                    <Cell key={idx} fill={entry.fill} fillOpacity={0.85} />
+  1061→                  ))}
+  1062→                </Bar>
+  1063→              </BarChart>
+  1064→            </ResponsiveContainer>
+  1065→          </CardContent>
+  1066→        </Card>
+  1067→
+  1068→        {/* Top Performers */}
+  1069→        <Card>
+  1070→          <CardHeader className="pb-2">
+  1071→            <CardTitle className="text-sm font-bold text-navy flex items-center gap-2">
+  1072→              <Award className="h-4 w-4 text-gold" /> Top Performers
+  1073→            </CardTitle>
+  1074→          </CardHeader>
+  1075→          <CardContent>
+  1076→            <div className="space-y-3">
+  1077→              {topPerformers.map((p, idx) => (
+  1078→                <div key={p.name} className="flex items-center gap-3">
+  1079→                  <div className={cn(
+  1080→                    "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white shrink-0",
+  1081→                    idx === 0 ? "bg-gold" : idx === 1 ? "bg-[#94A3B8]" : "bg-[#CD7F32]"
+  1082→                  )}>
+  1083→                    {idx + 1}
+  1084→                  </div>
+  1085→                  <div className="min-w-0 flex-1">
+  1086→                    <div className="flex items-center justify-between">
+  1087→                      <p className="text-xs font-semibold truncate">{p.name}</p>
+  1088→                      <p className="text-xs font-mono-num font-bold" style={{ color: NAVY }}>{fmtINR(p.totalWonValue)}</p>
+  1089→                    </div>
+  1090→                    <div className="flex items-center gap-3 mt-0.5">
+  1091→                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+  1092→                        <Trophy className="h-3 w-3 text-[#16A34A]" /> {p.wonLeads} won
+  1093→                      </span>
+  1094→                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+  1095→                        <CircleDot className="h-3 w-3 text-[#0284C7]" /> {p.activeLeads} active
+  1096→                      </span>
+  1097→                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+  1098→                        Pipeline: {fmtINR(p.totalActiveValue)}
+  1099→                      </span>
+  1100→                    </div>
+  1101→                    {/* Progress bar */}
+  1102→                    <div className="mt-1 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+  1103→                      <div
+  1104→                        className="h-full rounded-full transition-all"
+  1105→                        style={{
+  1106→                          width: `${Math.min((p.totalWonValue / (topPerformers[0]?.totalWonValue || 1)) * 100, 100)}%`,
+  1107→                          backgroundColor: idx === 0 ? GOLD : idx === 1 ? "#94A3B8" : "#CD7F32",
+  1108→                        }}
+  1109→                      />
+  1110→                    </div>
+  1111→                  </div>
+  1112→                </div>
+  1113→              ))}
+  1114→            </div>
+  1115→          </CardContent>
+  1116→        </Card>
+  1117→      </div>
+  1118→    </div>
+  1119→  );
+  1120→}
+  1121→
+  1122→// ─── Main Module ──────────────────────────────────────────────────────────────
+  1123→export function SalesModule() {
+  1124→  const { refreshTick, triggerRefresh } = useAppStore();
+  1125→  const [tab, setTab] = useState("pipeline");
+  1126→  const [leadDialog, setLeadDialog] = useState<{ open: boolean; lead: Lead | null }>({ open: false, lead: null });
+  1127→  const [dealDialog, setDealDialog] = useState(false);
+  1128→
+  1129→  const { data: leadsData, loading: leadsLoading, reload: reloadLeads } = useApi<Lead[]>("/api/sales/leads", [refreshTick]);
+  1130→  const { data: dealsData, loading: dealsLoading, reload: reloadDeals } = useApi<Deal[]>("/api/sales/deals", [refreshTick]);
+  1131→
+  1132→  const leads = leadsData ?? [];
+  1133→  const deals = dealsData ?? [];
+  1134→
+  1135→  // ─── Move lead to new stage
+  1136→  const handleMoveLead = async (id: string, newStatus: string) => {
+  1137→    try {
+  1138→      await apiPut("/api/sales/leads", { id, status: newStatus });
+  1139→      const stageLabel = PIPELINE_STAGES.find((s) => s.key === newStatus)?.label ?? newStatus;
+  1140→      toast.success(`Lead moved to ${stageLabel}`);
+  1141→      triggerRefresh();
+  1142→    } catch (e: any) {
+  1143→      toast.error(e.message || "Failed to move lead");
+  1144→    }
+  1145→  };
+  1146→
+  1147→  // ─── Quick action on lead
+  1148→  const handleQuickAction = async (id: string, action: string) => {
+  1149→    try {
+  1150→      await apiPut("/api/sales/leads", { id, status: action });
+  1151→      const stageLabel = PIPELINE_STAGES.find((s) => s.key === action)?.label ?? action;
+  1152→      toast.success(`Lead marked as ${stageLabel}`);
+  1153→      triggerRefresh();
+  1154→    } catch (e: any) {
+  1155→      toast.error(e.message || "Action failed");
+  1156→    }
+  1157→  };
+  1158→
+  1159→  // ─── Save lead
+  1160→  const handleSaveLead = async (data: any) => {
+  1161→    try {
+  1162→      if (data.id) {
+  1163→        await apiPut("/api/sales/leads", data);
+  1164→        toast.success("Lead updated successfully");
+  1165→      } else {
+  1166→        await apiPost("/api/sales/leads", data);
+  1167→        toast.success("Lead created successfully");
+  1168→      }
+  1169→      setLeadDialog({ open: false, lead: null });
+  1170→      triggerRefresh();
+  1171→    } catch (e: any) {
+  1172→      toast.error(e.message || "Failed to save lead");
+  1173→    }
+  1174→  };
+  1175→
+  1176→  // ─── Save deal
+  1177→  const handleSaveDeal = async (data: any) => {
+  1178→    try {
+  1179→      await apiPost("/api/sales/deals", data);
+  1180→      toast.success("Deal created successfully");
+  1181→      setDealDialog(false);
+  1182→      triggerRefresh();
+  1183→    } catch (e: any) {
+  1184→      toast.error(e.message || "Failed to create deal");
+  1185→    }
+  1186→  };
+  1187→
+  1188→  // ─── Move deal stage
+  1189→  const handleDealStageChange = async (id: string, stage: string) => {
+  1190→    try {
+  1191→      await apiPut("/api/sales/deals", { id, stage });
+  1192→      const stageLabel = DEAL_STAGES.find((s) => s.key === stage)?.label ?? stage;
+  1193→      toast.success(`Deal moved to ${stageLabel}`);
+  1194→      triggerRefresh();
+  1195→    } catch (e: any) {
+  1196→      toast.error(e.message || "Failed to move deal");
+  1197→    }
+  1198→  };
+  1199→
+  1200→  return (
+  1201→    <div className="space-y-5">
+  1202→      {/* Module Header */}
+  1203→      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+  1204→        <div>
+  1205→          <h1 className="font-display text-2xl font-bold text-navy flex items-center gap-2">
+  1206→            <TrendingUp className="h-6 w-6 text-gold" /> Sales Pipeline
+  1207→          </h1>
+  1208→          <p className="text-sm text-muted-foreground mt-0.5">Manage leads, track deals, and drive revenue growth</p>
+  1209→        </div>
+  1210→        <div className="flex items-center gap-2">
+  1211→          <Button size="sm" variant="outline" className="text-xs" onClick={() => { triggerRefresh(); toast.success("Data refreshed"); }}>
+  1212→            ↻ Refresh
+  1213→          </Button>
+  1214→          <Button size="sm" className="bg-navy hover:bg-navy/90 text-white text-xs" onClick={() => setLeadDialog({ open: true, lead: null })}>
+  1215→            <Plus className="h-4 w-4 mr-1" /> New Lead
+  1216→          </Button>
+  1217→        </div>
+  1218→      </div>
+  1219→
+  1220→      {/* Tabs */}
+  1221→      <Tabs value={tab} onValueChange={setTab}>
+  1222→        <TabsList className="grid w-full grid-cols-4 max-w-lg">
+  1223→          <TabsTrigger value="pipeline" className="text-xs">Pipeline</TabsTrigger>
+  1224→          <TabsTrigger value="leads" className="text-xs">Leads</TabsTrigger>
+  1225→          <TabsTrigger value="deals" className="text-xs">Deals</TabsTrigger>
+  1226→          <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
+  1227→        </TabsList>
+  1228→
+  1229→        <TabsContent value="pipeline" className="mt-4">
+  1230→          {leadsLoading ? (
+  1231→            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
+  1232→          ) : (
+  1233→            <PipelineTab leads={leads} onMoveLead={handleMoveLead} />
+  1234→          )}
+  1235→        </TabsContent>
+  1236→
+  1237→        <TabsContent value="leads" className="mt-4">
+  1238→          <LeadsTab
+  1239→            leads={leads}
+  1240→            loading={leadsLoading}
+  1241→            onEdit={(lead) => setLeadDialog({ open: true, lead })}
+  1242→            onQuickAction={handleQuickAction}
+  1243→            onAdd={() => setLeadDialog({ open: true, lead: null })}
+  1244→          />
+  1245→        </TabsContent>
+  1246→
+  1247→        <TabsContent value="deals" className="mt-4">
+  1248→          <DealsTab
+  1249→            deals={deals}
+  1250→            loading={dealsLoading}
+  1251→            onAdd={() => setDealDialog(true)}
+  1252→            onStageChange={handleDealStageChange}
+  1253→          />
+  1254→        </TabsContent>
+  1255→
+  1256→        <TabsContent value="analytics" className="mt-4">
+  1257→          <AnalyticsTab leads={leads} deals={deals} />
+  1258→        </TabsContent>
+  1259→      </Tabs>
+  1260→
+  1261→      {/* Dialogs */}
+  1262→      <LeadFormDialog
+  1263→        key={leadDialog.lead?.id ?? "new"}
+  1264→        open={leadDialog.open}
+  1265→        onClose={() => setLeadDialog({ open: false, lead: null })}
+  1266→        onSave={handleSaveLead}
+  1267→        initial={leadDialog.lead}
+  1268→      />
+  1269→      <DealFormDialog
+  1270→        key={dealDialog ? "open" : "closed"}
+  1271→        open={dealDialog}
+  1272→        onClose={() => setDealDialog(false)}
+  1273→        onSave={handleSaveDeal}
+  1274→        leads={leads}
+  1275→      />
+  1276→    </div>
+  1277→  );
+  1278→}
+  1279→

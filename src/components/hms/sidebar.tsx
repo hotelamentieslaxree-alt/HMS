@@ -1,4 +1,4 @@
-// HMS Sidebar — role-based navigation
+// HMS Sidebar — role-based navigation with expandable sub-items
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -6,12 +6,23 @@ import { useAppStore, ModuleKey, ROLE_META, ROLE_MODULES } from "@/lib/store";
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, Sparkles, Users, UtensilsCrossed,
   Receipt, BarChart3, MoonStar, UserCog, Wrench, ShieldCheck, Hotel, ChevronLeft, LogOut,
+  TrendingUp, Megaphone, UserCheck, Award, Clock, ChevronDown,
+  IndianRupee, Cake, Share2, Activity, Target, Briefcase,
+  Building2, PieChart, Calendar, Upload, FileText, ClipboardList,
 } from "lucide-react";
+
+interface SubItem {
+  key: string;
+  label: string;
+  icon: any;
+}
 
 interface NavItem {
   key: ModuleKey;
   label: string;
   icon: any;
+  badge?: string;
+  children?: SubItem[];
 }
 
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
@@ -33,6 +44,77 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Sales",
+    items: [
+      {
+        key: "sales",
+        label: "Sales Pipeline",
+        icon: TrendingUp,
+        children: [
+          { key: "pipeline", label: "Pipeline", icon: Target },
+          { key: "leads", label: "Leads", icon: Users },
+          { key: "deals", label: "Deals", icon: Briefcase },
+          { key: "analytics", label: "Analytics", icon: Activity },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Marketing",
+    items: [
+      {
+        key: "marketing",
+        label: "Marketing Hub",
+        icon: Megaphone,
+        children: [
+          { key: "overview", label: "Overview", icon: BarChart3 },
+          { key: "campaigns", label: "Campaigns", icon: Megaphone },
+          { key: "social", label: "Social Accounts", icon: Share2 },
+          { key: "analytics", label: "Analytics", icon: Activity },
+          { key: "reports", label: "Reports", icon: FileText },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Human Resources",
+    items: [
+      {
+        key: "hr",
+        label: "HR Hub",
+        icon: UserCog,
+        children: [
+          { key: "overview", label: "Overview", icon: BarChart3 },
+          { key: "employees", label: "Employees", icon: Users },
+          { key: "payroll", label: "Payroll", icon: IndianRupee },
+          { key: "events", label: "Events & Birthdays", icon: Cake },
+        ],
+      },
+      {
+        key: "attendance",
+        label: "Attendance",
+        icon: Clock,
+        children: [
+          { key: "overview", label: "Overview", icon: BarChart3 },
+          { key: "calendar", label: "Calendar", icon: Calendar },
+          { key: "table", label: "Attendance Table", icon: ClipboardList },
+          { key: "manual", label: "Manual Entry", icon: Clock },
+          { key: "reports", label: "Reports", icon: FileText },
+        ],
+      },
+      {
+        key: "scorecard",
+        label: "Scorecard",
+        icon: Award,
+        children: [
+          { key: "overview", label: "Overview", icon: BarChart3 },
+          { key: "scorecards", label: "Scorecards", icon: Award },
+          { key: "leaderboard", label: "Leaderboard", icon: PieChart },
+        ],
+      },
+    ],
+  },
+  {
     title: "Intelligence",
     items: [
       { key: "reports", label: "Reports", icon: BarChart3 },
@@ -43,20 +125,51 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Administration",
     items: [
-      { key: "staff", label: "Staff & Roles", icon: UserCog },
+      {
+        key: "staff",
+        label: "Staff Directory",
+        icon: UserCheck,
+        children: [
+          { key: "directory", label: "Directory", icon: Users },
+          { key: "departments", label: "Departments", icon: Building2 },
+          { key: "orgchart", label: "Org Chart", icon: PieChart },
+        ],
+      },
       { key: "maintenance", label: "Maintenance", icon: Wrench },
     ],
   },
 ];
 
 export function Sidebar() {
-  const { activeModule, setActiveModule, sidebarCollapsed, toggleSidebar, role, user, setUser } = useAppStore();
+  const {
+    activeModule, setActiveModule, activeSubModule, navigateTo,
+    sidebarCollapsed, toggleSidebar, expandedMenus, toggleMenu,
+    role, user, setUser,
+  } = useAppStore();
   const meta = ROLE_META[role];
   const allowedModules = ROLE_MODULES[role] ?? ROLE_MODULES.gm;
 
   const handleLogout = () => {
     localStorage.removeItem("aria_auth");
     setUser(null);
+  };
+
+  const isExpanded = (key: string) => expandedMenus.includes(key);
+
+  const handleParentClick = (item: NavItem) => {
+    if (item.children) {
+      // Toggle expand + navigate to module with first sub-item
+      if (!isExpanded(item.key)) {
+        toggleMenu(item.key);
+      }
+      navigateTo(item.key, item.children[0].key);
+    } else {
+      navigateTo(item.key, "");
+    }
+  };
+
+  const handleSubClick = (parentKey: ModuleKey, subKey: string) => {
+    navigateTo(parentKey, subKey);
   };
 
   return (
@@ -100,35 +213,78 @@ export function Sidebar() {
       )}
 
       {/* Nav — filtered by role */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1.5 scrollbar-thin">
         {NAV_GROUPS.map((group) => {
           const filteredItems = group.items.filter((item) => allowedModules.includes(item.key));
           if (filteredItems.length === 0) return null;
           return (
             <div key={group.title}>
               {!sidebarCollapsed && (
-                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">{group.title}</p>
+                <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">{group.title}</p>
               )}
               <div className="space-y-0.5">
                 {filteredItems.map((item) => {
                   const active = activeModule === item.key;
+                  const hasChildren = !!item.children;
+                  const expanded = isExpanded(item.key);
                   const Icon = item.icon;
+
                   return (
-                    <button
-                      key={item.key}
-                      onClick={() => setActiveModule(item.key)}
-                      title={sidebarCollapsed ? item.label : undefined}
-                      className={cn(
-                        "group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                        active
-                          ? "bg-gold text-navy shadow-sm"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                        sidebarCollapsed && "justify-center px-0"
+                    <div key={item.key}>
+                      {/* Parent item */}
+                      <button
+                        onClick={() => handleParentClick(item)}
+                        title={sidebarCollapsed ? item.label : undefined}
+                        className={cn(
+                          "group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                          active
+                            ? "bg-gold/10 text-gold"
+                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                          sidebarCollapsed && "justify-center px-0"
+                        )}
+                      >
+                        <Icon className={cn("h-4 w-4 shrink-0", active ? "text-gold" : "text-sidebar-foreground/60 group-hover:text-gold")} />
+                        {!sidebarCollapsed && (
+                          <>
+                            <span className="truncate flex-1 text-left">{item.label}</span>
+                            {hasChildren && (
+                              <ChevronDown className={cn(
+                                "h-3.5 w-3.5 shrink-0 text-sidebar-foreground/40 transition-transform duration-200",
+                                expanded && "rotate-180"
+                              )} />
+                            )}
+                          </>
+                        )}
+                        {!sidebarCollapsed && item.badge && (
+                          <span className="ml-auto rounded-full bg-gold/20 px-1.5 py-0.5 text-[10px] font-bold text-gold">{item.badge}</span>
+                        )}
+                      </button>
+
+                      {/* Sub-items */}
+                      {hasChildren && expanded && !sidebarCollapsed && (
+                        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border/50 pl-2">
+                          {item.children!.map((sub) => {
+                            const SubIcon = sub.icon;
+                            const subActive = active && activeSubModule === sub.key;
+                            return (
+                              <button
+                                key={sub.key}
+                                onClick={() => handleSubClick(item.key, sub.key)}
+                                className={cn(
+                                  "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
+                                  subActive
+                                    ? "bg-gold/15 text-gold"
+                                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                                )}
+                              >
+                                <SubIcon className={cn("h-3.5 w-3.5 shrink-0", subActive ? "text-gold" : "text-sidebar-foreground/40")} />
+                                <span className="truncate">{sub.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
-                    >
-                      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-navy" : "text-sidebar-foreground/60 group-hover:text-gold")} />
-                      {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

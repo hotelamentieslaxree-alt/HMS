@@ -51,13 +51,17 @@ model Property {
   payrollRecords    PayrollRecord[]
   companyEvents     CompanyEvent[]
   scorecards        Scorecard[]
+  leads             Lead[]
+  deals             Deal[]
+  campaigns         Campaign[]
+  socialAccounts    SocialAccount[]
 }
 
 model Department {
   id         String   @id @default(cuid())
   propertyId String
   name       String
-  code       String // FO | HK | FB | ENG | HR | FIN | SEC
+  code       String // FO | HK | FB | ENG | HR | FIN | SEC | SALES | MKT
   headUserId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -94,6 +98,8 @@ model User {
   payrollRecords PayrollRecord[]
   scorecards    Scorecard[]
   organizedEvents CompanyEvent[]  @relation("EventOrganizer")
+  assignedLeads   Lead[]          @relation("LeadAssignee")
+  assignedDeals   Deal[]          @relation("DealAssignee")
 
   @@index([propertyId])
 }
@@ -734,4 +740,106 @@ model Scorecard {
   @@unique([userId, period])
   @@index([propertyId])
   @@index([userId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// SALES & MARKETING
+// ════════════════════════════════════════════════════════════════
+
+model Lead {
+  id              String   @id @default(cuid())
+  propertyId      String
+  companyName     String
+  contactName     String
+  contactEmail    String?
+  contactPhone    String?
+  source          String   @default("direct") // direct | referral | website | linkedin | expo | cold_call | ota_partner
+  status          String   @default("new") // new | contacted | qualified | proposal | negotiation | won | lost
+  estimatedValue  Float    @default(0)
+  probability     Int      @default(20) // 0-100
+  assignedToId    String?
+  notes           String?
+  lastContactedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  assignedTo User?    @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  deals      Deal[]
+
+  @@index([propertyId, status])
+  @@index([assignedToId])
+}
+
+model Deal {
+  id             String   @id @default(cuid())
+  propertyId     String
+  leadId         String
+  title          String
+  value          Float    @default(0)
+  stage          String   @default("prospecting") // prospecting | qualification | proposal | negotiation | closed_won | closed_lost
+  probability    Int      @default(20)
+  closeDate      DateTime?
+  assignedToId   String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedTo User?    @relation("DealAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, stage])
+  @@index([leadId])
+}
+
+model Campaign {
+  id             String   @id @default(cuid())
+  propertyId     String
+  name           String
+  type           String   @default("social") // social | email | ppc | display | content | influencer | seo
+  platform       String   @default("multi") // multi | instagram | facebook | linkedin | google | youtube | twitter
+  status         String   @default("draft") // draft | active | paused | completed | cancelled
+  budget         Float    @default(0)
+  spent          Float    @default(0)
+  impressions    Int      @default(0)
+  clicks         Int      @default(0)
+  conversions    Int      @default(0)
+  leads          Int      @default(0)
+  revenue        Float    @default(0)
+  startDate      DateTime?
+  endDate        DateTime?
+  targetAudience String?
+  objective      String?  // awareness | engagement | traffic | conversions | lead_gen | sales
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([platform])
+}
+
+model SocialAccount {
+  id           String   @id @default(cuid())
+  propertyId   String
+  platform     String   // instagram | facebook | linkedin | youtube | twitter | tiktok | pinterest
+  handle       String
+  displayName  String?
+  avatarUrl    String?
+  followerCount Int     @default(0)
+  followingCount Int    @default(0)
+  postCount    Int      @default(0)
+  engagementRate Float  @default(0)
+  accessToken  String?
+  refreshToken String?
+  isActive     Boolean  @default(true)
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, platform, handle])
+  @@index([propertyId])
 }

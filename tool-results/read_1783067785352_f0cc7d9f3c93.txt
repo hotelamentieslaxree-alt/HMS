@@ -1,0 +1,1654 @@
+     1→// ARIA HMS — Performance Scorecard Module (standalone)
+     2→"use client";
+     3→
+     4→import { useState, useMemo, useCallback } from "react";
+     5→import { cn } from "@/lib/utils";
+     6→import { useApi, apiPost, apiPut } from "@/lib/api";
+     7→import { useAppStore } from "@/lib/store";
+     8→import { KpiCard, fmtDate } from "../shared";
+     9→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Badge } from "@/components/ui/badge";
+    12→import { Input } from "@/components/ui/input";
+    13→import { Label } from "@/components/ui/label";
+    14→import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+    15→import {
+    16→  Dialog,
+    17→  DialogContent,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→  DialogFooter,
+    21→} from "@/components/ui/dialog";
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→} from "@/components/ui/select";
+    29→import { Skeleton } from "@/components/ui/skeleton";
+    30→import {
+    31→  Table,
+    32→  TableBody,
+    33→  TableCell,
+    34→  TableHead,
+    35→  TableHeader,
+    36→  TableRow,
+    37→} from "@/components/ui/table";
+    38→import { Slider } from "@/components/ui/slider";
+    39→import { toast } from "sonner";
+    40→import {
+    41→  Award,
+    42→  Star,
+    43→  TrendingUp,
+    44→  Users,
+    45→  BarChart3,
+    46→  Trophy,
+    47→  Plus,
+    48→  Pencil,
+    49→  ChevronLeft,
+    50→  Search,
+    51→  Medal,
+    52→  ArrowUpRight,
+    53→  ArrowDownRight,
+    54→} from "lucide-react";
+    55→import {
+    56→  BarChart,
+    57→  Bar,
+    58→  RadarChart,
+    59→  Radar,
+    60→  PolarGrid,
+    61→  PolarAngleAxis,
+    62→  PolarRadiusAxis,
+    63→  ResponsiveContainer,
+    64→  XAxis,
+    65→  YAxis,
+    66→  Tooltip,
+    67→  CartesianGrid,
+    68→  LineChart,
+    69→  Line,
+    70→  ReferenceLine,
+    71→} from "recharts";
+    72→
+    73→// ─── Constants ────────────────────────────────────────────────────
+    74→const NAVY = "#1B3A6B";
+    75→const GOLD = "#C9952A";
+    76→const SUCCESS = "#16A34A";
+    77→
+    78→const GRADE_COLORS: Record<string, string> = {
+    79→  "A+": "bg-[#DCFCE7] text-[#14532D]",
+    80→  A: "bg-[#DCFCE7] text-[#16A34A]",
+    81→  "B+": "bg-[#DBEAFE] text-[#1B3A6B]",
+    82→  B: "bg-[#DBEAFE] text-[#0369A1]",
+    83→  C: "bg-[#FEF3C7] text-[#78350F]",
+    84→  D: "bg-[#FFE4E6] text-[#881337]",
+    85→};
+    86→
+    87→const METRIC_DEFS: {
+    88→  key: string;
+    89→  label: string;
+    90→  weight: number;
+    91→  max: number;
+    92→  unit: string;
+    93→}[] = [
+    94→  { key: "attendance", label: "Attendance", weight: 15, max: 100, unit: "%" },
+    95→  { key: "punctuality", label: "Punctuality", weight: 10, max: 10, unit: "/10" },
+    96→  { key: "taskCompletion", label: "Task Completion", weight: 20, max: 100, unit: "%" },
+    97→  { key: "guestFeedback", label: "Guest Feedback", weight: 15, max: 10, unit: "/10" },
+    98→  { key: "teamwork", label: "Teamwork", weight: 10, max: 10, unit: "/10" },
+    99→  { key: "initiative", label: "Initiative", weight: 10, max: 10, unit: "/10" },
+   100→  { key: "grooming", label: "Grooming", weight: 10, max: 10, unit: "/10" },
+   101→  { key: "communication", label: "Communication", weight: 10, max: 10, unit: "/10" },
+   102→];
+   103→
+   104→const now = new Date();
+   105→
+   106→function currentPeriod() {
+   107→  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+   108→}
+   109→
+   110→function periodLabel(p: string) {
+   111→  const [y, m] = p.split("-");
+   112→  const months = [
+   113→    "Jan","Feb","Mar","Apr","May","Jun",
+   114→    "Jul","Aug","Sep","Oct","Nov","Dec",
+   115→  ];
+   116→  return `${months[Number(m) - 1]} ${y}`;
+   117→}
+   118→
+   119→function last12Periods(): string[] {
+   120→  const periods: string[] = [];
+   121→  for (let i = 0; i < 12; i++) {
+   122→    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+   123→    periods.push(
+   124→      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+   125→    );
+   126→  }
+   127→  return periods;
+   128→}
+   129→
+   130→// ─── Types ────────────────────────────────────────────────────────
+   131→interface ScorecardRow {
+   132→  id: string;
+   133→  period: string;
+   134→  userId: string;
+   135→  userName: string | null;
+   136→  department: string | null;
+   137→  departmentCode: string | null;
+   138→  attendance: number;
+   139→  punctuality: number;
+   140→  taskCompletion: number;
+   141→  guestFeedback: number;
+   142→  teamwork: number;
+   143→  initiative: number;
+   144→  grooming: number;
+   145→  communication: number;
+   146→  overallScore: number;
+   147→  grade: string;
+   148→  remarks: string | null;
+   149→  reviewedBy: string | null;
+   150→  createdAt: string;
+   151→  updatedAt: string;
+   152→}
+   153→
+   154→interface ScorecardData {
+   155→  overallStats: {
+   156→    averageScore: number;
+   157→    totalEmployees: number;
+   158→    byGrade: Record<string, number>;
+   159→  };
+   160→  departmentAverages: Record<
+   161→    string,
+   162→    { average: number; count: number }
+   163→  >;
+   164→  scorecards: ScorecardRow[];
+   165→}
+   166→
+   167→interface Employee {
+   168→  id: string;
+   169→  fullName: string;
+   170→  department: string | null;
+   171→  departmentCode: string | null;
+   172→  role: string;
+   173→  isActive: boolean;
+   174→}
+   175→
+   176→// ─── Main Component ───────────────────────────────────────────────
+   177→export function ScorecardModule() {
+   178→  const [tab, setTab] = useState("overview");
+   179→  const [selectedEmployee, setSelectedEmployee] = useState<{
+   180→    userId: string;
+   181→    userName: string;
+   182→  } | null>(null);
+   183→
+   184→  const handleViewEmployee = (userId: string, userName: string) => {
+   185→    setSelectedEmployee({ userId, userName });
+   186→    setTab("detail");
+   187→  };
+   188→
+   189→  const handleBackFromDetail = () => {
+   190→    setSelectedEmployee(null);
+   191→    setTab("overview");
+   192→  };
+   193→
+   194→  return (
+   195→    <div className="space-y-4">
+   196→      <div className="flex items-center gap-3">
+   197→        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1B3A6B] text-white shadow-md">
+   198→          <Award className="h-5 w-5" />
+   199→        </div>
+   200→        <div>
+   201→          <h1 className="font-display text-xl font-bold text-foreground">
+   202→            Performance Scorecard
+   203→          </h1>
+   204→          <p className="text-xs text-muted-foreground">
+   205→            Employee KPI tracking &amp; weighted performance evaluation
+   206→          </p>
+   207→        </div>
+   208→      </div>
+   209→
+   210→      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+   211→        <TabsList className="flex-wrap">
+   212→          <TabsTrigger value="overview">Overview</TabsTrigger>
+   213→          <TabsTrigger value="scorecards">Scorecards</TabsTrigger>
+   214→          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+   215→          <TabsTrigger value="detail" disabled={!selectedEmployee}>
+   216→            {selectedEmployee
+   217→              ? selectedEmployee.userName
+   218→              : "Employee Detail"}
+   219→          </TabsTrigger>
+   220→        </TabsList>
+   221→
+   222→        <TabsContent value="overview">
+   223→          <OverviewTab onViewEmployee={handleViewEmployee} />
+   224→        </TabsContent>
+   225→        <TabsContent value="scorecards">
+   226→          <ScorecardsTab onViewEmployee={handleViewEmployee} />
+   227→        </TabsContent>
+   228→        <TabsContent value="leaderboard">
+   229→          <LeaderboardTab onViewEmployee={handleViewEmployee} />
+   230→        </TabsContent>
+   231→        <TabsContent value="detail">
+   232→          {selectedEmployee && (
+   233→            <EmployeeDetailTab
+   234→              userId={selectedEmployee.userId}
+   235→              userName={selectedEmployee.userName}
+   236→              onBack={handleBackFromDetail}
+   237→            />
+   238→          )}
+   239→        </TabsContent>
+   240→      </Tabs>
+   241→    </div>
+   242→  );
+   243→}
+   244→
+   245→// ─── Overview Tab ─────────────────────────────────────────────────
+   246→function OverviewTab({
+   247→  onViewEmployee,
+   248→}: {
+   249→  onViewEmployee: (userId: string, userName: string) => void;
+   250→}) {
+   251→  const [period, setPeriod] = useState(currentPeriod());
+   252→  const { data, loading, error } = useApi<ScorecardData>(
+   253→    `/api/hr/scorecards?period=${period}`,
+   254→    [period]
+   255→  );
+   256→
+   257→  if (loading || !data) return <SkeletonOverview />;
+   258→  if (error)
+   259→    return (
+   260→      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+   261→        Failed to load scorecard data: {error}
+   262→      </div>
+   263→    );
+   264→
+   265→  const { overallStats, departmentAverages, scorecards } = data;
+   266→  const byGrade = overallStats.byGrade || {};
+   267→  const topPerformer =
+   268→    scorecards.length > 0 ? scorecards[0] : null;
+   269→
+   270→  // Grade distribution for chart
+   271→  const gradeOrder = ["A+", "A", "B+", "B", "C", "D"];
+   272→  const gradeDist = gradeOrder
+   273→    .filter((g) => (byGrade[g] || 0) > 0)
+   274→    .map((g) => ({ grade: g, count: byGrade[g] || 0 }));
+   275→
+   276→  // Department averages chart
+   277→  const deptChartData = Object.entries(departmentAverages).map(
+   278→    ([dept, d]) => ({
+   279→      department: dept,
+   280→      average: d.average,
+   281→      count: d.count,
+   282→    })
+   283→  );
+   284→
+   285→  return (
+   286→    <div className="space-y-5">
+   287→      {/* Period Selector */}
+   288→      <div className="flex items-center gap-2">
+   289→        <Label className="text-xs text-muted-foreground">Period</Label>
+   290→        <Select value={period} onValueChange={setPeriod}>
+   291→          <SelectTrigger className="w-40">
+   292→            <SelectValue />
+   293→          </SelectTrigger>
+   294→          <SelectContent>
+   295→            {last12Periods().map((p) => (
+   296→              <SelectItem key={p} value={p}>
+   297→                {periodLabel(p)}
+   298→              </SelectItem>
+   299→            ))}
+   300→          </SelectContent>
+   301→        </Select>
+   302→      </div>
+   303→
+   304→      {/* KPI Cards */}
+   305→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   306→        <KpiCard
+   307→          label="Avg Score"
+   308→          value={overallStats.averageScore}
+   309→          unit="/100"
+   310→          icon={BarChart3}
+   311→          accent="navy"
+   312→        />
+   313→        <KpiCard
+   314→          label="Top Performer"
+   315→          value={topPerformer?.userName?.split(" ")[0] ?? "N/A"}
+   316→          hint={topPerformer ? `Score: ${topPerformer.overallScore}` : undefined}
+   317→          icon={Star}
+   318→          accent="gold"
+   319→        />
+   320→        <KpiCard
+   321→          label="Employees Evaluated"
+   322→          value={overallStats.totalEmployees}
+   323→          icon={Users}
+   324→          accent="success"
+   325→        />
+   326→        <KpiCard
+   327→          label="A+ Achievers"
+   328→          value={byGrade["A+"] || 0}
+   329→          icon={Trophy}
+   330→          accent="gold"
+   331→        />
+   332→      </div>
+   333→
+   334→      {/* Charts Row */}
+   335→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   336→        {/* Grade Distribution */}
+   337→        <Card>
+   338→          <CardHeader className="pb-2">
+   339→            <CardTitle className="font-display text-sm">
+   340→              Grade Distribution
+   341→            </CardTitle>
+   342→          </CardHeader>
+   343→          <CardContent>
+   344→            {gradeDist.length === 0 ? (
+   345→              <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
+   346→                No data for this period
+   347→              </div>
+   348→            ) : (
+   349→              <ResponsiveContainer width="100%" height={220}>
+   350→                <BarChart data={gradeDist} barSize={48}>
+   351→                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+   352→                  <XAxis
+   353→                    dataKey="grade"
+   354→                    tick={{ fontSize: 12, fontWeight: 600 }}
+   355→                  />
+   356→                  <YAxis
+   357→                    allowDecimals={false}
+   358→                    tick={{ fontSize: 11 }}
+   359→                  />
+   360→                  <Tooltip
+   361→                    contentStyle={{
+   362→                      borderRadius: 8,
+   363→                      fontSize: 12,
+   364→                      border: "1px solid #e5e7eb",
+   365→                    }}
+   366→                  />
+   367→                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+   368→                    {gradeDist.map((entry) => {
+   369→                      const colorMap: Record<string, string> = {
+   370→                        "A+": "#16A34A",
+   371→                        A: "#22C55E",
+   372→                        "B+": "#0369A1",
+   373→                        B: "#38BDF8",
+   374→                        C: "#D97706",
+   375→                        D: "#DC2626",
+   376→                      };
+   377→                      return (
+   378→                        <rect
+   379→                          key={entry.grade}
+   380→                          fill={colorMap[entry.grade] || NAVY}
+   381→                        />
+   382→                      );
+   383→                    })}
+   384→                  </Bar>
+   385→                </BarChart>
+   386→              </ResponsiveContainer>
+   387→            )}
+   388→          </CardContent>
+   389→        </Card>
+   390→
+   391→        {/* Department Averages */}
+   392→        <Card>
+   393→          <CardHeader className="pb-2">
+   394→            <CardTitle className="font-display text-sm">
+   395→              Department Averages
+   396→            </CardTitle>
+   397→          </CardHeader>
+   398→          <CardContent>
+   399→            {deptChartData.length === 0 ? (
+   400→              <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
+   401→                No department data
+   402→              </div>
+   403→            ) : (
+   404→              <ResponsiveContainer width="100%" height={220}>
+   405→                <BarChart
+   406→                  data={deptChartData}
+   407→                  layout="vertical"
+   408→                  barSize={18}
+   409→                >
+   410→                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+   411→                  <XAxis
+   412→                    type="number"
+   413→                    domain={[0, 100]}
+   414→                    tick={{ fontSize: 11 }}
+   415→                  />
+   416→                  <YAxis
+   417→                    type="category"
+   418→                    dataKey="department"
+   419→                    tick={{ fontSize: 11 }}
+   420→                    width={110}
+   421→                  />
+   422→                  <Tooltip
+   423→                    contentStyle={{
+   424→                      borderRadius: 8,
+   425→                      fontSize: 12,
+   426→                      border: "1px solid #e5e7eb",
+   427→                    }}
+   428→                    formatter={(value: number) => [
+   429→                      `${value.toFixed(1)}`,
+   430→                      "Avg Score",
+   431→                    ]}
+   432→                  />
+   433→                  <Bar
+   434→                    dataKey="average"
+   435→                    fill={GOLD}
+   436→                    radius={[0, 6, 6, 0]}
+   437→                  />
+   438→                </BarChart>
+   439→              </ResponsiveContainer>
+   440→            )}
+   441→          </CardContent>
+   442→        </Card>
+   443→      </div>
+   444→
+   445→      {/* Top 5 Performers Quick View */}
+   446→      <Card>
+   447→        <CardHeader className="pb-2">
+   448→          <CardTitle className="font-display text-sm flex items-center gap-2">
+   449→            <Trophy className="h-4 w-4 text-gold" />
+   450→            Top Performers — {periodLabel(period)}
+   451→          </CardTitle>
+   452→        </CardHeader>
+   453→        <CardContent>
+   454→          {scorecards.length === 0 ? (
+   455→            <div className="py-8 text-center text-sm text-muted-foreground">
+   456→              No scorecards for this period
+   457→            </div>
+   458→          ) : (
+   459→            <div className="space-y-2">
+   460→              {scorecards.slice(0, 5).map((sc, idx) => (
+   461→                <div
+   462→                  key={sc.id}
+   463→                  className="flex items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-accent/50 transition-colors cursor-pointer"
+   464→                  onClick={() =>
+   465→                    onViewEmployee(sc.userId, sc.userName || "Unknown")
+   466→                  }
+   467→                >
+   468→                  <div
+   469→                    className={cn(
+   470→                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+   471→                      idx === 0
+   472→                        ? "bg-[#C9952A]/20 text-[#C9952A]"
+   473→                        : idx === 1
+   474→                          ? "bg-[#9CA3AF]/20 text-[#6B7280]"
+   475→                          : idx === 2
+   476→                            ? "bg-[#D97706]/20 text-[#D97706]"
+   477→                            : "bg-muted text-muted-foreground"
+   478→                    )}
+   479→                  >
+   480→                    {idx === 0 ? (
+   481→                      <Medal className="h-4 w-4" />
+   482→                    ) : (
+   483→                      idx + 1
+   484→                    )}
+   485→                  </div>
+   486→                  <div className="min-w-0 flex-1">
+   487→                    <p className="text-sm font-medium truncate">
+   488→                      {sc.userName}
+   489→                    </p>
+   490→                    <p className="text-[11px] text-muted-foreground">
+   491→                      {sc.department || "Unassigned"}
+   492→                    </p>
+   493→                  </div>
+   494→                  <div className="text-right shrink-0">
+   495→                    <p className="text-sm font-bold tabular-nums">
+   496→                      {sc.overallScore}
+   497→                    </p>
+   498→                    <Badge
+   499→                      className={cn(
+   500→                        "text-[10px] border-0",
+   501→                        GRADE_COLORS[sc.grade] || ""
+   502→                      )}
+   503→                    >
+   504→                      {sc.grade}
+   505→                    </Badge>
+   506→                  </div>
+   507→                </div>
+   508→              ))}
+   509→            </div>
+   510→          )}
+   511→        </CardContent>
+   512→      </Card>
+   513→    </div>
+   514→  );
+   515→}
+   516→
+   517→// ─── Scorecards Table Tab ─────────────────────────────────────────
+   518→function ScorecardsTab({
+   519→  onViewEmployee,
+   520→}: {
+   521→  onViewEmployee: (userId: string, userName: string) => void;
+   522→}) {
+   523→  const [period, setPeriod] = useState(currentPeriod());
+   524→  const [search, setSearch] = useState("");
+   525→  const [deptFilter, setDeptFilter] = useState("all");
+   526→  const [addOpen, setAddOpen] = useState(false);
+   527→  const [editSc, setEditSc] = useState<ScorecardRow | null>(null);
+   528→
+   529→  const { data, loading, reload } = useApi<ScorecardData>(
+   530→    `/api/hr/scorecards?period=${period}`,
+   531→    [period]
+   532→  );
+   533→  const { data: empData } = useApi<Employee[]>(
+   534→    "/api/hr/employees?isActive=true",
+   535→    []
+   536→  );
+   537→  const { triggerRefresh } = useAppStore();
+   538→
+   539→  const employees: Employee[] = Array.isArray(empData) ? empData : [];
+   540→  const scorecards: ScorecardRow[] = data?.scorecards || [];
+   541→  const departments = useMemo(() => {
+   542→    const deptSet = new Set<string>();
+   543→    scorecards.forEach((sc) => {
+   544→      if (sc.department) deptSet.add(sc.department);
+   545→    });
+   546→    return Array.from(deptSet).sort();
+   547→  }, [scorecards]);
+   548→
+   549→  const filtered = useMemo(() => {
+   550→    let result = scorecards;
+   551→    if (search) {
+   552→      const q = search.toLowerCase();
+   553→      result = result.filter(
+   554→        (sc) =>
+   555→          sc.userName?.toLowerCase().includes(q) ||
+   556→          sc.department?.toLowerCase().includes(q)
+   557→      );
+   558→    }
+   559→    if (deptFilter !== "all") {
+   560→      result = result.filter((sc) => sc.department === deptFilter);
+   561→    }
+   562→    return result;
+   563→  }, [scorecards, search, deptFilter]);
+   564→
+   565→  const handleSave = async (metrics: MetricFormState) => {
+   566→    try {
+   567→      if (editSc) {
+   568→        await apiPut("/api/hr/scorecards", {
+   569→          id: editSc.id,
+   570→          ...metrics,
+   571→          period,
+   572→        });
+   573→        toast.success("Scorecard updated");
+   574→      } else {
+   575→        await apiPost("/api/hr/scorecards", { ...metrics, period });
+   576→        toast.success("Scorecard saved");
+   577→      }
+   578→      setAddOpen(false);
+   579→      setEditSc(null);
+   580→      reload();
+   581→      triggerRefresh();
+   582→    } catch (e: any) {
+   583→      toast.error(e.message);
+   584→    }
+   585→  };
+   586→
+   587→  if (loading || !data) return <SkeletonOverview />;
+   588→
+   589→  return (
+   590→    <div className="space-y-4">
+   591→      {/* Filters */}
+   592→      <div className="flex flex-wrap items-center gap-2">
+   593→        <Select value={period} onValueChange={setPeriod}>
+   594→          <SelectTrigger className="w-40">
+   595→            <SelectValue />
+   596→          </SelectTrigger>
+   597→          <SelectContent>
+   598→            {last12Periods().map((p) => (
+   599→              <SelectItem key={p} value={p}>
+   600→                {periodLabel(p)}
+   601→              </SelectItem>
+   602→            ))}
+   603→          </SelectContent>
+   604→        </Select>
+   605→
+   606→        <div className="relative">
+   607→          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+   608→          <Input
+   609→            className="w-52 pl-8"
+   610→            placeholder="Search employee…"
+   611→            value={search}
+   612→            onChange={(e) => setSearch(e.target.value)}
+   613→          />
+   614→        </div>
+   615→
+   616→        <Select value={deptFilter} onValueChange={setDeptFilter}>
+   617→          <SelectTrigger className="w-40">
+   618→            <SelectValue />
+   619→          </SelectTrigger>
+   620→          <SelectContent>
+   621→            <SelectItem value="all">All Departments</SelectItem>
+   622→            {departments.map((d) => (
+   623→              <SelectItem key={d} value={d}>
+   624→                {d}
+   625→              </SelectItem>
+   626→            ))}
+   627→          </SelectContent>
+   628→        </Select>
+   629→
+   630→        <div className="ml-auto">
+   631→          <Button
+   632→            size="sm"
+   633→            onClick={() => {
+   634→              setEditSc(null);
+   635→              setAddOpen(true);
+   636→            }}
+   637→          >
+   638→            <Plus className="h-3.5 w-3.5 mr-1" />
+   639→            Add Scorecard
+   640→          </Button>
+   641→        </div>
+   642→      </div>
+   643→
+   644→      {/* Summary Row */}
+   645→      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+   646→        <KpiCard
+   647→          label="Avg Score"
+   648→          value={data.overallStats.averageScore}
+   649→          unit="/100"
+   650→          icon={BarChart3}
+   651→          accent="navy"
+   652→        />
+   653→        <KpiCard
+   654→          label="Evaluated"
+   655→          value={filtered.length}
+   656→          icon={Users}
+   657→          accent="success"
+   658→        />
+   659→        <KpiCard
+   660→          label="A+ Achievers"
+   661→          value={(data.overallStats.byGrade || {})["A+"] || 0}
+   662→          icon={Trophy}
+   663→          accent="gold"
+   664→        />
+   665→      </div>
+   666→
+   667→      {/* Table */}
+   668→      <div className="overflow-x-auto rounded-lg border">
+   669→        <Table>
+   670→          <TableHeader>
+   671→            <TableRow>
+   672→              <TableHead className="min-w-[160px]">Employee</TableHead>
+   673→              <TableHead>Dept</TableHead>
+   674→              <TableHead className="text-center">Att%</TableHead>
+   675→              <TableHead className="text-center">Punct.</TableHead>
+   676→              <TableHead className="text-center">Task%</TableHead>
+   677→              <TableHead className="text-center">Feedback</TableHead>
+   678→              <TableHead className="text-center">Team</TableHead>
+   679→              <TableHead className="text-center">Init.</TableHead>
+   680→              <TableHead className="text-center">Groom.</TableHead>
+   681→              <TableHead className="text-center">Comm.</TableHead>
+   682→              <TableHead className="text-center font-bold">Overall</TableHead>
+   683→              <TableHead className="text-center">Grade</TableHead>
+   684→              <TableHead className="text-center">Actions</TableHead>
+   685→            </TableRow>
+   686→          </TableHeader>
+   687→          <TableBody>
+   688→            {filtered.length === 0 ? (
+   689→              <TableRow>
+   690→                <TableCell
+   691→                  colSpan={13}
+   692→                  className="text-center text-muted-foreground py-10"
+   693→                >
+   694→                  No scorecards found for {periodLabel(period)}
+   695→                </TableCell>
+   696→              </TableRow>
+   697→            ) : (
+   698→              filtered.map((sc) => (
+   699→                <TableRow
+   700→                  key={sc.id}
+   701→                  className="cursor-pointer hover:bg-accent/30 transition-colors"
+   702→                  onClick={() =>
+   703→                    onViewEmployee(sc.userId, sc.userName || "Unknown")
+   704→                  }
+   705→                >
+   706→                  <TableCell className="font-medium">
+   707→                    {sc.userName || "—"}
+   708→                  </TableCell>
+   709→                  <TableCell className="text-xs text-muted-foreground">
+   710→                    {sc.department || "—"}
+   711→                  </TableCell>
+   712→                  <TableCell className="font-mono text-xs text-center">
+   713→                    {sc.attendance}
+   714→                  </TableCell>
+   715→                  <TableCell className="font-mono text-xs text-center">
+   716→                    {sc.punctuality}
+   717→                  </TableCell>
+   718→                  <TableCell className="font-mono text-xs text-center">
+   719→                    {sc.taskCompletion}
+   720→                  </TableCell>
+   721→                  <TableCell className="font-mono text-xs text-center">
+   722→                    {sc.guestFeedback}
+   723→                  </TableCell>
+   724→                  <TableCell className="font-mono text-xs text-center">
+   725→                    {sc.teamwork}
+   726→                  </TableCell>
+   727→                  <TableCell className="font-mono text-xs text-center">
+   728→                    {sc.initiative}
+   729→                  </TableCell>
+   730→                  <TableCell className="font-mono text-xs text-center">
+   731→                    {sc.grooming}
+   732→                  </TableCell>
+   733→                  <TableCell className="font-mono text-xs text-center">
+   734→                    {sc.communication}
+   735→                  </TableCell>
+   736→                  <TableCell className="font-mono text-xs text-center font-bold">
+   737→                    {sc.overallScore}
+   738→                  </TableCell>
+   739→                  <TableCell className="text-center">
+   740→                    <Badge
+   741→                      className={cn(
+   742→                        "text-[10px] border-0",
+   743→                        GRADE_COLORS[sc.grade] || ""
+   744→                      )}
+   745→                    >
+   746→                      {sc.grade}
+   747→                    </Badge>
+   748→                  </TableCell>
+   749→                  <TableCell className="text-center">
+   750→                    <Button
+   751→                      variant="ghost"
+   752→                      size="icon"
+   753→                      className="h-7 w-7"
+   754→                      onClick={(e) => {
+   755→                        e.stopPropagation();
+   756→                        setEditSc(sc);
+   757→                        setAddOpen(true);
+   758→                      }}
+   759→                    >
+   760→                      <Pencil className="h-3.5 w-3.5" />
+   761→                    </Button>
+   762→                  </TableCell>
+   763→                </TableRow>
+   764→              ))
+   765→            )}
+   766→          </TableBody>
+   767→        </Table>
+   768→      </div>
+   769→
+   770→      {/* Add/Edit Dialog */}
+   771→      <ScorecardDialog
+   772→        open={addOpen}
+   773→        onOpenChange={(v) => {
+   774→          setAddOpen(v);
+   775→          if (!v) setEditSc(null);
+   776→        }}
+   777→        editSc={editSc}
+   778→        employees={employees}
+   779→        period={period}
+   780→        onSave={handleSave}
+   781→      />
+   782→    </div>
+   783→  );
+   784→}
+   785→
+   786→// ─── Leaderboard Tab ──────────────────────────────────────────────
+   787→function LeaderboardTab({
+   788→  onViewEmployee,
+   789→}: {
+   790→  onViewEmployee: (userId: string, userName: string) => void;
+   791→}) {
+   792→  const [period, setPeriod] = useState(currentPeriod());
+   793→  const { data, loading } = useApi<ScorecardData>(
+   794→    `/api/hr/scorecards?period=${period}`,
+   795→    [period]
+   796→  );
+   797→
+   798→  if (loading || !data)
+   799→    return (
+   800→      <div className="space-y-3">
+   801→        {Array.from({ length: 5 }).map((_, i) => (
+   802→          <Skeleton key={i} className="h-16" />
+   803→        ))}
+   804→      </div>
+   805→    );
+   806→
+   807→  const scorecards = data.scorecards || [];
+   808→
+   809→  return (
+   810→    <div className="space-y-4">
+   811→      <div className="flex items-center gap-2">
+   812→        <Label className="text-xs text-muted-foreground">Period</Label>
+   813→        <Select value={period} onValueChange={setPeriod}>
+   814→          <SelectTrigger className="w-40">
+   815→            <SelectValue />
+   816→          </SelectTrigger>
+   817→          <SelectContent>
+   818→            {last12Periods().map((p) => (
+   819→              <SelectItem key={p} value={p}>
+   820→                {periodLabel(p)}
+   821→              </SelectItem>
+   822→            ))}
+   823→          </SelectContent>
+   824→        </Select>
+   825→      </div>
+   826→
+   827→      {scorecards.length === 0 ? (
+   828→        <div className="text-center py-16 text-muted-foreground">
+   829→          <Trophy className="h-12 w-12 mx-auto mb-3 opacity-30" />
+   830→          <p>No scorecards for this period</p>
+   831→        </div>
+   832→      ) : (
+   833→        <div className="space-y-2">
+   834→          {scorecards.map((sc, idx) => {
+   835→            const prevSc =
+   836→              idx < scorecards.length - 1 ? scorecards[idx + 1] : null;
+   837→            const scoreDiff = prevSc
+   838→              ? sc.overallScore - prevSc.overallScore
+   839→              : 0;
+   840→
+   841→            return (
+   842→              <div
+   843→                key={sc.id}
+   844→                className="flex items-center gap-4 rounded-xl border px-4 py-3 hover:shadow-md hover:bg-accent/30 transition-all cursor-pointer"
+   845→                onClick={() =>
+   846→                  onViewEmployee(sc.userId, sc.userName || "Unknown")
+   847→                }
+   848→              >
+   849→                {/* Rank */}
+   850→                <div
+   851→                  className={cn(
+   852→                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+   853→                    idx === 0
+   854→                      ? "bg-[#C9952A]/20 text-[#C9952A] ring-2 ring-[#C9952A]/30"
+   855→                      : idx === 1
+   856→                        ? "bg-[#9CA3AF]/20 text-[#6B7280] ring-2 ring-[#9CA3AF]/30"
+   857→                        : idx === 2
+   858→                          ? "bg-[#D97706]/20 text-[#D97706] ring-2 ring-[#D97706]/30"
+   859→                          : "bg-muted text-muted-foreground"
+   860→                  )}
+   861→                >
+   862→                  {idx < 3 ? (
+   863→                    <Medal className="h-5 w-5" />
+   864→                  ) : (
+   865→                    `#${idx + 1}`
+   866→                  )}
+   867→                </div>
+   868→
+   869→                {/* Employee Info */}
+   870→                <div className="min-w-0 flex-1">
+   871→                  <p className="font-semibold truncate">
+   872→                    {sc.userName || "Unknown"}
+   873→                  </p>
+   874→                  <p className="text-xs text-muted-foreground">
+   875→                    {sc.department || "Unassigned"}
+   876→                  </p>
+   877→                </div>
+   878→
+   879→                {/* Score Bar */}
+   880→                <div className="hidden sm:flex items-center gap-3 w-48">
+   881→                  <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+   882→                    <div
+   883→                      className="h-full rounded-full transition-all"
+   884→                      style={{
+   885→                        width: `${sc.overallScore}%`,
+   886→                        backgroundColor:
+   887→                          sc.overallScore >= 90
+   888→                            ? SUCCESS
+   889→                            : sc.overallScore >= 70
+   890→                              ? NAVY
+   891→                              : sc.overallScore >= 50
+   892→                                ? GOLD
+   893→                                : "#DC2626",
+   894→                      }}
+   895→                    />
+   896→                  </div>
+   897→                </div>
+   898→
+   899→                {/* Score + Grade + Diff */}
+   900→                <div className="text-right shrink-0 flex items-center gap-2">
+   901→                  {scoreDiff !== 0 && (
+   902→                    <span
+   903→                      className={cn(
+   904→                        "inline-flex items-center gap-0.5 text-[10px] font-medium",
+   905→                        scoreDiff > 0
+   906→                          ? "text-[#16A34A]"
+   907→                          : "text-[#DC2626]"
+   908→                      )}
+   909→                    >
+   910→                      {scoreDiff > 0 ? (
+   911→                        <ArrowUpRight className="h-3 w-3" />
+   912→                      ) : (
+   913→                        <ArrowDownRight className="h-3 w-3" />
+   914→                      )}
+   915→                      {Math.abs(scoreDiff).toFixed(1)}
+   916→                    </span>
+   917→                  )}
+   918→                  <div>
+   919→                    <p className="text-lg font-bold tabular-nums leading-none">
+   920→                      {sc.overallScore}
+   921→                    </p>
+   922→                    <Badge
+   923→                      className={cn(
+   924→                        "text-[10px] border-0 mt-1",
+   925→                        GRADE_COLORS[sc.grade] || ""
+   926→                      )}
+   927→                    >
+   928→                      {sc.grade}
+   929→                    </Badge>
+   930→                  </div>
+   931→                </div>
+   932→              </div>
+   933→            );
+   934→          })}
+   935→        </div>
+   936→      )}
+   937→    </div>
+   938→  );
+   939→}
+   940→
+   941→// ─── Employee Detail Tab ──────────────────────────────────────────
+   942→function EmployeeDetailTab({
+   943→  userId,
+   944→  userName,
+   945→  onBack,
+   946→}: {
+   947→  userId: string;
+   948→  userName: string;
+   949→  onBack: () => void;
+   950→}) {
+   951→  const [period, setPeriod] = useState(currentPeriod());
+   952→  const periods = last12Periods();
+   953→
+   954→  // Fetch all scorecards for this employee across periods (fetch current period, plus previous)
+   955→  // We need to fetch multiple periods for the trend. We'll use the current period's data and also
+   956→  // fetch the employee's scorecards by making requests for multiple periods.
+   957→  const { data: currentData, loading: l1 } = useApi<ScorecardData>(
+   958→    `/api/hr/scorecards?period=${period}&userId=${userId}`,
+   959→    [period, userId]
+   960→  );
+   961→
+   962→  // For trend chart, we fetch data for multiple periods
+   963→  const [trendData, setTrendData] = useState<
+   964→    { period: string; overallScore: number; grade: string }[]
+   965→  >([]);
+   966→  const [trendLoading, setTrendLoading] = useState(true);
+   967→
+   968→  const loadTrend = useCallback(async () => {
+   969→    setTrendLoading(true);
+   970→    try {
+   971→      const results: { period: string; overallScore: number; grade: string }[] =
+   972→        [];
+   973→      // Fetch last 6 periods for the trend
+   974→      for (const p of periods.slice(0, 6)) {
+   975→        try {
+   976→          const res = await fetch(
+   977→            `/api/hr/scorecards?period=${p}&userId=${userId}`,
+   978→            {
+   979→              headers: {
+   980→                "Content-Type": "application/json",
+   981→                Authorization: `Bearer ${JSON.parse(localStorage.getItem("aria_auth") || "{}").token || ""}`,
+   982→              },
+   983→            }
+   984→          );
+   985→          const json = await res.json();
+   986→          if (json.success && json.data?.scorecards?.length > 0) {
+   987→            const sc = json.data.scorecards[0];
+   988→            results.push({
+   989→              period: p,
+   990→              overallScore: sc.overallScore,
+   991→              grade: sc.grade,
+   992→            });
+   993→          }
+   994→        } catch {
+   995→          // skip failed periods
+   996→        }
+   997→      }
+   998→      // Sort by period ascending
+   999→      results.sort((a, b) => a.period.localeCompare(b.period));
+  1000→      setTrendData(results);
+  1001→    } finally {
+  1002→      setTrendLoading(false);
+  1003→    }
+  1004→  }, [userId, periods]);
+  1005→
+  1006→  // Load trend on mount
+  1007→  useMemo(() => {
+  1008→    loadTrend();
+  1009→  }, [loadTrend]);
+  1010→
+  1011→  const currentSc = currentData?.scorecards?.[0] || null;
+  1012→
+  1013→  // Radar chart data for current scorecard
+  1014→  const radarData = currentSc
+  1015→    ? METRIC_DEFS.map((m) => {
+  1016→        const raw = (currentSc as any)[m.key] as number;
+  1017→        // Normalize everything to 0-100 scale for the radar
+  1018→        const normalized = m.max === 10 ? raw * 10 : raw;
+  1019→        return {
+  1020→          metric: m.label,
+  1021→          score: normalized,
+  1022→          weight: m.weight,
+  1023→          fullMark: 100,
+  1024→        };
+  1025→      })
+  1026→    : [];
+  1027→
+  1028→  // Trend chart data
+  1029→  const trendChartData = trendData.map((t) => ({
+  1030→    period: periodLabel(t.period),
+  1031→    score: t.overallScore,
+  1032→    grade: t.grade,
+  1033→  }));
+  1034→
+  1035→  return (
+  1036→    <div className="space-y-4">
+  1037→      {/* Back button + Header */}
+  1038→      <div className="flex items-center gap-3">
+  1039→        <Button
+  1040→          variant="ghost"
+  1041→          size="icon"
+  1042→          className="h-8 w-8"
+  1043→          onClick={onBack}
+  1044→        >
+  1045→          <ChevronLeft className="h-4 w-4" />
+  1046→        </Button>
+  1047→        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1B3A6B] text-white font-bold text-sm">
+  1048→          {userName
+  1049→            .split(" ")
+  1050→            .map((n) => n[0])
+  1051→            .join("")
+  1052→            .slice(0, 2)}
+  1053→        </div>
+  1054→        <div>
+  1055→          <h2 className="font-display text-lg font-bold">{userName}</h2>
+  1056→          <p className="text-xs text-muted-foreground">
+  1057→            {currentSc?.department || "Unassigned"} · Performance History
+  1058→          </p>
+  1059→        </div>
+  1060→        <div className="ml-auto flex items-center gap-2">
+  1061→          <Select value={period} onValueChange={setPeriod}>
+  1062→            <SelectTrigger className="w-40">
+  1063→              <SelectValue />
+  1064→            </SelectTrigger>
+  1065→            <SelectContent>
+  1066→              {periods.map((p) => (
+  1067→                <SelectItem key={p} value={p}>
+  1068→                  {periodLabel(p)}
+  1069→                </SelectItem>
+  1070→              ))}
+  1071→            </SelectContent>
+  1072→          </Select>
+  1073→        </div>
+  1074→      </div>
+  1075→
+  1076→      {l1 ? (
+  1077→        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1078→          {Array.from({ length: 4 }).map((_, i) => (
+  1079→            <Skeleton key={i} className="h-24" />
+  1080→          ))}
+  1081→        </div>
+  1082→      ) : !currentSc ? (
+  1083→        <div className="text-center py-16 text-muted-foreground">
+  1084→          <Award className="h-12 w-12 mx-auto mb-3 opacity-30" />
+  1085→          <p>No scorecard found for {periodLabel(period)}</p>
+  1086→          <p className="text-xs mt-1">
+  1087→            Try selecting a different period
+  1088→          </p>
+  1089→        </div>
+  1090→      ) : (
+  1091→        <>
+  1092→          {/* Score Summary */}
+  1093→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1094→            <KpiCard
+  1095→              label="Overall Score"
+  1096→              value={currentSc.overallScore}
+  1097→              unit="/100"
+  1098→              icon={BarChart3}
+  1099→              accent="navy"
+  1100→            />
+  1101→            <KpiCard
+  1102→              label="Grade"
+  1103→              value={currentSc.grade}
+  1104→              icon={Award}
+  1105→              accent={
+  1106→                currentSc.grade.startsWith("A")
+  1107→                  ? "success"
+  1108→                  : currentSc.grade.startsWith("B")
+  1109→                    ? "info"
+  1110→                    : currentSc.grade === "C"
+  1111→                      ? "warning"
+  1112→                      : "error"
+  1113→              }
+  1114→            />
+  1115→            <KpiCard
+  1116→              label="Task Completion"
+  1117→              value={currentSc.taskCompletion}
+  1118→              unit="%"
+  1119→              icon={TrendingUp}
+  1120→              accent="gold"
+  1121→            />
+  1122→            <KpiCard
+  1123→              label="Guest Feedback"
+  1124→              value={currentSc.guestFeedback}
+  1125→              unit="/10"
+  1126→              icon={Star}
+  1127→              accent="success"
+  1128→            />
+  1129→          </div>
+  1130→
+  1131→          {/* Radar + Trend */}
+  1132→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1133→            {/* Radar Chart */}
+  1134→            <Card>
+  1135→              <CardHeader className="pb-2">
+  1136→                <CardTitle className="font-display text-sm flex items-center gap-2">
+  1137→                  <Award className="h-4 w-4" />
+  1138→                  Metric Breakdown — {periodLabel(period)}
+  1139→                </CardTitle>
+  1140→              </CardHeader>
+  1141→              <CardContent>
+  1142→                <ResponsiveContainer width="100%" height={320}>
+  1143→                  <RadarChart
+  1144→                    data={radarData}
+  1145→                    cx="50%"
+  1146→                    cy="50%"
+  1147→                    outerRadius="70%"
+  1148→                  >
+  1149→                    <PolarGrid stroke="#e5e7eb" />
+  1150→                    <PolarAngleAxis
+  1151→                      dataKey="metric"
+  1152→                      tick={{ fontSize: 10, fill: "#6B7280" }}
+  1153→                    />
+  1154→                    <PolarRadiusAxis
+  1155→                      angle={90}
+  1156→                      domain={[0, 100]}
+  1157→                      tick={{ fontSize: 9 }}
+  1158→                    />
+  1159→                    <Radar
+  1160→                      name="Score"
+  1161→                      dataKey="score"
+  1162→                      stroke={NAVY}
+  1163→                      fill={NAVY}
+  1164→                      fillOpacity={0.2}
+  1165→                      strokeWidth={2}
+  1166→                    />
+  1167→                    <Tooltip
+  1168→                      contentStyle={{
+  1169→                        borderRadius: 8,
+  1170→                        fontSize: 12,
+  1171→                        border: "1px solid #e5e7eb",
+  1172→                      }}
+  1173→                      formatter={(value: number, name: string) => [
+  1174→                        `${value.toFixed(0)}/100`,
+  1175→                        "Normalized Score",
+  1176→                      ]}
+  1177→                    />
+  1178→                  </RadarChart>
+  1179→                </ResponsiveContainer>
+  1180→                {/* Weight Legend */}
+  1181→                <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
+  1182→                  {METRIC_DEFS.map((m) => (
+  1183→                    <span
+  1184→                      key={m.key}
+  1185→                      className="text-[10px] text-muted-foreground"
+  1186→                    >
+  1187→                      {m.label}{" "}
+  1188→                      <span className="font-semibold text-foreground">
+  1189→                        {m.weight}%
+  1190→                      </span>
+  1191→                    </span>
+  1192→                  ))}
+  1193→                </div>
+  1194→              </CardContent>
+  1195→            </Card>
+  1196→
+  1197→            {/* Trend Chart */}
+  1198→            <Card>
+  1199→              <CardHeader className="pb-2">
+  1200→                <CardTitle className="font-display text-sm flex items-center gap-2">
+  1201→                  <TrendingUp className="h-4 w-4" />
+  1202→                  Score Trend
+  1203→                </CardTitle>
+  1204→              </CardHeader>
+  1205→              <CardContent>
+  1206→                {trendLoading ? (
+  1207→                  <div className="flex items-center justify-center h-[320px]">
+  1208→                    <Skeleton className="h-[280px] w-full" />
+  1209→                  </div>
+  1210→                ) : trendChartData.length === 0 ? (
+  1211→                  <div className="flex items-center justify-center h-[320px] text-sm text-muted-foreground">
+  1212→                    No historical data available
+  1213→                  </div>
+  1214→                ) : (
+  1215→                  <ResponsiveContainer width="100%" height={320}>
+  1216→                    <LineChart data={trendChartData}>
+  1217→                      <CartesianGrid strokeDasharray="3 3" />
+  1218→                      <XAxis
+  1219→                        dataKey="period"
+  1220→                        tick={{ fontSize: 11 }}
+  1221→                      />
+  1222→                      <YAxis
+  1223→                        domain={[0, 100]}
+  1224→                        tick={{ fontSize: 11 }}
+  1225→                      />
+  1226→                      <Tooltip
+  1227→                        contentStyle={{
+  1228→                          borderRadius: 8,
+  1229→                          fontSize: 12,
+  1230→                          border: "1px solid #e5e7eb",
+  1231→                        }}
+  1232→                        formatter={(value: number) => [
+  1233→                          `${value.toFixed(1)}`,
+  1234→                          "Score",
+  1235→                        ]}
+  1236→                      />
+  1237→                      <Line
+  1238→                        type="monotone"
+  1239→                        dataKey="score"
+  1240→                        stroke={GOLD}
+  1241→                        strokeWidth={2.5}
+  1242→                        dot={{
+  1243→                          fill: NAVY,
+  1244→                          r: 4,
+  1245→                          strokeWidth: 2,
+  1246→                          stroke: GOLD,
+  1247→                        }}
+  1248→                        activeDot={{ r: 6 }}
+  1249→                      />
+  1250→                      {/* Reference lines for grade boundaries */}
+  1251→                      <ReferenceLine y={90} stroke="#16A34A" strokeDasharray="4 4" label={{ value: "A+", position: "right", fontSize: 9, fill: "#16A34A" }} />
+  1252→                      <ReferenceLine y={80} stroke="#0369A1" strokeDasharray="4 4" label={{ value: "A", position: "right", fontSize: 9, fill: "#0369A1" }} />
+  1253→                      <ReferenceLine y={70} stroke="#1B3A6B" strokeDasharray="4 4" label={{ value: "B+", position: "right", fontSize: 9, fill: "#1B3A6B" }} />
+  1254→                    </LineChart>
+  1255→                  </ResponsiveContainer>
+  1256→                )}
+  1257→              </CardContent>
+  1258→            </Card>
+  1259→          </div>
+  1260→
+  1261→          {/* Detailed Metric Scores */}
+  1262→          <Card>
+  1263→            <CardHeader className="pb-2">
+  1264→              <CardTitle className="font-display text-sm">
+  1265→                Detailed Scores — {periodLabel(period)}
+  1266→              </CardTitle>
+  1267→            </CardHeader>
+  1268→            <CardContent>
+  1269→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1270→                {METRIC_DEFS.map((m) => {
+  1271→                  const raw = (currentSc as any)[m.key] as number;
+  1272→                  const normalized = m.max === 10 ? raw * 10 : raw;
+  1273→                  const pct = Math.min(
+  1274→                    100,
+  1275→                    (normalized / 100) * 100
+  1276→                  );
+  1277→                  return (
+  1278→                    <div
+  1279→                      key={m.key}
+  1280→                      className="rounded-lg border p-3 space-y-1.5"
+  1281→                    >
+  1282→                      <div className="flex items-center justify-between">
+  1283→                        <span className="text-xs font-medium text-muted-foreground">
+  1284→                          {m.label}
+  1285→                        </span>
+  1286→                        <span className="text-[10px] font-semibold text-muted-foreground">
+  1287→                          {m.weight}%
+  1288→                        </span>
+  1289→                      </div>
+  1290→                      <div className="flex items-end gap-1">
+  1291→                        <span className="text-lg font-bold tabular-nums leading-none">
+  1292→                          {raw}
+  1293→                        </span>
+  1294→                        <span className="text-xs text-muted-foreground mb-0.5">
+  1295→                          {m.unit}
+  1296→                        </span>
+  1297→                      </div>
+  1298→                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+  1299→                        <div
+  1300→                          className="h-full rounded-full transition-all"
+  1301→                          style={{
+  1302→                            width: `${pct}%`,
+  1303→                            backgroundColor:
+  1304→                              normalized >= 80
+  1305→                                ? SUCCESS
+  1306→                                : normalized >= 60
+  1307→                                  ? NAVY
+  1308→                                  : normalized >= 40
+  1309→                                    ? GOLD
+  1310→                                    : "#DC2626",
+  1311→                          }}
+  1312→                        />
+  1313→                      </div>
+  1314→                    </div>
+  1315→                  );
+  1316→                })}
+  1317→              </div>
+  1318→            </CardContent>
+  1319→          </Card>
+  1320→
+  1321→          {/* Remarks */}
+  1322→          {currentSc.remarks && (
+  1323→            <Card>
+  1324→              <CardHeader className="pb-2">
+  1325→                <CardTitle className="font-display text-sm">
+  1326→                  Remarks
+  1327→                </CardTitle>
+  1328→              </CardHeader>
+  1329→              <CardContent>
+  1330→                <p className="text-sm text-muted-foreground">
+  1331→                  {currentSc.remarks}
+  1332→                </p>
+  1333→                {currentSc.reviewedBy && (
+  1334→                  <p className="text-xs text-muted-foreground mt-2">
+  1335→                    Reviewed by: {currentSc.reviewedBy}
+  1336→                  </p>
+  1337→                )}
+  1338→              </CardContent>
+  1339→            </Card>
+  1340→          )}
+  1341→        </>
+  1342→      )}
+  1343→    </div>
+  1344→  );
+  1345→}
+  1346→
+  1347→// ─── Add/Edit Scorecard Dialog ────────────────────────────────────
+  1348→interface MetricFormState {
+  1349→  userId: string;
+  1350→  attendance: number;
+  1351→  punctuality: number;
+  1352→  taskCompletion: number;
+  1353→  guestFeedback: number;
+  1354→  teamwork: number;
+  1355→  initiative: number;
+  1356→  grooming: number;
+  1357→  communication: number;
+  1358→  remarks: string;
+  1359→}
+  1360→
+  1361→function defaultFormState(): MetricFormState {
+  1362→  return {
+  1363→    userId: "",
+  1364→    attendance: 90,
+  1365→    punctuality: 8,
+  1366→    taskCompletion: 85,
+  1367→    guestFeedback: 8,
+  1368→    teamwork: 7,
+  1369→    initiative: 7,
+  1370→    grooming: 9,
+  1371→    communication: 8,
+  1372→    remarks: "",
+  1373→  };
+  1374→}
+  1375→
+  1376→function ScorecardDialog({
+  1377→  open,
+  1378→  onOpenChange,
+  1379→  editSc,
+  1380→  employees,
+  1381→  period,
+  1382→  onSave,
+  1383→}: {
+  1384→  open: boolean;
+  1385→  onOpenChange: (v: boolean) => void;
+  1386→  editSc: ScorecardRow | null;
+  1387→  employees: Employee[];
+  1388→  period: string;
+  1389→  onSave: (metrics: MetricFormState) => void;
+  1390→}) {
+  1391→  const [form, setForm] = useState<MetricFormState>(defaultFormState());
+  1392→  const [saving, setSaving] = useState(false);
+  1393→
+  1394→  // Reset form when dialog opens or editSc changes
+  1395→  const handleOpenChange = (v: boolean) => {
+  1396→    if (v) {
+  1397→      if (editSc) {
+  1398→        setForm({
+  1399→          userId: editSc.userId,
+  1400→          attendance: editSc.attendance,
+  1401→          punctuality: editSc.punctuality,
+  1402→          taskCompletion: editSc.taskCompletion,
+  1403→          guestFeedback: editSc.guestFeedback,
+  1404→          teamwork: editSc.teamwork,
+  1405→          initiative: editSc.initiative,
+  1406→          grooming: editSc.grooming,
+  1407→          communication: editSc.communication,
+  1408→          remarks: editSc.remarks || "",
+  1409→        });
+  1410→      } else {
+  1411→        setForm(defaultFormState());
+  1412→      }
+  1413→    }
+  1414→    onOpenChange(v);
+  1415→  };
+  1416→
+  1417→  // Compute live preview of overall score
+  1418→  const previewScore = useMemo(() => {
+  1419→    const s = form;
+  1420→    const raw =
+  1421→      s.attendance * 0.15 +
+  1422→      s.punctuality * 10 * 0.1 +
+  1423→      s.taskCompletion * 0.2 +
+  1424→      s.guestFeedback * 10 * 0.15 +
+  1425→      s.teamwork * 10 * 0.1 +
+  1426→      s.initiative * 10 * 0.1 +
+  1427→      s.grooming * 10 * 0.1 +
+  1428→      s.communication * 10 * 0.1;
+  1429→    return Math.round(raw * 100) / 100;
+  1430→  }, [form]);
+  1431→
+  1432→  const previewGrade = useMemo(() => {
+  1433→    if (previewScore >= 90) return "A+";
+  1434→    if (previewScore >= 80) return "A";
+  1435→    if (previewScore >= 70) return "B+";
+  1436→    if (previewScore >= 60) return "B";
+  1437→    if (previewScore >= 50) return "C";
+  1438→    return "D";
+  1439→  }, [previewScore]);
+  1440→
+  1441→  const handleSave = async () => {
+  1442→    if (!form.userId) {
+  1443→      toast.error("Please select an employee");
+  1444→      return;
+  1445→    }
+  1446→    setSaving(true);
+  1447→    try {
+  1448→      await onSave(form);
+  1449→    } finally {
+  1450→      setSaving(false);
+  1451→    }
+  1452→  };
+  1453→
+  1454→  return (
+  1455→    <Dialog open={open} onOpenChange={handleOpenChange}>
+  1456→      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+  1457→        <DialogHeader>
+  1458→          <DialogTitle className="font-display">
+  1459→            {editSc ? "Edit Scorecard" : "Add Scorecard"} —{" "}
+  1460→            {periodLabel(period)}
+  1461→          </DialogTitle>
+  1462→        </DialogHeader>
+  1463→
+  1464→        <div className="space-y-4">
+  1465→          {/* Employee Selection */}
+  1466→          <div>
+  1467→            <Label className="text-sm font-medium">Employee</Label>
+  1468→            <Select
+  1469→              value={form.userId}
+  1470→              onValueChange={(v) =>
+  1471→                setForm((f) => ({ ...f, userId: v }))
+  1472→              }
+  1473→              disabled={!!editSc}
+  1474→            >
+  1475→              <SelectTrigger className="mt-1">
+  1476→                <SelectValue placeholder="Select employee" />
+  1477→              </SelectTrigger>
+  1478→              <SelectContent>
+  1479→                {employees.map((e) => (
+  1480→                  <SelectItem key={e.id} value={e.id}>
+  1481→                    {e.fullName}
+  1482→                    {e.department ? ` — ${e.department}` : ""}
+  1483→                  </SelectItem>
+  1484→                ))}
+  1485→              </SelectContent>
+  1486→            </Select>
+  1487→          </div>
+  1488→
+  1489→          {/* Metrics with Sliders */}
+  1490→          <div className="space-y-4">
+  1491→            {METRIC_DEFS.map((m) => {
+  1492→              const value = (form as any)[m.key] as number;
+  1493→              return (
+  1494→                <div key={m.key} className="space-y-2">
+  1495→                  <div className="flex items-center justify-between">
+  1496→                    <Label className="text-sm">
+  1497→                      {m.label}{" "}
+  1498→                      <span className="text-muted-foreground text-xs font-normal">
+  1499→                        ({m.weight}% weight)
+  1500→                      </span>
+  1501→                    </Label>
+  1502→                    <div className="flex items-center gap-2">
+  1503→                      <Input
+  1504→                        type="number"
+  1505→                        min={0}
+  1506→                        max={m.max}
+  1507→                        value={value}
+  1508→                        onChange={(e) => {
+  1509→                          let v = Number(e.target.value);
+  1510→                          if (v < 0) v = 0;
+  1511→                          if (v > m.max) v = m.max;
+  1512→                          setForm((f) => ({ ...f, [m.key]: v }));
+  1513→                        }}
+  1514→                        className="w-16 h-8 text-center text-sm tabular-nums"
+  1515→                      />
+  1516→                      <span className="text-xs text-muted-foreground w-8">
+  1517→                        {m.unit}
+  1518→                      </span>
+  1519→                    </div>
+  1520→                  </div>
+  1521→                  <Slider
+  1522→                    min={0}
+  1523→                    max={m.max}
+  1524→                    step={m.max === 100 ? 1 : 0.5}
+  1525→                    value={[value]}
+  1526→                    onValueChange={([v]) =>
+  1527→                      setForm((f) => ({ ...f, [m.key]: v }))
+  1528→                    }
+  1529→                    className="w-full"
+  1530→                  />
+  1531→                  {/* Progress bar visual */}
+  1532→                  <div className="h-1 rounded-full bg-muted overflow-hidden -mt-1">
+  1533→                    <div
+  1534→                      className="h-full rounded-full transition-all"
+  1535→                      style={{
+  1536→                        width: `${(value / m.max) * 100}%`,
+  1537→                        backgroundColor:
+  1538→                          value / m.max >= 0.8
+  1539→                            ? SUCCESS
+  1540→                            : value / m.max >= 0.6
+  1541→                              ? NAVY
+  1542→                              : value / m.max >= 0.4
+  1543→                                ? GOLD
+  1544→                                : "#DC2626",
+  1545→                      }}
+  1546→                    />
+  1547→                  </div>
+  1548→                </div>
+  1549→              );
+  1550→            })}
+  1551→          </div>
+  1552→
+  1553→          {/* Remarks */}
+  1554→          <div>
+  1555→            <Label className="text-sm font-medium">Remarks</Label>
+  1556→            <Input
+  1557→              className="mt-1"
+  1558→              placeholder="Optional remarks…"
+  1559→              value={form.remarks}
+  1560→              onChange={(e) =>
+  1561→                setForm((f) => ({ ...f, remarks: e.target.value }))
+  1562→              }
+  1563→            />
+  1564→          </div>
+  1565→
+  1566→          {/* Live Preview */}
+  1567→          <div className="rounded-lg border-2 border-dashed border-[#1B3A6B]/20 bg-[#1B3A6B]/5 p-4">
+  1568→            <p className="text-xs font-semibold text-[#1B3A6B] uppercase tracking-wider mb-2">
+  1569→              Live Preview
+  1570→            </p>
+  1571→            <div className="flex items-center gap-4">
+  1572→              <div>
+  1573→                <p className="text-3xl font-bold tabular-nums text-foreground">
+  1574→                  {previewScore}
+  1575→                </p>
+  1576→                <p className="text-xs text-muted-foreground">
+  1577→                  Weighted Overall
+  1578→                </p>
+  1579→              </div>
+  1580→              <div className="flex-1" />
+  1581→              <Badge
+  1582→                className={cn(
+  1583→                  "text-lg px-3 py-1 border-0 font-bold",
+  1584→                  GRADE_COLORS[previewGrade] || ""
+  1585→                )}
+  1586→              >
+  1587→                {previewGrade}
+  1588→              </Badge>
+  1589→            </div>
+  1590→            {/* Mini breakdown */}
+  1591→            <div className="mt-3 grid grid-cols-4 gap-2">
+  1592→              {METRIC_DEFS.map((m) => {
+  1593→                const raw = (form as any)[m.key] as number;
+  1594→                const weighted =
+  1595→                  m.max === 100
+  1596→                    ? raw * (m.weight / 100)
+  1597→                    : raw * 10 * (m.weight / 100);
+  1598→                return (
+  1599→                  <div key={m.key} className="text-center">
+  1600→                    <p className="text-[10px] text-muted-foreground truncate">
+  1601→                      {m.label}
+  1602→                    </p>
+  1603→                    <p className="text-xs font-semibold tabular-nums">
+  1604→                      {weighted.toFixed(1)}
+  1605→                    </p>
+  1606→                  </div>
+  1607→                );
+  1608→              })}
+  1609→            </div>
+  1610→          </div>
+  1611→        </div>
+  1612→
+  1613→        <DialogFooter>
+  1614→          <Button
+  1615→            variant="outline"
+  1616→            onClick={() => onOpenChange(false)}
+  1617→          >
+  1618→            Cancel
+  1619→          </Button>
+  1620→          <Button
+  1621→            onClick={handleSave}
+  1622→            disabled={saving || !form.userId}
+  1623→          >
+  1624→            {saving
+  1625→              ? "Saving…"
+  1626→              : editSc
+  1627→                ? "Update Scorecard"
+  1628→                : "Save Scorecard"}
+  1629→          </Button>
+  1630→        </DialogFooter>
+  1631→      </DialogContent>
+  1632→    </Dialog>
+  1633→  );
+  1634→}
+  1635→
+  1636→// ─── Skeletons ────────────────────────────────────────────────────
+  1637→function SkeletonOverview() {
+  1638→  return (
+  1639→    <div className="space-y-4">
+  1640→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1641→        {Array.from({ length: 4 }).map((_, i) => (
+  1642→          <Skeleton key={i} className="h-24" />
+  1643→        ))}
+  1644→      </div>
+  1645→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1646→        <Skeleton className="h-[280px]" />
+  1647→        <Skeleton className="h-[280px]" />
+  1648→      </div>
+  1649→    </div>
+  1650→  );
+  1651→}
+  1652→
+  1653→
+  1654→
