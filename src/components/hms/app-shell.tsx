@@ -4,7 +4,8 @@
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { RealtimeToasts } from "./realtime-toasts";
-import { useAppStore } from "@/lib/store";
+import { LoginPage } from "./login-page";
+import { useAppStore, ROLE_MODULES, ModuleKey } from "@/lib/store";
 import { DashboardModule } from "./modules/dashboard";
 import { ReservationsModule } from "./modules/reservations";
 import { RoomsModule } from "./modules/rooms";
@@ -19,12 +20,41 @@ import { MaintenanceModule } from "./modules/maintenance";
 import { AuditModule } from "./modules/audit";
 import { useApi } from "@/lib/api";
 import { Hotel, Globe, ShieldCheck, Cpu } from "lucide-react";
+import { useEffect } from "react";
+
+const MODULE_COMPONENTS: Record<ModuleKey, React.FC> = {
+  dashboard: DashboardModule,
+  reservations: ReservationsModule,
+  rooms: RoomsModule,
+  housekeeping: HousekeepingModule,
+  guests: GuestsModule,
+  pos: PosModule,
+  folios: FoliosModule,
+  reports: ReportsModule,
+  "night-audit": NightAuditModule,
+  staff: StaffModule,
+  maintenance: MaintenanceModule,
+  audit: AuditModule,
+};
 
 export function AppShell() {
-  const { activeModule } = useAppStore();
-  // Get property id for realtime subscription
-  const { data: prop } = useApi<{ id: string }>("/api/dashboard", []);
-  const propertyId = prop?.property?.id;
+  const { user, isAuthenticated, activeModule, setActiveModule, role } = useAppStore();
+  const { data: prop } = useApi(isAuthenticated ? "/api/dashboard" : null, []);
+  const propertyId = user?.property?.id;
+
+  // Ensure activeModule is accessible by current role
+  const allowedModules = ROLE_MODULES[role] ?? ROLE_MODULES.gm;
+  useEffect(() => {
+    if (isAuthenticated && !allowedModules.includes(activeModule)) {
+      setActiveModule("dashboard");
+    }
+  }, [role, isAuthenticated, allowedModules, activeModule, setActiveModule]);
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  const ActiveComponent = MODULE_COMPONENTS[activeModule] ?? DashboardModule;
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -33,18 +63,7 @@ export function AppShell() {
         <Topbar propertyId={propertyId} />
         <main className="flex-1 overflow-x-hidden">
           <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8 lg:py-8">
-            {activeModule === "dashboard" && <DashboardModule />}
-            {activeModule === "reservations" && <ReservationsModule />}
-            {activeModule === "rooms" && <RoomsModule />}
-            {activeModule === "housekeeping" && <HousekeepingModule />}
-            {activeModule === "guests" && <GuestsModule />}
-            {activeModule === "pos" && <PosModule />}
-            {activeModule === "folios" && <FoliosModule />}
-            {activeModule === "reports" && <ReportsModule />}
-            {activeModule === "night-audit" && <NightAuditModule />}
-            {activeModule === "staff" && <StaffModule />}
-            {activeModule === "maintenance" && <MaintenanceModule />}
-            {activeModule === "audit" && <AuditModule />}
+            <ActiveComponent />
           </div>
         </main>
         <Footer />

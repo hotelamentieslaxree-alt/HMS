@@ -1,16 +1,16 @@
-// HMS Topbar
+// HMS Topbar — role-aware with user info
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useAppStore, RoleKey, ROLE_META, ModuleKey } from "@/lib/store";
-import { Bell, RefreshCw, Search, Menu, MoonStar, Sun } from "lucide-react";
+import { useAppStore, ROLE_META, ModuleKey } from "@/lib/store";
+import { Bell, RefreshCw, Search, MoonStar, Sun, LogOut, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useApi, apiPost } from "@/lib/api";
 import { timeAgo } from "./shared";
 
 const MODULE_TITLES: Record<ModuleKey, { title: string; subtitle: string }> = {
-  dashboard: { title: "Owner Command Center", subtitle: "Real-time property intelligence" },
+  dashboard: { title: "Command Center", subtitle: "Real-time property intelligence" },
   reservations: { title: "Reservations", subtitle: "Bookings · Arrivals · Departures" },
   rooms: { title: "Rooms & Inventory", subtitle: "Live status board across floors" },
   housekeeping: { title: "Housekeeping", subtitle: "Task board · Inspections · Laundry" },
@@ -25,7 +25,7 @@ const MODULE_TITLES: Record<ModuleKey, { title: string; subtitle: string }> = {
 };
 
 export function Topbar({ propertyId }: { propertyId?: string }) {
-  const { activeModule, role, setRole, triggerRefresh, notifOpen, setNotifOpen } = useAppStore();
+  const { activeModule, role, user, setUser, triggerRefresh, notifOpen, setNotifOpen } = useAppStore();
   const title = MODULE_TITLES[activeModule];
   const { theme, setTheme } = useTheme();
   const [now, setNow] = useState(() => new Date());
@@ -38,17 +38,23 @@ export function Topbar({ propertyId }: { propertyId?: string }) {
 
   const notifications = notifData?.notifications ?? [];
   const unread = notifData?.unreadCount ?? 0;
+  const meta = ROLE_META[role];
 
   const markAllRead = async () => {
     await apiPost("/api/notifications", { markAllRead: true });
     reload();
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("aria_auth");
+    setUser(null);
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-card/95 backdrop-blur px-4 lg:px-6">
       <div className="min-w-0 flex-1">
-        <h1 className="font-display text-lg font-bold text-foreground leading-tight truncate">{title.title}</h1>
-        <p className="text-xs text-muted-foreground truncate hidden sm:block">{title.subtitle}</p>
+        <h1 className="font-display text-lg font-bold text-foreground leading-tight truncate">{title?.title ?? "Dashboard"}</h1>
+        <p className="text-xs text-muted-foreground truncate hidden sm:block">{title?.subtitle ?? ""}</p>
       </div>
 
       {/* Search (decorative) */}
@@ -135,47 +141,25 @@ export function Topbar({ propertyId }: { propertyId?: string }) {
         )}
       </div>
 
-      {/* Role switcher */}
+      {/* User info + Logout */}
       <div className="flex items-center gap-2 border-l border-border pl-3">
-        <RoleSwitcher role={role} setRole={setRole} />
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: meta?.accent ?? "#1B3A6B" }}>
+            {user ? `${user.firstName[0]}${user.lastName[0]}` : "U"}
+          </div>
+          <div className="hidden sm:block text-left">
+            <p className="text-xs font-semibold leading-tight">{user ? `${user.firstName} ${user.lastName}` : "User"}</p>
+            <p className="text-[10px] text-muted-foreground">{meta?.label ?? role}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          title="Sign out"
+          className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:text-[#DC2626] hover:border-[#DC2626]/30 transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
     </header>
-  );
-}
-
-function RoleSwitcher({ role, setRole }: { role: RoleKey; setRole: (r: RoleKey) => void }) {
-  const meta = ROLE_META[role];
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 hover:bg-muted transition-colors"
-      >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: meta.accent }}>
-          {meta.label.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-        </div>
-        <div className="hidden sm:block text-left">
-          <p className="text-xs font-semibold leading-tight">{meta.label}</p>
-          <p className="text-[10px] text-muted-foreground">L{meta.level}</p>
-        </div>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-border bg-popover shadow-card-lg overflow-hidden">
-          <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">Switch role</p>
-          {(Object.keys(ROLE_META) as RoleKey[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => { setRole(r); setOpen(false); }}
-              className={cn("flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors", role === r && "bg-muted")}
-            >
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ROLE_META[r].accent }} />
-              <span className="font-medium">{ROLE_META[r].label}</span>
-              <span className="ml-auto text-[10px] text-muted-foreground">L{ROLE_META[r].level}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }

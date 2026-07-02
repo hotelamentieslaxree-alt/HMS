@@ -1,18 +1,17 @@
-// HMS Sidebar
+// HMS Sidebar — role-based navigation
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useAppStore, ModuleKey, RoleKey, ROLE_META } from "@/lib/store";
+import { useAppStore, ModuleKey, ROLE_META, ROLE_MODULES } from "@/lib/store";
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, Sparkles, Users, UtensilsCrossed,
-  Receipt, BarChart3, MoonStar, UserCog, Wrench, ShieldCheck, Hotel, ChevronLeft,
+  Receipt, BarChart3, MoonStar, UserCog, Wrench, ShieldCheck, Hotel, ChevronLeft, LogOut,
 } from "lucide-react";
 
 interface NavItem {
   key: ModuleKey;
   label: string;
   icon: any;
-  roles?: RoleKey[]; // if omitted, visible to all
 }
 
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
@@ -51,8 +50,14 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 ];
 
 export function Sidebar() {
-  const { activeModule, setActiveModule, sidebarCollapsed, toggleSidebar, role } = useAppStore();
+  const { activeModule, setActiveModule, sidebarCollapsed, toggleSidebar, role, user, setUser } = useAppStore();
   const meta = ROLE_META[role];
+  const allowedModules = ROLE_MODULES[role] ?? ROLE_MODULES.gm;
+
+  const handleLogout = () => {
+    localStorage.removeItem("aria_auth");
+    setUser(null);
+  };
 
   return (
     <aside
@@ -87,60 +92,75 @@ export function Sidebar() {
           <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/60 px-3 py-2">
             <Hotel className="h-4 w-4 text-gold shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-sidebar-foreground truncate">The Aurelian Grand</p>
+              <p className="text-xs font-semibold text-sidebar-foreground truncate">{user?.property?.name ?? "The Aurelian Grand"}</p>
               <p className="text-[10px] text-sidebar-foreground/60 truncate">Mumbai · 5★ · 80 rooms</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Nav */}
+      {/* Nav — filtered by role */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.title}>
-            {!sidebarCollapsed && (
-              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">{group.title}</p>
-            )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const active = activeModule === item.key;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => setActiveModule(item.key)}
-                    title={sidebarCollapsed ? item.label : undefined}
-                    className={cn(
-                      "group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                      active
-                        ? "bg-gold text-navy shadow-sm"
-                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                      sidebarCollapsed && "justify-center px-0"
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-navy" : "text-sidebar-foreground/60 group-hover:text-gold")} />
-                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                  </button>
-                );
-              })}
+        {NAV_GROUPS.map((group) => {
+          const filteredItems = group.items.filter((item) => allowedModules.includes(item.key));
+          if (filteredItems.length === 0) return null;
+          return (
+            <div key={group.title}>
+              {!sidebarCollapsed && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">{group.title}</p>
+              )}
+              <div className="space-y-0.5">
+                {filteredItems.map((item) => {
+                  const active = activeModule === item.key;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setActiveModule(item.key)}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={cn(
+                        "group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                        active
+                          ? "bg-gold text-navy shadow-sm"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                        sidebarCollapsed && "justify-center px-0"
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-navy" : "text-sidebar-foreground/60 group-hover:text-gold")} />
+                      {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
-      {/* Role footer */}
-      <div className={cn("border-t border-sidebar-border p-3", sidebarCollapsed && "px-2")}>
+      {/* User / Role footer + Logout */}
+      <div className={cn("border-t border-sidebar-border p-3 space-y-2", sidebarCollapsed && "px-2")}>
         <div className={cn("flex items-center gap-2 rounded-lg bg-sidebar-accent/40 p-2", sidebarCollapsed && "justify-center")}>
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: meta.accent }}>
-            {meta.label.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: meta?.accent ?? "#1B3A6B" }}>
+            {user ? `${user.firstName[0]}${user.lastName[0]}` : "U"}
           </div>
           {!sidebarCollapsed && (
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-sidebar-foreground truncate">{meta.label}</p>
-              <p className="text-[10px] text-sidebar-foreground/50">Level {meta.level} access</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-sidebar-foreground truncate">{user ? `${user.firstName} ${user.lastName}` : meta?.label}</p>
+              <p className="text-[10px] text-sidebar-foreground/50">{meta?.label ?? role} · Level {meta?.level ?? 4}</p>
             </div>
           )}
         </div>
+        <button
+          onClick={handleLogout}
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sidebar-foreground/60 hover:bg-[#DC2626]/20 hover:text-[#FCA5A5] transition-colors w-full",
+            sidebarCollapsed && "justify-center px-0"
+          )}
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!sidebarCollapsed && <span>Sign Out</span>}
+        </button>
       </div>
     </aside>
   );
