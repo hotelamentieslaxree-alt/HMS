@@ -1,0 +1,1168 @@
+     1→// Dashboard module — Role-specific dashboards
+     2→"use client";
+     3→
+     4→import { cn } from "@/lib/utils";
+     5→import { useApi } from "@/lib/api";
+     6→import { useAppStore } from "@/lib/store";
+     7→import { KpiCard, RoomStatusBadge, ROOM_STATUS_META, ResStatusBadge, SOURCE_META, VipBadge, fmtINR, fmtDate, timeAgo } from "../shared";
+     8→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+     9→import { Button } from "@/components/ui/button";
+    10→import { Badge } from "@/components/ui/badge";
+    11→import { Skeleton } from "@/components/ui/skeleton";
+    12→import { useEffect } from "react";
+    13→import {
+    14→  BedDouble, IndianRupee, TrendingUp, Percent, LogIn, LogOut, Sparkles,
+    15→  Wrench, UtensilsCrossed, AlertCircle, Activity, ArrowRight, Users,
+    16→  Shield, DollarSign, BarChart3, Clock, CheckCircle2, AlertTriangle,
+    17→  ClipboardList, ChefHat, CreditCard, Wallet, FileText, UserCog, Building2,
+    18→  MoonStar, Calendar,
+    19→} from "lucide-react";
+    20→import {
+    21→  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
+    22→  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+    23→} from "recharts";
+    24→
+    25→const CHART_COLORS = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
+    26→
+    27→export function DashboardModule() {
+    28→  const { role } = useAppStore();
+    29→
+    30→  // Route to the correct dashboard based on role
+    31→  const roleLevel = role.includes("owner") ? "owner" :
+    32→    role === "gm" ? "gm" :
+    33→    role === "fom" || role === "receptionist" ? "frontdesk" :
+    34→    role === "hk_mgr" || role === "hk_attendant" ? "housekeeping" :
+    35→    role === "fb_mgr" || role === "waiter" ? "fnb" :
+    36→    role === "fin_mgr" ? "finance" :
+    37→    role === "eng_mgr" || role === "technician" ? "engineering" :
+    38→    role === "rev_mgr" ? "revenue" :
+    39→    role === "hr_mgr" ? "hr" :
+    40→    role === "sales_mgr" || role === "sales_exec" ? "sales" :
+    41→    role === "mkt_mgr" || role === "mkt_exec" ? "marketing" :
+    42→    "gm"; // fallback
+    43→
+    44→  switch (roleLevel) {
+    45→    case "owner": return <OwnerDashboard />;
+    46→    case "gm": return <GMDashboard />;
+    47→    case "frontdesk": return <FrontDeskDashboard />;
+    48→    case "housekeeping": return <HousekeepingDashboard />;
+    49→    case "fnb": return <FnBDashboard />;
+    50→    case "finance": return <FinanceDashboard />;
+    51→    case "engineering": return <EngineeringDashboard />;
+    52→    case "revenue": return <RevenueDashboard />;
+    53→    case "hr": return <HRDashboard />;
+    54→    case "sales": return <SalesDashboard />;
+    55→    case "marketing": return <MarketingDashboard />;
+    56→    default: return <GMDashboard />;
+    57→  }
+    58→}
+    59→
+    60→// ─── Shared hook for dashboard data ─────────────────────────────
+    61→function useDashboardData() {
+    62→  const { data, loading, reload } = useApi<any>("/api/dashboard", []);
+    63→  const { refreshTick } = useAppStore();
+    64→  useEffect(() => {
+    65→    if (refreshTick > 0) reload();
+    66→  }, [refreshTick, reload]);
+    67→  return { data, loading };
+    68→}
+    69→
+    70→// ─── OWNER DASHBOARD ────────────────────────────────────────────
+    71→function OwnerDashboard() {
+    72→  const { data, loading } = useDashboardData();
+    73→  const { setActiveModule } = useAppStore();
+    74→
+    75→  if (loading || !data) return <DashboardSkeleton />;
+    76→
+    77→  const k = data.kpis;
+    78→  const revenueSeries = data.revenueSeries?.slice(-14) ?? [];
+    79→  const channelSeries = data.channelSeries ?? [];
+    80→
+    81→  return (
+    82→    <div className="space-y-6">
+    83→      {/* Owner banner */}
+    84→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#1B3A6B] to-[#2E5FA3] px-5 py-4 text-white shadow-card">
+    85→        <div>
+    86→          <p className="text-[11px] uppercase tracking-widest text-[#F0C96A]/90">Owner Command Center</p>
+    87→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+    88→        </div>
+    89→        <div className="flex flex-wrap items-center gap-4 text-sm">
+    90→          <Metric label="Occupancy" value={`${k.occupancyRate}%`} />
+    91→          <Divider />
+    92→          <Metric label="In-house" value={`${data.inHouseCount}`} />
+    93→          <Divider />
+    94→          <Metric label="Room Rev" value={fmtINR(k.adr * k.occupiedRooms)} />
+    95→          <Divider />
+    96→          <Metric label="RevPAR" value={fmtINR(k.revpar)} />
+    97→        </div>
+    98→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("reports")} className="bg-gold text-navy hover:bg-gold-light font-semibold">
+    99→          Full Reports
+   100→        </Button>
+   101→      </div>
+   102→
+   103→      {/* KPIs */}
+   104→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+   105→        <KpiCard label="Occupancy" value={k.occupancyRate} unit="%" icon={Percent} accent="navy" hint={`${k.occupiedRooms}/${k.availableRooms} rooms`} delta={4.2} deltaLabel="vs last week" />
+   106→        <KpiCard label="ADR" value={fmtINR(k.adr)} icon={IndianRupee} accent="gold" hint="Avg daily rate" delta={2.8} deltaLabel="WoW" />
+   107→        <KpiCard label="RevPAR" value={fmtINR(k.revpar)} icon={TrendingUp} accent="success" hint="Per available room" delta={3.5} deltaLabel="WoW" />
+   108→        <KpiCard label="TRevPAR" value={fmtINR(k.trevpar)} icon={TrendingUp} accent="info" hint="Total revenue / room" delta={5.1} deltaLabel="WoW" />
+   109→        <KpiCard label="GOPPAR" value={fmtINR(k.goppar)} icon={IndianRupee} accent="navy" hint="Gross operating profit" delta={1.9} deltaLabel="WoW" />
+   110→        <KpiCard label="CPOR" value={fmtINR(k.cpor)} icon={BedDouble} accent="warning" hint="Cost per occupied room" delta={-1.2} deltaLabel="WoW" />
+   111→      </div>
+   112→
+   113→      {/* Charts */}
+   114→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   115→        <Card className="lg:col-span-2">
+   116→          <CardHeader className="pb-2">
+   117→            <CardTitle className="text-base font-display">Revenue Trend (14 days)</CardTitle>
+   118→          </CardHeader>
+   119→          <CardContent>
+   120→            <ResponsiveContainer width="100%" height={280}>
+   121→              <AreaChart data={revenueSeries} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+   122→                <defs>
+   123→                  <linearGradient id="gRoom" x1="0" y1="0" x2="0" y2="1">
+   124→                    <stop offset="0%" stopColor="#1B3A6B" stopOpacity={0.5} />
+   125→                    <stop offset="100%" stopColor="#1B3A6B" stopOpacity={0} />
+   126→                  </linearGradient>
+   127→                  <linearGradient id="gFb" x1="0" y1="0" x2="0" y2="1">
+   128→                    <stop offset="0%" stopColor="#C9952A" stopOpacity={0.5} />
+   129→                    <stop offset="100%" stopColor="#C9952A" stopOpacity={0} />
+   130→                  </linearGradient>
+   131→                </defs>
+   132→                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+   133→                <XAxis dataKey="day" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} stroke="#94A3B8" />
+   134→                <YAxis tick={{ fontSize: 10 }} stroke="#94A3B8" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+   135→                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 12 }} formatter={(v: any) => fmtINR(v)} />
+   136→                <Legend wrapperStyle={{ fontSize: 11 }} />
+   137→                <Area type="monotone" dataKey="room" name="Room" stroke="#1B3A6B" strokeWidth={2} fill="url(#gRoom)" />
+   138→                <Area type="monotone" dataKey="fb" name="F&B" stroke="#C9952A" strokeWidth={2} fill="url(#gFb)" />
+   139→                <Area type="monotone" dataKey="other" name="Other" stroke="#16A34A" strokeWidth={2} fill="transparent" />
+   140→              </AreaChart>
+   141→            </ResponsiveContainer>
+   142→          </CardContent>
+   143→        </Card>
+   144→        <Card>
+   145→          <CardHeader className="pb-2">
+   146→            <CardTitle className="text-base font-display">Channel Mix</CardTitle>
+   147→          </CardHeader>
+   148→          <CardContent>
+   149→            <ResponsiveContainer width="100%" height={280}>
+   150→              <PieChart>
+   151→                <Pie data={channelSeries} dataKey="revenue" nameKey="source" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={2}>
+   152→                  {channelSeries.map((_: any, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+   153→                </Pie>
+   154→                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 12 }} formatter={(v: any, n: any) => [fmtINR(v), SOURCE_META[n] || n]} />
+   155→                <Legend wrapperStyle={{ fontSize: 10 }} formatter={(v) => SOURCE_META[v] || v} />
+   156→              </PieChart>
+   157→            </ResponsiveContainer>
+   158→          </CardContent>
+   159→        </Card>
+   160→      </div>
+   161→
+   162→      {/* Department health + Arrivals */}
+   163→      <DepartmentHealthAndArrivals data={data} setActiveModule={setActiveModule} />
+   164→    </div>
+   165→  );
+   166→}
+   167→
+   168→// ─── GM DASHBOARD ────────────────────────────────────────────────
+   169→function GMDashboard() {
+   170→  const { data, loading } = useDashboardData();
+   171→  const { setActiveModule } = useAppStore();
+   172→
+   173→  if (loading || !data) return <DashboardSkeleton />;
+   174→
+   175→  const k = data.kpis;
+   176→
+   177→  return (
+   178→    <div className="space-y-6">
+   179→      {/* GM banner */}
+   180→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gradient-to-r from-navy to-[#2E5FA3] px-5 py-4 text-white shadow-card">
+   181→        <div>
+   182→          <p className="text-[11px] uppercase tracking-widest text-gold/90">General Manager · Operations Overview</p>
+   183→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   184→        </div>
+   185→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   186→          <Metric label="Occupancy" value={`${k.occupancyRate}%`} />
+   187→          <Divider />
+   188→          <Metric label="In-house" value={`${data.inHouseCount}`} />
+   189→          <Divider />
+   190→          <Metric label="Arrivals" value={`${data.arrivalsToday.length}`} />
+   191→          <Divider />
+   192→          <Metric label="Departures" value={`${data.departuresToday.length}`} />
+   193→        </div>
+   194→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("night-audit")} className="bg-gold text-navy hover:bg-gold-light font-semibold">
+   195→          Run Night Audit
+   196→        </Button>
+   197→      </div>
+   198→
+   199→      {/* KPIs */}
+   200→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+   201→        <KpiCard label="Occupancy" value={k.occupancyRate} unit="%" icon={Percent} accent="navy" hint={`${k.occupiedRooms}/${k.availableRooms} rooms`} />
+   202→        <KpiCard label="ADR" value={fmtINR(k.adr)} icon={IndianRupee} accent="gold" hint="Avg daily rate" />
+   203→        <KpiCard label="RevPAR" value={fmtINR(k.revpar)} icon={TrendingUp} accent="success" />
+   204→        <KpiCard label="TRevPAR" value={fmtINR(k.trevpar)} icon={TrendingUp} accent="info" />
+   205→        <KpiCard label="GOPPAR" value={fmtINR(k.goppar)} icon={IndianRupee} accent="navy" />
+   206→        <KpiCard label="CPOR" value={fmtINR(k.cpor)} icon={BedDouble} accent="warning" />
+   207→      </div>
+   208→
+   209→      {/* Room status + Arrivals/Departures */}
+   210→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   211→        <RoomStatusCard statusCounts={data.statusCounts} k={k} setActiveModule={setActiveModule} />
+   212→        <ArrivalsCard arrivals={data.arrivalsToday} />
+   213→        <DeparturesCard departures={data.departuresToday} />
+   214→      </div>
+   215→
+   216→      {/* Department health + Activity */}
+   217→      <DepartmentHealthAndArrivals data={data} setActiveModule={setActiveModule} />
+   218→    </div>
+   219→  );
+   220→}
+   221→
+   222→// ─── FRONT DESK DASHBOARD ────────────────────────────────────────
+   223→function FrontDeskDashboard() {
+   224→  const { data, loading } = useDashboardData();
+   225→  const { setActiveModule } = useAppStore();
+   226→
+   227→  if (loading || !data) return <DashboardSkeleton />;
+   228→
+   229→  return (
+   230→    <div className="space-y-6">
+   231→      {/* Front Desk banner */}
+   232→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#0369A1]/30 bg-gradient-to-r from-[#0369A1] to-[#0284C7] px-5 py-4 text-white shadow-card">
+   233→        <div>
+   234→          <p className="text-[11px] uppercase tracking-widest text-white/70">Front Office · Today's Operations</p>
+   235→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   236→        </div>
+   237→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   238→          <Metric label="Arrivals" value={`${data.arrivalsToday.length}`} />
+   239→          <Divider />
+   240→          <Metric label="Departures" value={`${data.departuresToday.length}`} />
+   241→          <Divider />
+   242→          <Metric label="In-house" value={`${data.inHouseCount}`} />
+   243→        </div>
+   244→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("reservations")} className="bg-white text-[#0369A1] hover:bg-white/90 font-semibold">
+   245→          New Reservation
+   246→        </Button>
+   247→      </div>
+   248→
+   249→      {/* Front desk KPIs */}
+   250→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   251→        <KpiCard label="Expected Arrivals" value={data.arrivalsToday.length} icon={LogIn} accent="info" />
+   252→        <KpiCard label="Expected Departures" value={data.departuresToday.length} icon={LogOut} accent="warning" />
+   253→        <KpiCard label="In-House Guests" value={data.inHouseCount ?? 0} icon={Users} accent="navy" />
+   254→        <KpiCard label="Occupancy" value={data.kpis.occupancyRate} unit="%" icon={Percent} accent="gold" />
+   255→      </div>
+   256→
+   257→      {/* Arrivals + Departures */}
+   258→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   259→        <ArrivalsCard arrivals={data.arrivalsToday} />
+   260→        <DeparturesCard departures={data.departuresToday} />
+   261→      </div>
+   262→
+   263→      {/* Room status */}
+   264→      <RoomStatusCard statusCounts={data.statusCounts} k={data.kpis} setActiveModule={setActiveModule} />
+   265→    </div>
+   266→  );
+   267→}
+   268→
+   269→// ─── HOUSEKEEPING DASHBOARD ──────────────────────────────────────
+   270→function HousekeepingDashboard() {
+   271→  const { data, loading } = useDashboardData();
+   272→  const { setActiveModule } = useAppStore();
+   273→  const { data: hkData } = useApi<any>("/api/housekeeping", []);
+   274→
+   275→  if (loading || !data) return <DashboardSkeleton />;
+   276→
+   277→  const hk = hkData?.summary ?? data.hkSummary;
+   278→  const tasks = hkData?.tasks ?? [];
+   279→
+   280→  return (
+   281→    <div className="space-y-6">
+   282→      {/* HK banner */}
+   283→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#0F766E]/30 bg-gradient-to-r from-[#0F766E] to-[#14B8A6] px-5 py-4 text-white shadow-card">
+   284→        <div>
+   285→          <p className="text-[11px] uppercase tracking-widest text-white/70">Housekeeping Department</p>
+   286→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   287→        </div>
+   288→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   289→          <Metric label="Pending" value={`${hk?.pending ?? 0}`} />
+   290→          <Divider />
+   291→          <Metric label="In Progress" value={`${hk?.in_progress ?? 0}`} />
+   292→          <Divider />
+   293→          <Metric label="Completed" value={`${hk?.completed ?? 0}`} />
+   294→          <Divider />
+   295→          <Metric label="Inspected" value={`${hk?.inspected ?? 0}`} />
+   296→        </div>
+   297→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("housekeeping")} className="bg-white text-[#0F766E] hover:bg-white/90 font-semibold">
+   298→          Task Board
+   299→        </Button>
+   300→      </div>
+   301→
+   302→      {/* HK KPIs */}
+   303→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   304→        <KpiCard label="Total Tasks" value={hk?.total ?? 0} icon={ClipboardList} accent="navy" />
+   305→        <KpiCard label="Pending" value={hk?.pending ?? 0} icon={Clock} accent="warning" />
+   306→        <KpiCard label="In Progress" value={hk?.in_progress ?? 0} icon={Sparkles} accent="info" />
+   307→        <KpiCard label="Completed" value={(hk?.completed ?? 0) + (hk?.inspected ?? 0)} icon={CheckCircle2} accent="success" />
+   308→      </div>
+   309→
+   310→      {/* Room status grid */}
+   311→      <RoomStatusCard statusCounts={data.statusCounts} k={data.kpis} setActiveModule={setActiveModule} />
+   312→
+   313→      {/* Task list */}
+   314→      <Card>
+   315→        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   316→          <CardTitle className="text-base font-display flex items-center gap-2"><Sparkles className="h-4 w-4 text-gold" /> Today's Tasks</CardTitle>
+   317→          <Badge variant="secondary" className="text-[10px]">{tasks.length} tasks</Badge>
+   318→        </CardHeader>
+   319→        <CardContent>
+   320→          <div className="max-h-80 overflow-y-auto space-y-1.5">
+   321→            {tasks.length === 0 ? (
+   322→              <p className="text-center text-sm text-muted-foreground py-8">No tasks found</p>
+   323→            ) : tasks.slice(0, 15).map((t: any) => (
+   324→              <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/40">
+   325→                <div className={cn("h-2 w-2 rounded-full", {
+   326→                  "bg-[#DC2626]": t.priority === "urgent",
+   327→                  "bg-[#D97706]": t.priority === "high",
+   328→                  "bg-[#0369A1]": t.priority === "normal",
+   329→                  "bg-[#6B7280]": t.priority === "low",
+   330→                })} />
+   331→                <div className="min-w-0 flex-1">
+   332→                  <p className="text-xs font-semibold">Room {t.room?.number ?? "—"} · {t.taskType?.replace(/_/g, " ")}</p>
+   333→                  <p className="text-[10px] text-muted-foreground">{t.assignee?.name ?? "Unassigned"}</p>
+   334→                </div>
+   335→                <Badge variant="outline" className={cn("text-[10px]", {
+   336→                  "border-[#DC2626] text-[#DC2626]": t.status === "pending",
+   337→                  "border-[#D97706] text-[#D97706]": t.status === "in_progress",
+   338→                  "border-[#16A34A] text-[#16A34A]": t.status === "completed",
+   339→                  "border-[#0369A1] text-[#0369A1]": t.status === "inspected",
+   340→                })}>{t.status?.replace(/_/g, " ")}</Badge>
+   341→              </div>
+   342→            ))}
+   343→          </div>
+   344→        </CardContent>
+   345→      </Card>
+   346→    </div>
+   347→  );
+   348→}
+   349→
+   350→// ─── F&B DASHBOARD ───────────────────────────────────────────────
+   351→function FnBDashboard() {
+   352→  const { data, loading } = useDashboardData();
+   353→  const { setActiveModule } = useAppStore();
+   354→  const { data: posData } = useApi<any>("/api/pos/outlets", []);
+   355→
+   356→  if (loading || !data) return <DashboardSkeleton />;
+   357→
+   358→  const outlets = Array.isArray(posData) ? posData : (posData?.outlets ?? []);
+   359→
+   360→  return (
+   361→    <div className="space-y-6">
+   362→      {/* F&B banner */}
+   363→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#B45309]/30 bg-gradient-to-r from-[#B45309] to-[#D97706] px-5 py-4 text-white shadow-card">
+   364→        <div>
+   365→          <p className="text-[11px] uppercase tracking-widest text-white/70">Food & Beverage Department</p>
+   366→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   367→        </div>
+   368→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   369→          <Metric label="Outlets" value={`${outlets.length}`} />
+   370→          <Divider />
+   371→          <Metric label="Occupancy" value={`${data.kpis.occupancyRate}%`} />
+   372→        </div>
+   373→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("pos")} className="bg-white text-[#B45309] hover:bg-white/90 font-semibold">
+   374→          Open POS
+   375→        </Button>
+   376→      </div>
+   377→
+   378→      {/* F&B KPIs */}
+   379→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   380→        <KpiCard label="Active Outlets" value={outlets.length} icon={UtensilsCrossed} accent="gold" />
+   381→        <KpiCard label="Occupancy" value={data.kpis.occupancyRate} unit="%" icon={Percent} accent="navy" />
+   382→        <KpiCard label="In-House Guests" value={data.inHouseCount ?? 0} icon={Users} accent="info" />
+   383→        <KpiCard label="Tables Available" value={outlets.reduce((sum: number, o: any) => sum + (o.tableCount ?? 0), 0)} icon={CheckCircle2} accent="success" />
+   384→      </div>
+   385→
+   386→      {/* Outlets grid */}
+   387→      <Card>
+   388→        <CardHeader className="pb-2">
+   389→          <CardTitle className="text-base font-display flex items-center gap-2"><ChefHat className="h-4 w-4 text-gold" /> Outlets</CardTitle>
+   390→        </CardHeader>
+   391→        <CardContent>
+   392→          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+   393→            {outlets.map((o: any) => (
+   394→              <div key={o.id} className="rounded-xl border border-border p-3 hover:shadow-card transition-shadow">
+   395→                <div className="flex items-center justify-between mb-2">
+   396→                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/10">
+   397→                    <UtensilsCrossed className="h-4 w-4 text-gold" />
+   398→                  </div>
+   399→                  <Badge variant="outline" className={cn("text-[10px]", o.isActive ? "border-[#16A34A] text-[#16A34A]" : "border-[#DC2626] text-[#DC2626]")}>
+   400→                    {o.isActive ? "Open" : "Closed"}
+   401→                  </Badge>
+   402→                </div>
+   403→                <p className="text-sm font-semibold">{o.name}</p>
+   404→                <p className="text-[10px] text-muted-foreground">{o.type?.replace(/_/g, " ")} · {o.tableCount} tables</p>
+   405→              </div>
+   406→            ))}
+   407→          </div>
+   408→        </CardContent>
+   409→      </Card>
+   410→    </div>
+   411→  );
+   412→}
+   413→
+   414→// ─── FINANCE DASHBOARD ───────────────────────────────────────────
+   415→function FinanceDashboard() {
+   416→  const { data, loading } = useDashboardData();
+   417→  const { setActiveModule } = useAppStore();
+   418→  const { data: reportData } = useApi<any>("/api/reports?type=daily_revenue", []);
+   419→
+   420→  if (loading || !data) return <DashboardSkeleton />;
+   421→
+   422→  const k = data.kpis;
+   423→
+   424→  return (
+   425→    <div className="space-y-6">
+   426→      {/* Finance banner */}
+   427→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#15803D]/30 bg-gradient-to-r from-[#15803D] to-[#16A34A] px-5 py-4 text-white shadow-card">
+   428→        <div>
+   429→          <p className="text-[11px] uppercase tracking-widest text-white/70">Finance & Accounts</p>
+   430→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   431→        </div>
+   432→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   433→          <Metric label="Room Revenue" value={fmtINR(k.adr * k.occupiedRooms)} />
+   434→          <Divider />
+   435→          <Metric label="ADR" value={fmtINR(k.adr)} />
+   436→          <Divider />
+   437→          <Metric label="RevPAR" value={fmtINR(k.revpar)} />
+   438→        </div>
+   439→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("folios")} className="bg-white text-[#15803D] hover:bg-white/90 font-semibold">
+   440→          View Folios
+   441→        </Button>
+   442→      </div>
+   443→
+   444→      {/* Finance KPIs */}
+   445→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   446→        <KpiCard label="TRevPAR" value={fmtINR(k.trevpar)} icon={DollarSign} accent="success" />
+   447→        <KpiCard label="GOPPAR" value={fmtINR(k.goppar)} icon={TrendingUp} accent="navy" />
+   448→        <KpiCard label="ADR" value={fmtINR(k.adr)} icon={IndianRupee} accent="gold" />
+   449→        <KpiCard label="CPOR" value={fmtINR(k.cpor)} icon={CreditCard} accent="warning" />
+   450→      </div>
+   451→
+   452→      {/* Revenue trend */}
+   453→      <Card>
+   454→        <CardHeader className="pb-2">
+   455→          <CardTitle className="text-base font-display flex items-center gap-2"><BarChart3 className="h-4 w-4 text-gold" /> Revenue Trend</CardTitle>
+   456→        </CardHeader>
+   457→        <CardContent>
+   458→          <ResponsiveContainer width="100%" height={300}>
+   459→            <BarChart data={data.revenueSeries?.slice(-14) ?? []} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+   460→              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+   461→              <XAxis dataKey="day" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} stroke="#94A3B8" />
+   462→              <YAxis tick={{ fontSize: 10 }} stroke="#94A3B8" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+   463→              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 12 }} formatter={(v: any) => fmtINR(v)} />
+   464→              <Bar dataKey="room" name="Room" fill="#1B3A6B" radius={[4, 4, 0, 0]} />
+   465→              <Bar dataKey="fb" name="F&B" fill="#C9952A" radius={[4, 4, 0, 0]} />
+   466→            </BarChart>
+   467→          </ResponsiveContainer>
+   468→        </CardContent>
+   469→      </Card>
+   470→
+   471→      {/* Quick actions */}
+   472→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   473→        <QuickAction icon={FileText} label="Daily Revenue" onClick={() => setActiveModule("reports")} />
+   474→        <QuickAction icon={Wallet} label="GST Report" onClick={() => setActiveModule("reports")} />
+   475→        <QuickAction icon={CreditCard} label="Payment Methods" onClick={() => setActiveModule("reports")} />
+   476→        <QuickAction icon={MoonStar} label="Night Audit" onClick={() => setActiveModule("night-audit")} />
+   477→      </div>
+   478→    </div>
+   479→  );
+   480→}
+   481→
+   482→// ─── ENGINEERING DASHBOARD ───────────────────────────────────────
+   483→function EngineeringDashboard() {
+   484→  const { data, loading } = useDashboardData();
+   485→  const { setActiveModule } = useAppStore();
+   486→  const { data: maintData } = useApi<any>("/api/maintenance", []);
+   487→
+   488→  if (loading || !data) return <DashboardSkeleton />;
+   489→
+   490→  const tickets = maintData?.tickets ?? [];
+   491→  const openTickets = tickets.filter((t: any) => t.status === "open" || t.status === "in_progress");
+   492→
+   493→  return (
+   494→    <div className="space-y-6">
+   495→      {/* Engineering banner */}
+   496→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DC2626]/30 bg-gradient-to-r from-[#7F1D1D] to-[#DC2626] px-5 py-4 text-white shadow-card">
+   497→        <div>
+   498→          <p className="text-[11px] uppercase tracking-widest text-white/70">Engineering & Maintenance</p>
+   499→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   500→        </div>
+   501→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   502→          <Metric label="Open Tickets" value={`${openTickets.length}`} />
+   503→          <Divider />
+   504→          <Metric label="OOO Rooms" value={`${data.statusCounts?.out_of_order ?? 0}`} />
+   505→        </div>
+   506→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("maintenance")} className="bg-white text-[#DC2626] hover:bg-white/90 font-semibold">
+   507→          All Tickets
+   508→        </Button>
+   509→      </div>
+   510→
+   511→      {/* KPIs */}
+   512→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   513→        <KpiCard label="Open Tickets" value={openTickets.length} icon={AlertTriangle} accent="error" />
+   514→        <KpiCard label="OOO Rooms" value={data.statusCounts?.out_of_order ?? 0} icon={Wrench} accent="warning" />
+   515→        <KpiCard label="OOS Rooms" value={data.statusCounts?.out_of_service ?? 0} icon={Building2} accent="info" />
+   516→        <KpiCard label="Occupancy" value={data.kpis.occupancyRate} unit="%" icon={Percent} accent="navy" />
+   517→      </div>
+   518→
+   519→      {/* Ticket list */}
+   520→      <Card>
+   521→        <CardHeader className="pb-2">
+   522→          <CardTitle className="text-base font-display flex items-center gap-2"><Wrench className="h-4 w-4 text-gold" /> Active Tickets</CardTitle>
+   523→        </CardHeader>
+   524→        <CardContent>
+   525→          <div className="max-h-96 overflow-y-auto space-y-1.5">
+   526→            {openTickets.length === 0 ? (
+   527→              <p className="text-center text-sm text-muted-foreground py-8">No active tickets</p>
+   528→            ) : openTickets.map((t: any) => (
+   529→              <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/40">
+   530→                <div className={cn("h-2 w-2 rounded-full", {
+   531→                  "bg-[#DC2626]": t.priority === "urgent",
+   532→                  "bg-[#D97706]": t.priority === "high",
+   533→                  "bg-[#0369A1]": t.priority === "normal",
+   534→                  "bg-[#6B7280]": t.priority === "low",
+   535→                })} />
+   536→                <div className="min-w-0 flex-1">
+   537→                  <p className="text-xs font-semibold">{t.title}</p>
+   538→                  <p className="text-[10px] text-muted-foreground">{t.room ? `Room ${t.room.number}` : "General"} · {t.category ?? "General"}</p>
+   539→                </div>
+   540→                <Badge variant="outline" className={cn("text-[10px]", {
+   541→                  "border-[#DC2626] text-[#DC2626]": t.status === "open",
+   542→                  "border-[#D97706] text-[#D97706]": t.status === "in_progress",
+   543→                })}>{t.status?.replace(/_/g, " ")}</Badge>
+   544→              </div>
+   545→            ))}
+   546→          </div>
+   547→        </CardContent>
+   548→      </Card>
+   549→    </div>
+   550→  );
+   551→}
+   552→
+   553→// ─── REVENUE DASHBOARD ───────────────────────────────────────────
+   554→function RevenueDashboard() {
+   555→  const { data, loading } = useDashboardData();
+   556→  const { setActiveModule } = useAppStore();
+   557→
+   558→  if (loading || !data) return <DashboardSkeleton />;
+   559→
+   560→  const k = data.kpis;
+   561→  const revenueSeries = data.revenueSeries?.slice(-14) ?? [];
+   562→
+   563→  return (
+   564→    <div className="space-y-6">
+   565→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#5B21B6] to-[#7C3AED] px-5 py-4 text-white shadow-card">
+   566→        <div>
+   567→          <p className="text-[11px] uppercase tracking-widest text-white/70">Revenue Management</p>
+   568→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   569→        </div>
+   570→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("reports")} className="bg-white text-[#7C3AED] hover:bg-white/90 font-semibold">
+   571→          Analytics
+   572→        </Button>
+   573→      </div>
+   574→
+   575→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   576→        <KpiCard label="Occupancy" value={k.occupancyRate} unit="%" icon={Percent} accent="navy" delta={4.2} deltaLabel="WoW" />
+   577→        <KpiCard label="ADR" value={fmtINR(k.adr)} icon={IndianRupee} accent="gold" delta={2.8} deltaLabel="WoW" />
+   578→        <KpiCard label="RevPAR" value={fmtINR(k.revpar)} icon={TrendingUp} accent="success" delta={3.5} deltaLabel="WoW" />
+   579→        <KpiCard label="TRevPAR" value={fmtINR(k.trevpar)} icon={BarChart3} accent="info" delta={5.1} deltaLabel="WoW" />
+   580→      </div>
+   581→
+   582→      <Card>
+   583→        <CardHeader className="pb-2">
+   584→          <CardTitle className="text-base font-display">Revenue Trend (14 days)</CardTitle>
+   585→        </CardHeader>
+   586→        <CardContent>
+   587→          <ResponsiveContainer width="100%" height={320}>
+   588→            <AreaChart data={revenueSeries} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+   589→              <defs>
+   590→                <linearGradient id="gRoom2" x1="0" y1="0" x2="0" y2="1">
+   591→                  <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.5} />
+   592→                  <stop offset="100%" stopColor="#7C3AED" stopOpacity={0} />
+   593→                </linearGradient>
+   594→              </defs>
+   595→              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+   596→              <XAxis dataKey="day" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} stroke="#94A3B8" />
+   597→              <YAxis tick={{ fontSize: 10 }} stroke="#94A3B8" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+   598→              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 12 }} formatter={(v: any) => fmtINR(v)} />
+   599→              <Legend wrapperStyle={{ fontSize: 11 }} />
+   600→              <Area type="monotone" dataKey="room" name="Room" stroke="#7C3AED" strokeWidth={2} fill="url(#gRoom2)" />
+   601→              <Area type="monotone" dataKey="fb" name="F&B" stroke="#C9952A" strokeWidth={2} fill="transparent" />
+   602→            </AreaChart>
+   603→          </ResponsiveContainer>
+   604→        </CardContent>
+   605→      </Card>
+   606→
+   607→      {/* Channel breakdown */}
+   608→      <Card>
+   609→        <CardHeader className="pb-2">
+   610→          <CardTitle className="text-base font-display">Channel Production</CardTitle>
+   611→        </CardHeader>
+   612→        <CardContent>
+   613→          <div className="space-y-2">
+   614→            {(data.channelSeries ?? []).map((c: any, i: number) => (
+   615→              <div key={c.source} className="flex items-center gap-3">
+   616→                <span className="text-xs w-24 font-medium">{SOURCE_META[c.source] || c.source}</span>
+   617→                <div className="flex-1 h-4 rounded-full bg-border overflow-hidden">
+   618→                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, (c.revenue / (data.channelSeries[0]?.revenue || 1)) * 100)}%`, backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+   619→                </div>
+   620→                <span className="text-xs font-mono-num font-semibold w-20 text-right">{fmtINR(c.revenue)}</span>
+   621→              </div>
+   622→            ))}
+   623→          </div>
+   624→        </CardContent>
+   625→      </Card>
+   626→    </div>
+   627→  );
+   628→}
+   629→
+   630→// ─── HR DASHBOARD ────────────────────────────────────────────────
+   631→function HRDashboard() {
+   632→  const { data, loading } = useDashboardData();
+   633→  const { setActiveModule } = useAppStore();
+   634→  const { data: staffData } = useApi<any>("/api/staff", []);
+   635→  const { data: attnData } = useApi<any>("/api/hr/attendance?view=monthly", []);
+   636→  const { data: payrollData } = useApi<any>("/api/hr/payroll", []);
+   637→  const { data: eventsData } = useApi<any>("/api/hr/events", []);
+   638→  const { data: scoreData } = useApi<any>("/api/hr/scorecards?period=" + new Date().toISOString().slice(0, 7), []);
+   639→
+   640→  if (loading || !data) return <DashboardSkeleton />;
+   641→
+   642→  const staff = Array.isArray(staffData) ? staffData : (staffData?.users ?? []);
+   643→  const deptMap = new Map<string, { id: string; name: string; code: string }>();
+   644→  staff.forEach((s: any) => {
+   645→    if (s.department && s.departmentCode) {
+   646→      deptMap.set(s.departmentCode, { id: s.departmentCode, name: s.department, code: s.departmentCode });
+   647→    }
+   648→  });
+   649→  const departments = Array.from(deptMap.values());
+   650→  const attnSummary = attnData?.summary ?? {};
+   651→  const payrollSummary = payrollData?.summary ?? {};
+   652→  const upcomingEvents = (eventsData?.events ?? []).filter((e: any) => e.status === "upcoming").slice(0, 4);
+   653→  const topPerformers = (scoreData?.scorecards ?? [])
+   654→    .sort((a: any, b: any) => (b.overallScore ?? 0) - (a.overallScore ?? 0))
+   655→    .slice(0, 5);
+   656→
+   657→  const CHART_COLORS_LOCAL = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
+   658→
+   659→  return (
+   660→    <div className="space-y-6">
+   661→      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#BE185D]/30 bg-gradient-to-r from-[#9D174D] to-[#BE185D] px-5 py-4 text-white shadow-card">
+   662→        <div>
+   663→          <p className="text-[11px] uppercase tracking-widest text-white/70">Human Resources Command Center</p>
+   664→          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+   665→        </div>
+   666→        <div className="flex flex-wrap items-center gap-4 text-sm">
+   667→          <Metric label="Staff" value={`${staff.length}`} />
+   668→          <Divider />
+   669→          <Metric label="Attendance" value={`${Math.round(attnSummary.attendanceRate ?? 0)}%`} />
+   670→          <Divider />
+   671→          <Metric label="Payroll" value={fmtINR(payrollSummary.totalNetPay ?? 0)} />
+   672→        </div>
+   673→        <Button size="sm" variant="secondary" onClick={() => setActiveModule("staff")} className="bg-white text-[#BE185D] hover:bg-white/90 font-semibold">
+   674→          HR Module
+   675→        </Button>
+   676→      </div>
+   677→
+   678→      {/* KPI Row */}
+   679→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+   680→        <KpiCard label="Total Staff" value={staff.length} icon={Users} accent="navy" />
+   681→        <KpiCard label="Attendance Rate" value={Math.round(attnSummary.attendanceRate ?? 0)} unit="%" icon={ClipboardList} accent="success" />
+   682→        <KpiCard label="Present (Month)" value={attnSummary.totalPresent ?? 0} icon={CheckCircle2} accent="info" />
+   683→        <KpiCard label="Late/Absent" value={(attnSummary.totalLate ?? 0) + (attnSummary.totalAbsent ?? 0)} icon={AlertTriangle} accent="warning" />
+   684→        <KpiCard label="Monthly Payroll" value={fmtINR(payrollSummary.totalNetPay ?? 0)} icon={IndianRupee} accent="gold" />
+   685→        <KpiCard label="Avg Score" value={Math.round(scoreData?.overallStats?.averageScore ?? 0)} icon={BarChart3} accent="navy" />
+   686→      </div>
+   687→
+   688→      {/* Two columns: Department Staffing + Top Performers */}
+   689→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   690→        <Card>
+   691→          <CardHeader className="pb-2">
+   692→            <CardTitle className="text-base font-display">Department Staffing</CardTitle>
+   693→          </CardHeader>
+   694→          <CardContent>
+   695→            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+   696→              {departments.map((d: any) => {
+   697→                const deptStaff = staff.filter((s: any) => s.departmentCode === d.code);
+   698→                return (
+   699→                  <div key={d.id} className="rounded-xl border border-border p-3 hover:shadow-card transition-shadow cursor-pointer" onClick={() => setActiveModule("staff")}>
+   700→                    <p className="text-sm font-semibold">{d.name}</p>
+   701→                    <p className="text-lg font-display font-bold">{deptStaff.length}</p>
+   702→                    <p className="text-[10px] text-muted-foreground">{d.code} department</p>
+   703→                  </div>
+   704→                );
+   705→              })}
+   706→            </div>
+   707→          </CardContent>
+   708→        </Card>
+   709→        <Card>
+   710→          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   711→            <CardTitle className="text-base font-display">Top Performers</CardTitle>
+   712→            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("staff")}>All Scorecards</Button>
+   713→          </CardHeader>
+   714→          <CardContent>
+   715→            <div className="space-y-2">
+   716→              {topPerformers.length === 0 ? (
+   717→                <p className="text-center text-sm text-muted-foreground py-8">No scorecard data</p>
+   718→              ) : topPerformers.map((s: any, i: number) => (
+   719→                <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/40">
+   720→                  <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: CHART_COLORS_LOCAL[i % 6] }}>
+   721→                    #{i + 1}
+   722→                  </div>
+   723→                  <div className="min-w-0 flex-1">
+   724→                    <p className="text-xs font-semibold">{s.userName ?? (`${s.user?.firstName ?? ""} ${s.user?.lastName ?? ""}`.trim() || "—")}</p>
+   725→                    <p className="text-[10px] text-muted-foreground">{[s.department ?? s.user?.department, s.user?.role].filter(Boolean).join(" · ") || "—"}</p>
+   726→                  </div>
+   727→                  <div className="text-right">
+   728→                    <p className="text-sm font-display font-bold">{Math.round(s.overallScore ?? 0)}%</p>
+   729→                    <Badge className={cn("text-[9px] px-1.5 py-0", {
+   730→                      "bg-[#16A34A] text-white": s.grade === "A+" || s.grade === "A",
+   731→                      "bg-[#0369A1] text-white": s.grade === "B+" || s.grade === "B",
+   732→                      "bg-[#D97706] text-white": s.grade === "C",
+   733→                      "bg-[#DC2626] text-white": s.grade === "D",
+   734→                    })}>{s.grade}</Badge>
+   735→                  </div>
+   736→                </div>
+   737→              ))}
+   738→            </div>
+   739→          </CardContent>
+   740→        </Card>
+   741→      </div>
+   742→
+   743→      {/* Payroll Summary + Upcoming Events */}
+   744→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   745→        <Card>
+   746→          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   747→            <CardTitle className="text-base font-display flex items-center gap-2"><IndianRupee className="h-4 w-4 text-gold" /> Payroll Summary</CardTitle>
+   748→            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("staff")}>Full Payroll</Button>
+   749→          </CardHeader>
+   750→          <CardContent>
+   751→            <div className="space-y-3">
+   752→              <div className="grid grid-cols-3 gap-3">
+   753→                <div className="rounded-lg bg-[#16A34A]/10 border border-[#16A34A]/20 p-3 text-center">
+   754→                  <p className="text-[10px] text-muted-foreground">Gross</p>
+   755→                  <p className="text-sm font-display font-bold text-[#16A34A]">{fmtINR(payrollSummary.totalGrossEarnings ?? 0)}</p>
+   756→                </div>
+   757→                <div className="rounded-lg bg-[#DC2626]/10 border border-[#DC2626]/20 p-3 text-center">
+   758→                  <p className="text-[10px] text-muted-foreground">Deductions</p>
+   759→                  <p className="text-sm font-display font-bold text-[#DC2626]">{fmtINR(payrollSummary.totalDeductions ?? 0)}</p>
+   760→                </div>
+   761→                <div className="rounded-lg bg-navy/10 border border-navy/20 p-3 text-center">
+   762→                  <p className="text-[10px] text-muted-foreground">Net Pay</p>
+   763→                  <p className="text-sm font-display font-bold text-navy">{fmtINR(payrollSummary.totalNetPay ?? 0)}</p>
+   764→                </div>
+   765→              </div>
+   766→              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   767→                <span>{payrollSummary.draftCount ?? 0} draft</span>
+   768→                <span>·</span>
+   769→                <span>{payrollSummary.processedCount ?? 0} processed</span>
+   770→                <span>·</span>
+   771→                <span>{payrollSummary.paidCount ?? 0} paid</span>
+   772→              </div>
+   773→            </div>
+   774→          </CardContent>
+   775→        </Card>
+   776→        <Card>
+   777→          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   778→            <CardTitle className="text-base font-display flex items-center gap-2"><Calendar className="h-4 w-4 text-gold" /> Upcoming Events</CardTitle>
+   779→            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("staff")}>All Events</Button>
+   780→          </CardHeader>
+   781→          <CardContent>
+   782→            <div className="space-y-2 max-h-60 overflow-y-auto">
+   783→              {upcomingEvents.length === 0 ? (
+   784→                <p className="text-center text-sm text-muted-foreground py-6">No upcoming events</p>
+   785→              ) : upcomingEvents.map((e: any) => {
+   786→                const typeColor: Record<string, string> = { festival: "#C9952A", training: "#0369A1", meeting: "#1B3A6B", celebration: "#16A34A", audit: "#DC2626", other: "#6B7280" };
+   787→                return (
+   788→                  <div key={e.id} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/40">
+   789→                    <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${typeColor[e.type] ?? "#6B7280"}20` }}>
+   790→                      <Calendar className="h-4 w-4" style={{ color: typeColor[e.type] ?? "#6B7280" }} />
+   791→                    </div>
+   792→                    <div className="min-w-0 flex-1">
+   793→                      <p className="text-xs font-semibold">{e.title}</p>
+   794→                      <p className="text-[10px] text-muted-foreground">{fmtDate(e.eventDate)} · {e.venue ?? "TBD"}</p>
+   795→                    </div>
+   796→                    <Badge variant="outline" className="text-[9px]">{e.type}</Badge>
+   797→                  </div>
+   798→                );
+   799→              })}
+   800→            </div>
+   801→          </CardContent>
+   802→        </Card>
+   803→      </div>
+   804→    </div>
+   805→  );
+   806→}
+   807→
+   808→// ─── Shared Components ───────────────────────────────────────────
+   809→
+   810→function DashboardSkeleton() {
+   811→  return (
+   812→    <div className="space-y-4">
+   813→      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+   814→        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+   815→      </div>
+   816→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   817→        <Skeleton className="h-80 rounded-xl lg:col-span-2" />
+   818→        <Skeleton className="h-80 rounded-xl" />
+   819→      </div>
+   820→    </div>
+   821→  );
+   822→}
+   823→
+   824→function RoomStatusCard({ statusCounts, k, setActiveModule }: any) {
+   825→  return (
+   826→    <Card>
+   827→      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   828→        <CardTitle className="text-base font-display">Room Status Board</CardTitle>
+   829→        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("rooms")}>
+   830→          View all <ArrowRight className="h-3 w-3 ml-1" />
+   831→        </Button>
+   832→      </CardHeader>
+   833→      <CardContent className="space-y-3">
+   834→        <div className="grid grid-cols-3 gap-2">
+   835→          {Object.entries(ROOM_STATUS_META).map(([key, m]) => (
+   836→            <div key={key} className={`rounded-lg border p-2 ${m.cls}`}>
+   837→              <p className="text-lg font-bold tabular-nums">{statusCounts[key] ?? 0}</p>
+   838→              <p className="text-[10px] font-medium uppercase">{m.short}</p>
+   839→            </div>
+   840→          ))}
+   841→        </div>
+   842→        <div className="rounded-lg bg-muted/40 p-3">
+   843→          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">Live occupancy gauge</p>
+   844→          <div className="relative h-3 w-full rounded-full bg-border overflow-hidden">
+   845→            <div className="absolute inset-y-0 left-0 bg-navy rounded-full" style={{ width: `${k.occupancyRate}%` }} />
+   846→          </div>
+   847→          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+   848→            <span>0</span>
+   849→            <span className="font-semibold text-foreground">{k.occupiedRooms} occupied</span>
+   850→            <span>{k.totalRooms}</span>
+   851→          </div>
+   852→        </div>
+   853→      </CardContent>
+   854→    </Card>
+   855→  );
+   856→}
+   857→
+   858→function ArrivalsCard({ arrivals }: any) {
+   859→  return (
+   860→    <Card>
+   861→      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   862→        <CardTitle className="text-base font-display flex items-center gap-2"><LogIn className="h-4 w-4 text-[#16A34A]" /> Arrivals Today</CardTitle>
+   863→        <Badge variant="secondary" className="text-[10px]">{arrivals?.length ?? 0}</Badge>
+   864→      </CardHeader>
+   865→      <CardContent>
+   866→        <div className="max-h-64 overflow-y-auto space-y-1.5 -mx-1 px-1">
+   867→          {!arrivals?.length ? (
+   868→            <p className="text-center text-sm text-muted-foreground py-8">No arrivals today</p>
+   869→          ) : arrivals.map((r: any) => (
+   870→            <div key={r.id} className="flex items-center gap-2 rounded-lg border border-border/60 px-2 py-1.5 hover:bg-muted/40">
+   871→              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy/10 text-xs font-bold text-navy">
+   872→                {r.guestName?.split(" ").slice(1, 3).map((w: string) => w[0]).join("") ?? "?"}
+   873→              </div>
+   874→              <div className="min-w-0 flex-1">
+   875→                <p className="text-xs font-semibold truncate flex items-center gap-1">
+   876→                  {r.guestName} <VipBadge vip={r.vip} />
+   877→                </p>
+   878→                <p className="text-[10px] text-muted-foreground">{r.category} · {r.nights}N</p>
+   879→              </div>
+   880→              <div className="text-right">
+   881→                <p className="text-xs font-mono-num font-semibold">{r.assignedRoom ?? "—"}</p>
+   882→                <p className="text-[10px] text-muted-foreground">{fmtINR(r.ratePerNight)}</p>
+   883→              </div>
+   884→            </div>
+   885→          ))}
+   886→        </div>
+   887→      </CardContent>
+   888→    </Card>
+   889→  );
+   890→}
+   891→
+   892→function DeparturesCard({ departures }: any) {
+   893→  return (
+   894→    <Card>
+   895→      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   896→        <CardTitle className="text-base font-display flex items-center gap-2"><LogOut className="h-4 w-4 text-[#D97706]" /> Departures Today</CardTitle>
+   897→        <Badge variant="secondary" className="text-[10px]">{departures?.length ?? 0}</Badge>
+   898→      </CardHeader>
+   899→      <CardContent>
+   900→        <div className="max-h-64 overflow-y-auto space-y-1.5 -mx-1 px-1">
+   901→          {!departures?.length ? (
+   902→            <p className="text-center text-sm text-muted-foreground py-8">No departures today</p>
+   903→          ) : departures.map((r: any) => (
+   904→            <div key={r.id} className="flex items-center gap-2 rounded-lg border border-border/60 px-2 py-1.5 hover:bg-muted/40">
+   905→              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D97706]/10 text-xs font-bold text-[#D97706]">
+   906→                {r.guestName?.split(" ").slice(1, 3).map((w: string) => w[0]).join("") ?? "?"}
+   907→              </div>
+   908→              <div className="min-w-0 flex-1">
+   909→                <p className="text-xs font-semibold truncate">{r.guestName}</p>
+   910→                <p className="text-[10px] text-muted-foreground">{r.category} · {r.nights}N</p>
+   911→              </div>
+   912→              <p className="text-xs font-mono-num font-semibold">{r.roomNumber ?? "—"}</p>
+   913→            </div>
+   914→          ))}
+   915→        </div>
+   916→      </CardContent>
+   917→    </Card>
+   918→  );
+   919→}
+   920→
+   921→function DepartmentHealthAndArrivals({ data, setActiveModule }: any) {
+   922→  return (
+   923→    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   924→      <Card className="lg:col-span-2">
+   925→        <CardHeader className="pb-2">
+   926→          <CardTitle className="text-base font-display">Department Health</CardTitle>
+   927→        </CardHeader>
+   928→        <CardContent>
+   929→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   930→            {(data.departmentHealth ?? []).map((d: any) => {
+   931→              const Icon = d.code === "FO" ? Users : d.code === "HK" ? Sparkles : d.code === "FB" ? UtensilsCrossed : Wrench;
+   932→              const statusColor = d.status === "healthy" ? "#16A34A" : d.status === "busy" ? "#D97706" : "#DC2626";
+   933→              return (
+   934→                <div key={d.code} className="rounded-xl border border-border p-3">
+   935→                  <div className="flex items-center justify-between mb-2">
+   936→                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted"><Icon className="h-4 w-4 text-navy" /></div>
+   937→                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusColor }} />
+   938→                  </div>
+   939→                  <p className="text-sm font-semibold">{d.name}</p>
+   940→                  <p className="text-lg font-display font-bold text-foreground">{d.metric}</p>
+   941→                  <p className="text-[10px] text-muted-foreground line-clamp-1">{d.detail}</p>
+   942→                </div>
+   943→              );
+   944→            })}
+   945→          </div>
+   946→          {/* HK progress */}
+   947→          <div className="mt-4 rounded-lg bg-muted/40 p-3">
+   948→            <div className="flex items-center justify-between mb-2">
+   949→              <p className="text-xs font-semibold flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-gold" /> Housekeeping progress</p>
+   950→              <p className="text-xs text-muted-foreground">{(data.hkSummary?.completed ?? 0) + (data.hkSummary?.inspected ?? 0)}/{data.hkSummary?.total ?? 0} done</p>
+   951→            </div>
+   952→            <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-border">
+   953→              <div className="bg-[#16A34A]" style={{ width: `${((data.hkSummary?.inspected ?? 0) / (data.hkSummary?.total || 1)) * 100}%` }} />
+   954→              <div className="bg-[#86EFAC]" style={{ width: `${((data.hkSummary?.completed ?? 0) / (data.hkSummary?.total || 1)) * 100}%` }} />
+   955→              <div className="bg-[#D97706]" style={{ width: `${((data.hkSummary?.inProgress ?? 0) / (data.hkSummary?.total || 1)) * 100}%` }} />
+   956→              <div className="bg-[#E2E8F0]" style={{ width: `${((data.hkSummary?.pending ?? 0) / (data.hkSummary?.total || 1)) * 100}%` }} />
+   957→            </div>
+   958→          </div>
+   959→        </CardContent>
+   960→      </Card>
+   961→      <Card>
+   962→        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+   963→          <CardTitle className="text-base font-display flex items-center gap-2"><Activity className="h-4 w-4 text-gold" /> Activity Feed</CardTitle>
+   964→          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setActiveModule("audit")}>Full log</Button>
+   965→        </CardHeader>
+   966→        <CardContent>
+   967→          <div className="max-h-80 overflow-y-auto space-y-2 -mx-1 px-1">
+   968→            {(data.auditFeed ?? []).map((a: any, i: number) => (
+   969→              <div key={a.id} className="flex gap-2.5">
+   970→                <div className="flex flex-col items-center">
+   971→                  <div className="h-2 w-2 rounded-full bg-gold mt-1.5" />
+   972→                  {i < (data.auditFeed?.length ?? 0) - 1 && <div className="w-px flex-1 bg-border" />}
+   973→                </div>
+   974→                <div className="min-w-0 pb-2">
+   975→                  <p className="text-xs font-semibold text-foreground">{a.action?.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())}</p>
+   976→                  <p className="text-[10px] text-muted-foreground">{a.userRole} · {a.userEmail}</p>
+   977→                  <p className="text-[10px] text-muted-foreground/70">{timeAgo(a.occurredAt)}</p>
+   978→                </div>
+   979→              </div>
+   980→            ))}
+   981→          </div>
+   982→        </CardContent>
+   983→      </Card>
+   984→    </div>
+   985→  );
+   986→}
+   987→
+   988→function QuickAction({ icon: Icon, label, onClick }: { icon: any; label: string; onClick: () => void }) {
+   989→  return (
+   990→    <button onClick={onClick} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:shadow-card transition-shadow text-left w-full">
+   991→      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted"><Icon className="h-4 w-4 text-navy" /></div>
+   992→      <p className="text-sm font-semibold">{label}</p>
+   993→    </button>
+   994→  );
+   995→}
+   996→
+   997→function Metric({ label, value }: { label: string; value: string }) {
+   998→  return (
+   999→    <div className="text-center">
+  1000→      <p className="text-[10px] uppercase tracking-wider text-white/60">{label}</p>
+  1001→      <p className="font-display text-lg font-bold">{value}</p>
+  1002→    </div>
+  1003→  );
+  1004→}
+  1005→function Divider() { return <div className="h-8 w-px bg-white/20" />; }
+  1006→
+  1007→// ─── SALES DASHBOARD ─────────────────────────────────────────────
+  1008→function SalesDashboard() {
+  1009→  const { data, loading } = useDashboardData();
+  1010→  if (loading || !data) return <Skeleton className="h-96" />;
+  1011→
+  1012→  return (
+  1013→    <div className="space-y-6">
+  1014→      <div className="flex items-center justify-between">
+  1015→        <div>
+  1016→          <h2 className="font-display text-2xl font-bold">Sales Dashboard</h2>
+  1017→          <p className="text-sm text-muted-foreground">Pipeline performance & deal tracking</p>
+  1018→        </div>
+  1019→        <Badge className="bg-[#EA580C] text-white border-0">Sales Department</Badge>
+  1020→      </div>
+  1021→
+  1022→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+  1023→        <KpiCard label="Pipeline Value" value="₹24.5L" icon={TrendingUp} accent="warning" delta={18} deltaLabel="vs last month" />
+  1024→        <KpiCard label="Won This Month" value="₹8.2L" icon={DollarSign} accent="success" delta={24} deltaLabel="vs last month" />
+  1025→        <KpiCard label="Win Rate" value="42%" icon={Percent} accent="navy" delta={5} deltaLabel="improvement" />
+  1026→        <KpiCard label="Active Leads" value="38" icon={Users} accent="gold" delta={12} deltaLabel="new this week" />
+  1027→      </div>
+  1028→
+  1029→      <div className="grid md:grid-cols-2 gap-6">
+  1030→        <Card>
+  1031→          <CardHeader><CardTitle className="text-sm">Pipeline by Stage</CardTitle></CardHeader>
+  1032→          <CardContent className="h-64">
+  1033→            <ResponsiveContainer width="100%" height="100%">
+  1034→              <BarChart data={[
+  1035→                { stage: "New", value: 8, fill: "#0369A1" },
+  1036→                { stage: "Contacted", value: 12, fill: "#0F766E" },
+  1037→                { stage: "Qualified", value: 6, fill: "#C9952A" },
+  1038→                { stage: "Proposal", value: 5, fill: "#EA580C" },
+  1039→                { stage: "Negotiation", value: 4, fill: "#1B3A6B" },
+  1040→                { stage: "Won", value: 3, fill: "#16A34A" },
+  1041→              ]}>
+  1042→                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+  1043→                <XAxis dataKey="stage" fontSize={11} />
+  1044→                <YAxis fontSize={11} />
+  1045→                <Tooltip />
+  1046→                <Bar dataKey="value" radius={[4,4,0,0]} />
+  1047→              </BarChart>
+  1048→            </ResponsiveContainer>
+  1049→          </CardContent>
+  1050→        </Card>
+  1051→
+  1052→        <Card>
+  1053→          <CardHeader><CardTitle className="text-sm">Monthly Revenue</CardTitle></CardHeader>
+  1054→          <CardContent className="h-64">
+  1055→            <ResponsiveContainer width="100%" height="100%">
+  1056→              <AreaChart data={[
+  1057→                { month: "Oct", revenue: 680000 },
+  1058→                { month: "Nov", revenue: 720000 },
+  1059→                { month: "Dec", revenue: 950000 },
+  1060→                { month: "Jan", revenue: 820000 },
+  1061→                { month: "Feb", revenue: 880000 },
+  1062→              ]}>
+  1063→                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+  1064→                <XAxis dataKey="month" fontSize={11} />
+  1065→                <YAxis fontSize={11} />
+  1066→                <Tooltip formatter={(v: number) => fmtINR(v)} />
+  1067→                <Area type="monotone" dataKey="revenue" stroke="#EA580C" fill="#EA580C" fillOpacity={0.15} strokeWidth={2} />
+  1068→              </AreaChart>
+  1069→            </ResponsiveContainer>
+  1070→          </CardContent>
+  1071→        </Card>
+  1072→      </div>
+  1073→
+  1074→      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+  1075→        {[
+  1076→          { icon: TrendingUp, label: "View Pipeline", desc: "Manage leads & deals" },
+  1077→          { icon: Users, label: "Lead Database", desc: "38 active prospects" },
+  1078→          { icon: BarChart3, label: "Sales Reports", desc: "Performance analytics" },
+  1079→        ].map((a, i) => (
+  1080→          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+  1081→        ))}
+  1082→      </div>
+  1083→    </div>
+  1084→  );
+  1085→}
+  1086→
+  1087→// ─── MARKETING DASHBOARD ─────────────────────────────────────────
+  1088→function MarketingDashboard() {
+  1089→  const { data, loading } = useDashboardData();
+  1090→  if (loading || !data) return <Skeleton className="h-96" />;
+  1091→
+  1092→  return (
+  1093→    <div className="space-y-6">
+  1094→      <div className="flex items-center justify-between">
+  1095→        <div>
+  1096→          <h2 className="font-display text-2xl font-bold">Marketing Dashboard</h2>
+  1097→          <p className="text-sm text-muted-foreground">Campaign performance & social analytics</p>
+  1098→        </div>
+  1099→        <Badge className="bg-[#7C3AED] text-white border-0">Marketing Department</Badge>
+  1100→      </div>
+  1101→
+  1102→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+  1103→        <KpiCard label="Total Spend" value="₹74K" icon={DollarSign} accent="warning" delta={-14.6} deltaLabel="vs last month" />
+  1104→        <KpiCard label="ROAS" value="5.88x" icon={TrendingUp} accent="success" delta={11.2} deltaLabel="improvement" />
+  1105→        <KpiCard label="Total Followers" value="180K" icon={Users} accent="navy" delta={12.4} deltaLabel="growth" />
+  1106→        <KpiCard label="Conversions" value="9.2K" icon={Percent} accent="gold" delta={8.3} deltaLabel="vs last month" />
+  1107→      </div>
+  1108→
+  1109→      <div className="grid md:grid-cols-2 gap-6">
+  1110→        <Card>
+  1111→          <CardHeader><CardTitle className="text-sm">Channel Performance</CardTitle></CardHeader>
+  1112→          <CardContent className="h-64">
+  1113→            <ResponsiveContainer width="100%" height="100%">
+  1114→              <BarChart data={[
+  1115→                { channel: "Instagram", roas: 4.86, fill: "#E4405F" },
+  1116→                { channel: "Facebook", roas: 8.28, fill: "#1877F2" },
+  1117→                { channel: "Google", roas: 3.49, fill: "#EA4335" },
+  1118→                { channel: "LinkedIn", roas: 15.43, fill: "#0A66C2" },
+  1119→                { channel: "YouTube", roas: 5.33, fill: "#FF0000" },
+  1120→                { channel: "Email", roas: 13.39, fill: "#16A34A" },
+  1121→              ]}>
+  1122→                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+  1123→                <XAxis dataKey="channel" fontSize={11} />
+  1124→                <YAxis fontSize={11} />
+  1125→                <Tooltip />
+  1126→                <Bar dataKey="roas" radius={[4,4,0,0]} />
+  1127→              </BarChart>
+  1128→            </ResponsiveContainer>
+  1129→          </CardContent>
+  1130→        </Card>
+  1131→
+  1132→        <Card>
+  1133→          <CardHeader><CardTitle className="text-sm">Social Growth</CardTitle></CardHeader>
+  1134→          <CardContent className="h-64">
+  1135→            <ResponsiveContainer width="100%" height="100%">
+  1136→              <AreaChart data={[
+  1137→                { month: "Oct", followers: 142000 },
+  1138→                { month: "Nov", followers: 148000 },
+  1139→                { month: "Dec", followers: 158000 },
+  1140→                { month: "Jan", followers: 168000 },
+  1141→                { month: "Feb", followers: 180000 },
+  1142→              ]}>
+  1143→                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+  1144→                <XAxis dataKey="month" fontSize={11} />
+  1145→                <YAxis fontSize={11} />
+  1146→                <Tooltip formatter={(v: number) => `${(v/1000).toFixed(0)}K`} />
+  1147→                <Area type="monotone" dataKey="followers" stroke="#7C3AED" fill="#7C3AED" fillOpacity={0.15} strokeWidth={2} />
+  1148→              </AreaChart>
+  1149→            </ResponsiveContainer>
+  1150→          </CardContent>
+  1151→        </Card>
+  1152→      </div>
+  1153→
+  1154→      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+  1155→        {[
+  1156→          { icon: BarChart3, label: "Campaign Manager", desc: "8 active campaigns" },
+  1157→          { icon: Users, label: "Social Accounts", desc: "5 connected platforms" },
+  1158→          { icon: TrendingUp, label: "Analytics", desc: "Performance reports" },
+  1159→        ].map((a, i) => (
+  1160→          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+  1161→        ))}
+  1162→      </div>
+  1163→    </div>
+  1164→  );
+  1165→}
+  1166→
+  1167→
+  1168→

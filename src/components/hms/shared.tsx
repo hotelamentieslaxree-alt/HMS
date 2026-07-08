@@ -25,26 +25,26 @@ export function KpiCard({
     error: "bg-[#DC2626] text-white",
   };
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-card hover:shadow-card-lg transition-shadow">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 shadow-card hover:shadow-card-lg transition-shadow">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="flex-1">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-          <p className="mt-1 font-display text-2xl font-bold text-foreground tabular-nums">{value}<span className="ml-0.5 text-sm font-medium text-muted-foreground">{unit}</span></p>
+          <p className="mt-1 font-display text-lg sm:text-xl font-bold text-foreground tabular-nums">{value}<span className="ml-0.5 text-sm font-medium text-muted-foreground">{unit}</span></p>
           {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
         </div>
         {Icon && (
-          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", accentMap[accent])}>
-            <Icon className="h-4 w-4" />
+          <div className={cn("hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", accentMap[accent])}>
+            <Icon className="h-3.5 w-3.5" />
           </div>
         )}
       </div>
       {delta !== undefined && (
-        <div className="mt-2 flex items-center gap-1 text-xs">
-          <span className={cn("inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-medium", delta >= 0 ? "bg-[#DCFCE7] text-[#16A34A]" : "bg-[#FFE4E6] text-[#DC2626]")}>
+        <div className="mt-2 flex items-center gap-1 text-xs flex-wrap">
+          <span className={cn("inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-medium whitespace-nowrap", delta >= 0 ? "bg-[#DCFCE7] text-[#16A34A]" : "bg-[#FFE4E6] text-[#DC2626]")}>
             {delta >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
             {Math.abs(delta)}%
           </span>
-          {deltaLabel && <span className="text-muted-foreground">{deltaLabel}</span>}
+          {deltaLabel && <span className="text-muted-foreground truncate">{deltaLabel}</span>}
         </div>
       )}
     </div>

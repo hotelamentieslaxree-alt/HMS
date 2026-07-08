@@ -138,3 +138,23 @@ Stage Summary:
 - Headers simplified to compact design with dynamic tab label subtitles
 - No breaking changes to existing tab content or functionality
 - TypeScript compilation: no new errors introduced in either file
+
+---
+Task ID: fix-banners
+Agent: General-purpose
+Task: Fix remaining 7 dashboard banners to prevent overlapping
+
+Work Log:
+- Read dashboard.tsx and identified 7 banners still using the old `flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3` pattern on their outer div
+- Verified the Owner and GM banners were already fixed (using the 2-row pattern)
+- Applied the 2-row layout fix to all 7 remaining banners:
+  1. FrontDeskDashboard (border-[#0369A1]/30) — title + New Reservation button on row 1, metrics (Arrivals, Departures, In-house) on row 2
+  2. HousekeepingDashboard (border-[#0F766E]/30) — title + Task Board button on row 1, metrics (Pending, In Progress, Completed, Inspected) on row 2
+  3. FnBDashboard (border-[#B45309]/30) — title + Open POS button on row 1, metrics (Outlets, Occupancy) on row 2
+  4. FinanceDashboard (border-[#15803D]/30) — title + View Folios button on row 1, metrics (Room Revenue, ADR, RevPAR) on row 2
+  5. EngineeringDashboard (border-[#DC2626]/30) — title + All Tickets button on row 1, metrics (Open Tickets, OOO Rooms) on row 2
+  6. RevenueDashboard (border-[#7C3AED]/30) — title + Analytics button on row 1 (no metrics div in this banner)
+  7. HRDashboard (border-[#BE185D]/30) — title + HR Module button on row 1, metrics (Staff, Attendance, Payroll) on row 2
+- For each banner: removed flex layout classes from outer div, wrapped title+Button in inner `flex items-center justify-between gap-3` div, moved metrics div outside inner div with `mt-3` class added
+- Verified zero remaining instances of `flex flex-col sm:flex-row` in the file
+- TypeScript compilation: no new errors introduced

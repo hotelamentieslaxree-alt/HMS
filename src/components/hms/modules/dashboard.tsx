@@ -81,12 +81,17 @@ function OwnerDashboard() {
   return (
     <div className="space-y-6">
       {/* Owner banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#1B3A6B] to-[#2E5FA3] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-[#F0C96A]/90">Owner Command Center</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#1B3A6B] to-[#2E5FA3] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-[#F0C96A]/90">Owner Command Center</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("reports")} className="bg-gold text-navy hover:bg-gold-light font-semibold">
+            Full Reports
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Occupancy" value={`${k.occupancyRate}%`} />
           <Divider />
           <Metric label="In-house" value={`${data.inHouseCount}`} />
@@ -95,13 +100,10 @@ function OwnerDashboard() {
           <Divider />
           <Metric label="RevPAR" value={fmtINR(k.revpar)} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("reports")} className="bg-gold text-navy hover:bg-gold-light font-semibold">
-          Full Reports
-        </Button>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard label="Occupancy" value={k.occupancyRate} unit="%" icon={Percent} accent="navy" hint={`${k.occupiedRooms}/${k.availableRooms} rooms`} delta={4.2} deltaLabel="vs last week" />
         <KpiCard label="ADR" value={fmtINR(k.adr)} icon={IndianRupee} accent="gold" hint="Avg daily rate" delta={2.8} deltaLabel="WoW" />
         <KpiCard label="RevPAR" value={fmtINR(k.revpar)} icon={TrendingUp} accent="success" hint="Per available room" delta={3.5} deltaLabel="WoW" />
@@ -177,12 +179,17 @@ function GMDashboard() {
   return (
     <div className="space-y-6">
       {/* GM banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gradient-to-r from-navy to-[#2E5FA3] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-gold/90">General Manager · Operations Overview</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-gold/30 bg-gradient-to-r from-navy to-[#2E5FA3] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-gold/90">General Manager · Operations Overview</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("night-audit")} className="bg-gold text-navy hover:bg-gold-light font-semibold">
+            Run Night Audit
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Occupancy" value={`${k.occupancyRate}%`} />
           <Divider />
           <Metric label="In-house" value={`${data.inHouseCount}`} />
@@ -191,13 +198,10 @@ function GMDashboard() {
           <Divider />
           <Metric label="Departures" value={`${data.departuresToday.length}`} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("night-audit")} className="bg-gold text-navy hover:bg-gold-light font-semibold">
-          Run Night Audit
-        </Button>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard label="Occupancy" value={k.occupancyRate} unit="%" icon={Percent} accent="navy" hint={`${k.occupiedRooms}/${k.availableRooms} rooms`} />
         <KpiCard label="ADR" value={fmtINR(k.adr)} icon={IndianRupee} accent="gold" hint="Avg daily rate" />
         <KpiCard label="RevPAR" value={fmtINR(k.revpar)} icon={TrendingUp} accent="success" />
@@ -229,21 +233,23 @@ function FrontDeskDashboard() {
   return (
     <div className="space-y-6">
       {/* Front Desk banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#0369A1]/30 bg-gradient-to-r from-[#0369A1] to-[#0284C7] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Front Office · Today's Operations</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#0369A1]/30 bg-gradient-to-r from-[#0369A1] to-[#0284C7] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Front Office · Today's Operations</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("reservations")} className="bg-white text-[#0369A1] hover:bg-white/90 font-semibold">
+            New Reservation
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Arrivals" value={`${data.arrivalsToday.length}`} />
           <Divider />
           <Metric label="Departures" value={`${data.departuresToday.length}`} />
           <Divider />
           <Metric label="In-house" value={`${data.inHouseCount}`} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("reservations")} className="bg-white text-[#0369A1] hover:bg-white/90 font-semibold">
-          New Reservation
-        </Button>
       </div>
 
       {/* Front desk KPIs */}
@@ -280,12 +286,17 @@ function HousekeepingDashboard() {
   return (
     <div className="space-y-6">
       {/* HK banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#0F766E]/30 bg-gradient-to-r from-[#0F766E] to-[#14B8A6] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Housekeeping Department</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#0F766E]/30 bg-gradient-to-r from-[#0F766E] to-[#14B8A6] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Housekeeping Department</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("housekeeping")} className="bg-white text-[#0F766E] hover:bg-white/90 font-semibold">
+            Task Board
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Pending" value={`${hk?.pending ?? 0}`} />
           <Divider />
           <Metric label="In Progress" value={`${hk?.in_progress ?? 0}`} />
@@ -294,9 +305,6 @@ function HousekeepingDashboard() {
           <Divider />
           <Metric label="Inspected" value={`${hk?.inspected ?? 0}`} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("housekeeping")} className="bg-white text-[#0F766E] hover:bg-white/90 font-semibold">
-          Task Board
-        </Button>
       </div>
 
       {/* HK KPIs */}
@@ -360,19 +368,21 @@ function FnBDashboard() {
   return (
     <div className="space-y-6">
       {/* F&B banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#B45309]/30 bg-gradient-to-r from-[#B45309] to-[#D97706] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Food & Beverage Department</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#B45309]/30 bg-gradient-to-r from-[#B45309] to-[#D97706] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Food & Beverage Department</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("pos")} className="bg-white text-[#B45309] hover:bg-white/90 font-semibold">
+            Open POS
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Outlets" value={`${outlets.length}`} />
           <Divider />
           <Metric label="Occupancy" value={`${data.kpis.occupancyRate}%`} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("pos")} className="bg-white text-[#B45309] hover:bg-white/90 font-semibold">
-          Open POS
-        </Button>
       </div>
 
       {/* F&B KPIs */}
@@ -424,21 +434,23 @@ function FinanceDashboard() {
   return (
     <div className="space-y-6">
       {/* Finance banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#15803D]/30 bg-gradient-to-r from-[#15803D] to-[#16A34A] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Finance & Accounts</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#15803D]/30 bg-gradient-to-r from-[#15803D] to-[#16A34A] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Finance & Accounts</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("folios")} className="bg-white text-[#15803D] hover:bg-white/90 font-semibold">
+            View Folios
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Room Revenue" value={fmtINR(k.adr * k.occupiedRooms)} />
           <Divider />
           <Metric label="ADR" value={fmtINR(k.adr)} />
           <Divider />
           <Metric label="RevPAR" value={fmtINR(k.revpar)} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("folios")} className="bg-white text-[#15803D] hover:bg-white/90 font-semibold">
-          View Folios
-        </Button>
       </div>
 
       {/* Finance KPIs */}
@@ -493,19 +505,21 @@ function EngineeringDashboard() {
   return (
     <div className="space-y-6">
       {/* Engineering banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DC2626]/30 bg-gradient-to-r from-[#7F1D1D] to-[#DC2626] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Engineering & Maintenance</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#DC2626]/30 bg-gradient-to-r from-[#7F1D1D] to-[#DC2626] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Engineering & Maintenance</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("maintenance")} className="bg-white text-[#DC2626] hover:bg-white/90 font-semibold">
+            All Tickets
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Open Tickets" value={`${openTickets.length}`} />
           <Divider />
           <Metric label="OOO Rooms" value={`${data.statusCounts?.out_of_order ?? 0}`} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("maintenance")} className="bg-white text-[#DC2626] hover:bg-white/90 font-semibold">
-          All Tickets
-        </Button>
       </div>
 
       {/* KPIs */}
@@ -562,14 +576,16 @@ function RevenueDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#5B21B6] to-[#7C3AED] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Revenue Management</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#5B21B6] to-[#7C3AED] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Revenue Management</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("reports")} className="bg-white text-[#7C3AED] hover:bg-white/90 font-semibold">
+            Analytics
+          </Button>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("reports")} className="bg-white text-[#7C3AED] hover:bg-white/90 font-semibold">
-          Analytics
-        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -658,25 +674,27 @@ function HRDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#BE185D]/30 bg-gradient-to-r from-[#9D174D] to-[#BE185D] px-5 py-4 text-white shadow-card">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-white/70">Human Resources Command Center</p>
-          <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+      <div className="rounded-xl border border-[#BE185D]/30 bg-gradient-to-r from-[#9D174D] to-[#BE185D] px-5 py-4 text-white shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Human Resources Command Center</p>
+            <p className="font-display text-xl font-bold">{fmtDate(data.businessDate)}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setActiveModule("staff")} className="bg-white text-[#BE185D] hover:bg-white/90 font-semibold">
+            HR Module
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm mt-3">
           <Metric label="Staff" value={`${staff.length}`} />
           <Divider />
           <Metric label="Attendance" value={`${Math.round(attnSummary.attendanceRate ?? 0)}%`} />
           <Divider />
           <Metric label="Payroll" value={fmtINR(payrollSummary.totalNetPay ?? 0)} />
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setActiveModule("staff")} className="bg-white text-[#BE185D] hover:bg-white/90 font-semibold">
-          HR Module
-        </Button>
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard label="Total Staff" value={staff.length} icon={Users} accent="navy" />
         <KpiCard label="Attendance Rate" value={Math.round(attnSummary.attendanceRate ?? 0)} unit="%" icon={ClipboardList} accent="success" />
         <KpiCard label="Present (Month)" value={attnSummary.totalPresent ?? 0} icon={CheckCircle2} accent="info" />
@@ -810,7 +828,7 @@ function HRDashboard() {
 function DashboardSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -831,7 +849,7 @@ function RoomStatusCard({ statusCounts, k, setActiveModule }: any) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {Object.entries(ROOM_STATUS_META).map(([key, m]) => (
             <div key={key} className={`rounded-lg border p-2 ${m.cls}`}>
               <p className="text-lg font-bold tabular-nums">{statusCounts[key] ?? 0}</p>
