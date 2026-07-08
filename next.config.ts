@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   // Allow cross-origin requests from preview panel
   allowedDevOrigins: ["21.0.21.112"],
+  // Reduce compilation overhead in dev
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "date-fns",
+      "framer-motion",
+      "@prisma/client",
+    ],
+  },
 };
 
 export default nextConfig;
