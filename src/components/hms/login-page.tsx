@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAppStore, AuthUser, ROLE_META } from "@/lib/store";
 import { Hotel, Shield, Eye, EyeOff, LogIn, ArrowRight, Star, Users, Sparkles, UtensilsCrossed, Wrench, DollarSign, BarChart3, UserCog, ChevronRight, TrendingUp, Megaphone } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 // Quick login cards for demo
@@ -116,12 +115,7 @@ export function LoginPage() {
         <main className="flex-1 flex items-center justify-center px-4 py-8">
           <div className="w-full max-w-6xl">
             {/* Welcome text */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="text-center mb-10"
-            >
+            <div className="text-center mb-10 animate-[fadeInUp_0.6s_ease-out]">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#C9952A]/30 bg-[#C9952A]/10 px-4 py-1.5 mb-4">
                 <Star className="h-3.5 w-3.5 text-[#C9952A]" />
                 <span className="text-xs font-medium text-[#F0C96A]">The Aurelian Grand · Mumbai</span>
@@ -132,7 +126,7 @@ export function LoginPage() {
               <p className="mt-3 text-base text-white/50 max-w-lg mx-auto">
                 Select your role to access your workspace, or sign in with your credentials
               </p>
-            </motion.div>
+            </div>
 
             {/* Mode toggle */}
             <div className="flex items-center justify-center gap-3 mb-8">
@@ -150,122 +144,105 @@ export function LoginPage() {
               </button>
             </div>
 
-            <AnimatePresence mode="wait">
-              {mode === "cards" ? (
-                <motion.div
-                  key="cards"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {/* Role cards grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-w-4xl mx-auto">
-                    {QUICK_LOGINS.map((q, i) => {
-                      const Icon = q.icon;
-                      const meta = ROLE_META[q.role];
-                      return (
-                        <motion.button
-                          key={q.email}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          onClick={() => quickLogin(q.email)}
-                          disabled={loading}
-                          className="group relative flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 text-center hover:border-[#C9952A]/40 hover:bg-white/10 transition-all duration-300 disabled:opacity-50"
-                        >
-                          {/* Role badge */}
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: `${q.color}20` }}>
-                            <Icon className="h-5 w-5" style={{ color: q.color }} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-white group-hover:text-[#F0C96A] transition-colors">{q.label}</p>
-                            <p className="text-[10px] text-white/40 mt-0.5">{q.desc}</p>
-                          </div>
-                          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ChevronRight className="h-3.5 w-3.5 text-[#C9952A]" />
-                          </div>
-                          {/* Level badge */}
-                          <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wider text-white/30">L{meta?.level ?? 4}</span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-center text-xs text-white/30 mt-6">
-                    Click a role card to instantly log in · Demo password: <code className="px-1.5 py-0.5 rounded bg-white/10 text-[#F0C96A]">aurelian2024</code>
-                  </p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="manual"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <form onSubmit={submitManual} className="max-w-md mx-auto space-y-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5">
-                      <div className="text-center mb-2">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#C9952A] to-[#F0C96A] text-[#0A0F1C] mx-auto mb-3">
-                          <LogIn className="h-6 w-6" />
-                        </div>
-                        <h3 className="font-display text-xl font-bold">Sign In</h3>
-                        <p className="text-xs text-white/40 mt-1">Enter your ARIA HMS credentials</p>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-white/60 mb-1.5 block">Email Address</label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="your.name@aurelian.com"
-                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[#C9952A]/50 focus:outline-none focus:ring-1 focus:ring-[#C9952A]/30 transition-colors"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-white/60 mb-1.5 block">Password</label>
-                        <div className="relative">
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter password"
-                            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-white placeholder:text-white/30 focus:border-[#C9952A]/50 focus:outline-none focus:ring-1 focus:ring-[#C9952A]/30 transition-colors"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </div>
-
+            {mode === "cards" ? (
+              <div className="animate-[fadeIn_0.3s_ease-out]">
+                {/* Role cards grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-w-4xl mx-auto">
+                  {QUICK_LOGINS.map((q) => {
+                    const Icon = q.icon;
+                    const meta = ROLE_META[q.role];
+                    return (
                       <button
-                        type="submit"
+                        key={q.email}
+                        onClick={() => quickLogin(q.email)}
                         disabled={loading}
-                        className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#C9952A] to-[#F0C96A] px-4 py-3 text-sm font-bold text-[#0A0F1C] hover:shadow-glow-gold transition-all disabled:opacity-50"
+                        className="group relative flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 text-center hover:border-[#C9952A]/40 hover:bg-white/10 transition-all duration-300 disabled:opacity-50"
                       >
-                        {loading ? (
-                          <div className="h-4 w-4 border-2 border-[#0A0F1C]/30 border-t-[#0A0F1C] rounded-full animate-spin" />
-                        ) : (
-                          <>
-                            <ArrowRight className="h-4 w-4" />
-                            Sign In
-                          </>
-                        )}
+                        {/* Role badge */}
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: `${q.color}20` }}>
+                          <Icon className="h-5 w-5" style={{ color: q.color }} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-white group-hover:text-[#F0C96A] transition-colors">{q.label}</p>
+                          <p className="text-[10px] text-white/40 mt-0.5">{q.desc}</p>
+                        </div>
+                        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <ChevronRight className="h-3.5 w-3.5 text-[#C9952A]" />
+                        </div>
+                        {/* Level badge */}
+                        <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wider text-white/30">L{meta?.level ?? 4}</span>
                       </button>
+                    );
+                  })}
+                </div>
+                <p className="text-center text-xs text-white/30 mt-6">
+                  Click a role card to instantly log in · Demo password: <code className="px-1.5 py-0.5 rounded bg-white/10 text-[#F0C96A]">aurelian2024</code>
+                </p>
+              </div>
+            ) : (
+              <div className="animate-[fadeIn_0.3s_ease-out]">
+                <form onSubmit={submitManual} className="max-w-md mx-auto space-y-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5">
+                    <div className="text-center mb-2">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#C9952A] to-[#F0C96A] text-[#0A0F1C] mx-auto mb-3">
+                        <LogIn className="h-6 w-6" />
+                      </div>
+                      <h3 className="font-display text-xl font-bold">Sign In</h3>
+                      <p className="text-xs text-white/40 mt-1">Enter your ARIA HMS credentials</p>
                     </div>
-                    <p className="text-center text-xs text-white/30">
-                      All demo accounts use password: <code className="px-1.5 py-0.5 rounded bg-white/10 text-[#F0C96A]">aurelian2024</code>
-                    </p>
-                  </form>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
+                    <div>
+                      <label className="text-xs font-medium text-white/60 mb-1.5 block">Email Address</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="your.name@aurelian.com"
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[#C9952A]/50 focus:outline-none focus:ring-1 focus:ring-[#C9952A]/30 transition-colors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-white/60 mb-1.5 block">Password</label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter password"
+                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-white placeholder:text-white/30 focus:border-[#C9952A]/50 focus:outline-none focus:ring-1 focus:ring-[#C9952A]/30 transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#C9952A] to-[#F0C96A] px-4 py-3 text-sm font-bold text-[#0A0F1C] hover:shadow-glow-gold transition-all disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <div className="h-4 w-4 border-2 border-[#0A0F1C]/30 border-t-[#0A0F1C] rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <ArrowRight className="h-4 w-4" />
+                          Sign In
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-center text-xs text-white/30">
+                    All demo accounts use password: <code className="px-1.5 py-0.5 rounded bg-white/10 text-[#F0C96A]">aurelian2024</code>
+                  </p>
+                </form>
+              </div>
+            )}
           </div>
         </main>
 
