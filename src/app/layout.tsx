@@ -10,9 +10,9 @@ const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["lati
 const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ARIA HMS — Hospitality Management System",
-  description: "Enterprise-grade hospitality management system · Reservations, Front Office, Housekeeping, F&B POS, Billing, Night Audit & Analytics",
-  keywords: ["HMS", "PMS", "Hospitality", "Hotel Management", "Reservations", "POS", "Night Audit"],
+  title: "ARIA HMS — Hospitality Operating System",
+  description: "Enterprise-grade Hospitality Operating System · Hotels, Restaurants, Hospitals, Clinics, Resorts, Co-working Spaces · AI-Powered · Real-time",
+  keywords: ["HMS", "PMS", "Hospitality OS", "Hotel Management", "Hospital Management", "Restaurant POS", "Reservations", "Night Audit", "AI"],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

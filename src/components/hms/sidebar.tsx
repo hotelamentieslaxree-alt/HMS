@@ -1,14 +1,16 @@
-// HMS Sidebar — role-based navigation with expandable sub-items
+// ARIA HMS — Enterprise Sidebar — Hospitality Operating System
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useAppStore, ModuleKey, ROLE_META, ROLE_MODULES } from "@/lib/store";
+import { useAppStore, ModuleKey, ROLE_META, ROLE_MODULES, DEFAULT_MODULES } from "@/lib/store";
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, Sparkles, Users, UtensilsCrossed,
-  Receipt, BarChart3, MoonStar, UserCog, Wrench, ShieldCheck, Hotel, ChevronLeft, LogOut,
+  Receipt, MoonStar, UserCog, Wrench, ShieldCheck, Hotel, ChevronLeft, LogOut,
   TrendingUp, Megaphone, UserCheck, Award, Clock, ChevronDown,
   IndianRupee, Cake, Share2, Activity, Target, Briefcase,
-  Building2, PieChart, Calendar, Upload, FileText, ClipboardList,
+  Building2, PieChart, Calendar, FileText, ClipboardList, BarChart3,
+  Heart, Package, Landmark, Handshake, CheckSquare, Brain, Zap,
+  Plug, Settings, ChefHat, Globe, Cpu,
 } from "lucide-react";
 
 interface SubItem {
@@ -30,92 +32,120 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Operations",
     items: [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { key: "reservations", label: "Reservations", icon: CalendarCheck },
-      { key: "rooms", label: "Rooms & Inventory", icon: DoorOpen },
-      { key: "housekeeping", label: "Housekeeping", icon: Sparkles },
-      { key: "guests", label: "Guest CRM", icon: Users },
+      { key: "reservations", label: "Reservations", icon: CalendarCheck, children: [
+        { key: "overview", label: "All Reservations", icon: ClipboardList },
+        { key: "arrivals", label: "Arrivals", icon: CalendarCheck },
+        { key: "departures", label: "Departures", icon: Globe },
+        { key: "calendar", label: "Calendar View", icon: Calendar },
+      ]},
+      { key: "rooms", label: "Front Office", icon: DoorOpen },
+      { key: "housekeeping", label: "Housekeeping", icon: Sparkles, children: [
+        { key: "overview", label: "Task Board", icon: ClipboardList },
+        { key: "inspections", label: "Inspections", icon: ShieldCheck },
+        { key: "room-board", label: "Room Board", icon: DoorOpen },
+      ]},
+      { key: "guests", label: "Guests", icon: Users },
     ],
   },
   {
-    title: "Commerce",
+    title: "Restaurant & Kitchen",
     items: [
-      { key: "pos", label: "F&B / POS", icon: UtensilsCrossed },
+      { key: "pos", label: "Restaurant / POS", icon: UtensilsCrossed, children: [
+        { key: "outlets", label: "Outlets & Tables", icon: UtensilsCrossed },
+        { key: "orders", label: "Orders", icon: ClipboardList },
+        { key: "menu", label: "Menu Builder", icon: FileText },
+      ]},
+      { key: "kitchen", label: "Kitchen Display", icon: ChefHat },
       { key: "folios", label: "Folios & Billing", icon: Receipt },
     ],
   },
   {
-    title: "Sales",
+    title: "Hospital & Clinic",
     items: [
-      {
-        key: "sales",
-        label: "Sales Pipeline",
-        icon: TrendingUp,
-        children: [
-          { key: "pipeline", label: "Pipeline", icon: Target },
-          { key: "leads", label: "Leads", icon: Users },
-          { key: "deals", label: "Deals", icon: Briefcase },
-          { key: "analytics", label: "Analytics", icon: Activity },
-        ],
-      },
+      { key: "hospital", label: "Hospital", icon: Heart, children: [
+        { key: "patients", label: "Patients", icon: Users },
+        { key: "doctors", label: "Doctors", icon: UserCog },
+        { key: "appointments", label: "Appointments", icon: Calendar },
+        { key: "emergency", label: "Emergency", icon: Activity },
+      ]},
     ],
   },
   {
-    title: "Marketing",
+    title: "Inventory & Procurement",
     items: [
-      {
-        key: "marketing",
-        label: "Marketing Hub",
-        icon: Megaphone,
-        children: [
-          { key: "overview", label: "Overview", icon: BarChart3 },
-          { key: "campaigns", label: "Campaigns", icon: Megaphone },
-          { key: "social", label: "Social Accounts", icon: Share2 },
-          { key: "analytics", label: "Analytics", icon: Activity },
-          { key: "reports", label: "Reports", icon: FileText },
-        ],
-      },
+      { key: "inventory", label: "Inventory", icon: Package, children: [
+        { key: "stock", label: "Stock Items", icon: Package },
+        { key: "procurement", label: "Procurement", icon: ClipboardList },
+        { key: "vendors", label: "Vendors", icon: Briefcase },
+      ]},
     ],
   },
   {
-    title: "Human Resources",
+    title: "Finance & Accounting",
     items: [
-      {
-        key: "hr",
-        label: "HR Hub",
-        icon: UserCog,
-        children: [
-          { key: "overview", label: "Overview", icon: BarChart3 },
-          { key: "employees", label: "Employees", icon: Users },
-          { key: "payroll", label: "Payroll", icon: IndianRupee },
-          { key: "events", label: "Events & Birthdays", icon: Cake },
-        ],
-      },
-      {
-        key: "attendance",
-        label: "Attendance",
-        icon: Clock,
-        children: [
-          { key: "overview", label: "Overview", icon: BarChart3 },
-          { key: "calendar", label: "Calendar", icon: Calendar },
-          { key: "table", label: "Attendance Table", icon: ClipboardList },
-          { key: "manual", label: "Manual Entry", icon: Clock },
-          { key: "reports", label: "Reports", icon: FileText },
-        ],
-      },
-      {
-        key: "scorecard",
-        label: "Scorecard",
-        icon: Award,
-        children: [
-          { key: "overview", label: "Overview", icon: BarChart3 },
-          { key: "scorecards", label: "Scorecards", icon: Award },
-          { key: "leaderboard", label: "Leaderboard", icon: PieChart },
-        ],
-      },
+      { key: "finance", label: "Finance", icon: Landmark, children: [
+        { key: "invoices", label: "Invoices", icon: Receipt },
+        { key: "expenses", label: "Expenses", icon: IndianRupee },
+        { key: "gst", label: "GST", icon: FileText },
+        { key: "cashbook", label: "Cashbook", icon: IndianRupee },
+        { key: "pnl", label: "Profit & Loss", icon: TrendingUp },
+      ]},
     ],
   },
   {
-    title: "Intelligence",
+    title: "HRMS",
+    items: [
+      { key: "hr", label: "HR Hub", icon: UserCog, children: [
+        { key: "overview", label: "Overview", icon: BarChart3 },
+        { key: "employees", label: "Employees", icon: Users },
+        { key: "payroll", label: "Payroll", icon: IndianRupee },
+        { key: "events", label: "Events & Birthdays", icon: Cake },
+      ]},
+      { key: "attendance", label: "Attendance", icon: Clock, children: [
+        { key: "overview", label: "Overview", icon: BarChart3 },
+        { key: "calendar", label: "Calendar", icon: Calendar },
+        { key: "table", label: "Attendance Table", icon: ClipboardList },
+        { key: "manual", label: "Manual Entry", icon: Clock },
+      ]},
+      { key: "scorecard", label: "Scorecard", icon: Award, children: [
+        { key: "overview", label: "Overview", icon: BarChart3 },
+        { key: "scorecards", label: "Scorecards", icon: Award },
+        { key: "leaderboard", label: "Leaderboard", icon: PieChart },
+      ]},
+    ],
+  },
+  {
+    title: "CRM & Sales",
+    items: [
+      { key: "sales", label: "Sales Pipeline", icon: TrendingUp, children: [
+        { key: "pipeline", label: "Pipeline", icon: Target },
+        { key: "leads", label: "Leads", icon: Users },
+        { key: "deals", label: "Deals", icon: Briefcase },
+        { key: "analytics", label: "Analytics", icon: Activity },
+      ]},
+      { key: "marketing", label: "Marketing Hub", icon: Megaphone, children: [
+        { key: "overview", label: "Overview", icon: BarChart3 },
+        { key: "campaigns", label: "Campaigns", icon: Megaphone },
+        { key: "social", label: "Social Accounts", icon: Share2 },
+        { key: "analytics", label: "Analytics", icon: Activity },
+      ]},
+      { key: "crm", label: "CRM", icon: Handshake, children: [
+        { key: "guests", label: "Guest CRM", icon: Users },
+        { key: "leads", label: "Lead CRM", icon: Target },
+        { key: "corporate", label: "Corporate", icon: Building2 },
+        { key: "loyalty", label: "Loyalty & Membership", icon: Award },
+      ]},
+    ],
+  },
+  {
+    title: "Productivity",
+    items: [
+      { key: "tasks", label: "Tasks", icon: CheckSquare },
+      { key: "documents", label: "Documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Intelligence & Analytics",
     items: [
       { key: "reports", label: "Reports", icon: BarChart3 },
       { key: "night-audit", label: "Night Audit", icon: MoonStar },
@@ -123,19 +153,24 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "AI & Automation",
+    items: [
+      { key: "ai-center", label: "AI Center", icon: Brain, badge: "NEW" },
+      { key: "automation", label: "Automation", icon: Zap },
+    ],
+  },
+  {
     title: "Administration",
     items: [
-      {
-        key: "staff",
-        label: "Staff Directory",
-        icon: UserCheck,
-        children: [
-          { key: "directory", label: "Directory", icon: Users },
-          { key: "departments", label: "Departments", icon: Building2 },
-          { key: "orgchart", label: "Org Chart", icon: PieChart },
-        ],
-      },
+      { key: "staff", label: "Staff Directory", icon: UserCheck, children: [
+        { key: "directory", label: "Directory", icon: Users },
+        { key: "departments", label: "Departments", icon: Building2 },
+        { key: "orgchart", label: "Org Chart", icon: PieChart },
+      ]},
       { key: "maintenance", label: "Maintenance", icon: Wrench },
+      { key: "properties", label: "Properties", icon: Hotel },
+      { key: "integrations", label: "Integrations", icon: Plug },
+      { key: "settings", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -144,10 +179,15 @@ export function Sidebar() {
   const {
     activeModule, setActiveModule, activeSubModule, navigateTo,
     sidebarCollapsed, toggleSidebar, expandedMenus, toggleMenu,
-    role, user, setUser,
+    role, user, setUser, enabledModules,
   } = useAppStore();
   const meta = ROLE_META[role];
   const allowedModules = ROLE_MODULES[role] ?? ROLE_MODULES.gm;
+
+  // Filter: module must be enabled AND allowed by role
+  const isModuleVisible = (key: ModuleKey) => {
+    return enabledModules.includes(key) && allowedModules.includes(key);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("aria_auth");
@@ -158,7 +198,6 @@ export function Sidebar() {
 
   const handleParentClick = (item: NavItem) => {
     if (item.children) {
-      // Toggle expand + navigate to module with first sub-item
       if (!isExpanded(item.key)) {
         toggleMenu(item.key);
       }
@@ -187,7 +226,7 @@ export function Sidebar() {
         {!sidebarCollapsed && (
           <div className="min-w-0">
             <p className="font-display text-sm font-bold leading-tight text-sidebar-foreground truncate">ARIA HMS</p>
-            <p className="text-[10px] uppercase tracking-widest text-gold/80">Hospitality Suite</p>
+            <p className="text-[10px] uppercase tracking-widest text-gold/80">Hospitality OS</p>
           </div>
         )}
         <button
@@ -212,10 +251,10 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Nav — filtered by role */}
+      {/* Nav — filtered by role + module ON/OFF */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1.5 scrollbar-thin">
         {NAV_GROUPS.map((group) => {
-          const filteredItems = group.items.filter((item) => allowedModules.includes(item.key));
+          const filteredItems = group.items.filter((item) => isModuleVisible(item.key));
           if (filteredItems.length === 0) return null;
           return (
             <div key={group.title}>
@@ -292,6 +331,15 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Module count */}
+      {!sidebarCollapsed && (
+        <div className="px-3 py-1.5 border-t border-sidebar-border/50">
+          <p className="text-[10px] text-sidebar-foreground/40 text-center">
+            {enabledModules.length} of {DEFAULT_MODULES.length} modules active
+          </p>
+        </div>
+      )}
 
       {/* User / Role footer + Logout */}
       <div className={cn("border-t border-sidebar-border p-3 space-y-2", sidebarCollapsed && "px-2")}>

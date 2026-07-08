@@ -100,7 +100,7 @@ export function LoginPage() {
             </div>
             <div>
               <h1 className="font-display text-lg font-bold tracking-tight">ARIA HMS</h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#C9952A]/80">Hospitality Intelligence Architecture</p>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[#C9952A]/80">Hospitality Operating System</p>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-4 text-xs text-white/40">
@@ -130,7 +130,7 @@ export function LoginPage() {
                 Welcome to <span className="text-[#C9952A]">ARIA</span>
               </h2>
               <p className="mt-3 text-base text-white/50 max-w-lg mx-auto">
-                Select your role to access your department dashboard, or sign in with your credentials
+                Select your role to access your workspace, or sign in with your credentials
               </p>
             </motion.div>
 
@@ -272,8 +272,8 @@ export function LoginPage() {
         {/* Footer */}
         <footer className="px-6 py-4 lg:px-12">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-white/20">
-            <p>ARIA HMS v1.0 · Hospitality Intelligence Architecture</p>
-            <p>Secure · Real-time · Enterprise-grade</p>
+            <p>ARIA HMS v2.0 · Hospitality Operating System</p>
+            <p>Secure · AI-Powered · Real-time · Enterprise-grade</p>
           </div>
         </footer>
       </div>

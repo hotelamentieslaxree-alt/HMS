@@ -1,4 +1,4 @@
-// ARIA HMS — Zustand global store
+// ARIA HMS — Hospitality Operating System — Zustand global store
 "use client";
 
 import { create } from "zustand";
@@ -20,7 +20,19 @@ export type ModuleKey =
   | "night-audit"
   | "staff"
   | "maintenance"
-  | "audit";
+  | "audit"
+  | "hospital"
+  | "inventory"
+  | "finance"
+  | "crm"
+  | "tasks"
+  | "documents"
+  | "ai-center"
+  | "automation"
+  | "integrations"
+  | "settings"
+  | "properties"
+  | "kitchen";
 
 export type RoleKey =
   | "owner"
@@ -56,26 +68,127 @@ export interface AuthUser {
   token: string;
 }
 
-// Which modules each role can access
-// Attendance is HR-only, Scorecard accessible to managers+
+// ─── Module System ──────────────────────────────────────────────────
+// Each module has a label, icon reference, and default enabled state
+// Module ON/OFF is controlled at the tenant/property level
+
+export interface ModuleConfig {
+  key: ModuleKey;
+  label: string;
+  group: string;
+  enabled: boolean;
+  required?: boolean; // Some modules are always on (dashboard, settings)
+}
+
+export const MODULE_GROUPS: Record<string, { label: string; modules: ModuleKey[] }> = {
+  operations: {
+    label: "Operations",
+    modules: ["dashboard", "reservations", "rooms", "housekeeping", "guests"],
+  },
+  commerce: {
+    label: "Restaurant & Kitchen",
+    modules: ["pos", "kitchen", "folios"],
+  },
+  hospitality: {
+    label: "Hospital & Clinic",
+    modules: ["hospital"],
+  },
+  inventory: {
+    label: "Inventory & Procurement",
+    modules: ["inventory"],
+  },
+  finance: {
+    label: "Finance & Accounting",
+    modules: ["finance"],
+  },
+  hrms: {
+    label: "HRMS",
+    modules: ["hr", "attendance", "scorecard"],
+  },
+  crm: {
+    label: "CRM & Sales",
+    modules: ["sales", "marketing", "crm"],
+  },
+  productivity: {
+    label: "Productivity",
+    modules: ["tasks", "documents"],
+  },
+  intelligence: {
+    label: "Intelligence & Analytics",
+    modules: ["reports", "night-audit", "audit"],
+  },
+  ai: {
+    label: "AI & Automation",
+    modules: ["ai-center", "automation"],
+  },
+  admin: {
+    label: "Administration",
+    modules: ["staff", "maintenance", "properties", "settings", "integrations"],
+  },
+};
+
+export const DEFAULT_MODULES: ModuleConfig[] = [
+  // Operations — always on for hotel
+  { key: "dashboard", label: "Dashboard", group: "operations", enabled: true, required: true },
+  { key: "reservations", label: "Reservations", group: "operations", enabled: true },
+  { key: "rooms", label: "Front Office", group: "operations", enabled: true },
+  { key: "housekeeping", label: "Housekeeping", group: "operations", enabled: true },
+  { key: "guests", label: "Guests", group: "operations", enabled: true },
+  // Commerce
+  { key: "pos", label: "Restaurant / POS", group: "commerce", enabled: true },
+  { key: "kitchen", label: "Kitchen Display", group: "commerce", enabled: false },
+  { key: "folios", label: "Folios & Billing", group: "commerce", enabled: true },
+  // Hospital
+  { key: "hospital", label: "Hospital", group: "hospitality", enabled: false },
+  // Inventory
+  { key: "inventory", label: "Inventory", group: "inventory", enabled: false },
+  // Finance
+  { key: "finance", label: "Finance", group: "finance", enabled: true },
+  // HRMS
+  { key: "hr", label: "HR Hub", group: "hrms", enabled: true },
+  { key: "attendance", label: "Attendance", group: "hrms", enabled: true },
+  { key: "scorecard", label: "Scorecard", group: "hrms", enabled: true },
+  // CRM & Sales
+  { key: "sales", label: "Sales Pipeline", group: "crm", enabled: true },
+  { key: "marketing", label: "Marketing Hub", group: "crm", enabled: true },
+  { key: "crm", label: "CRM", group: "crm", enabled: false },
+  // Productivity
+  { key: "tasks", label: "Tasks", group: "productivity", enabled: false },
+  { key: "documents", label: "Documents", group: "productivity", enabled: false },
+  // Intelligence
+  { key: "reports", label: "Reports", group: "intelligence", enabled: true },
+  { key: "night-audit", label: "Night Audit", group: "intelligence", enabled: true },
+  { key: "audit", label: "Audit Log", group: "intelligence", enabled: true },
+  // AI & Automation
+  { key: "ai-center", label: "AI Center", group: "ai", enabled: false },
+  { key: "automation", label: "Automation", group: "ai", enabled: false },
+  // Admin
+  { key: "staff", label: "Staff Directory", group: "admin", enabled: true },
+  { key: "maintenance", label: "Maintenance", group: "admin", enabled: true },
+  { key: "properties", label: "Properties", group: "admin", enabled: true },
+  { key: "settings", label: "Settings", group: "admin", enabled: true, required: true },
+  { key: "integrations", label: "Integrations", group: "admin", enabled: false },
+];
+
+// Which modules each role can access (among enabled modules)
 export const ROLE_MODULES: Record<string, ModuleKey[]> = {
-  owner: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "folios", "sales", "marketing", "hr", "attendance", "scorecard", "reports", "night-audit", "staff", "maintenance", "audit"],
-  gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "folios", "sales", "marketing", "hr", "attendance", "scorecard", "reports", "night-audit", "staff", "maintenance", "audit"],
-  fom: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "folios", "reports", "night-audit", "staff", "scorecard"],
-  receptionist: ["dashboard", "reservations", "rooms", "guests", "folios", "staff"],
-  hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard"],
-  hk_attendant: ["dashboard", "housekeeping"],
-  fb_mgr: ["dashboard", "pos", "reports", "staff", "scorecard"],
-  waiter: ["dashboard", "pos"],
-  rev_mgr: ["dashboard", "reservations", "reports", "night-audit", "sales", "marketing", "scorecard"],
-  fin_mgr: ["dashboard", "folios", "reports", "night-audit", "audit", "scorecard"],
-  eng_mgr: ["dashboard", "maintenance", "rooms", "staff", "scorecard"],
-  technician: ["dashboard", "maintenance"],
-  hr_mgr: ["dashboard", "hr", "attendance", "scorecard", "staff", "audit"],
-  sales_mgr: ["dashboard", "sales", "scorecard", "staff", "reports"],
-  sales_exec: ["dashboard", "sales", "staff"],
-  mkt_mgr: ["dashboard", "marketing", "scorecard", "staff", "reports"],
-  mkt_exec: ["dashboard", "marketing", "staff"],
+  owner: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
+  gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
+  fom: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "folios", "reports", "night-audit", "staff", "scorecard", "tasks"],
+  receptionist: ["dashboard", "reservations", "rooms", "guests", "folios", "staff", "tasks"],
+  hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard", "tasks", "laundry"],
+  hk_attendant: ["dashboard", "housekeeping", "tasks"],
+  fb_mgr: ["dashboard", "pos", "kitchen", "reports", "staff", "scorecard", "inventory", "tasks"],
+  waiter: ["dashboard", "pos", "kitchen", "tasks"],
+  rev_mgr: ["dashboard", "reservations", "reports", "night-audit", "sales", "marketing", "crm", "scorecard", "ai-center"],
+  fin_mgr: ["dashboard", "folios", "finance", "reports", "night-audit", "audit", "scorecard", "inventory"],
+  eng_mgr: ["dashboard", "maintenance", "rooms", "staff", "scorecard", "inventory", "tasks"],
+  technician: ["dashboard", "maintenance", "tasks"],
+  hr_mgr: ["dashboard", "hr", "attendance", "scorecard", "staff", "audit", "tasks", "documents"],
+  sales_mgr: ["dashboard", "sales", "crm", "scorecard", "staff", "reports", "tasks"],
+  sales_exec: ["dashboard", "sales", "crm", "staff", "tasks"],
+  mkt_mgr: ["dashboard", "marketing", "crm", "scorecard", "staff", "reports", "tasks"],
+  mkt_exec: ["dashboard", "marketing", "crm", "staff", "tasks"],
 };
 
 export const ROLE_META: Record<string, { label: string; level: number; accent: string; barClass: string; deptCode?: string }> = {
@@ -117,6 +230,11 @@ interface AppState {
   toggleSidebar: () => void;
   expandedMenus: string[];
   toggleMenu: (key: string) => void;
+  // Module ON/OFF system
+  enabledModules: ModuleKey[];
+  setEnabledModules: (modules: ModuleKey[]) => void;
+  toggleModule: (key: ModuleKey) => void;
+  isModuleEnabled: (key: ModuleKey) => boolean;
   // Live data refresh tick
   refreshTick: number;
   triggerRefresh: () => void;
@@ -129,7 +247,17 @@ interface AppState {
   dismissToast: (id: string) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+// Get enabled modules from localStorage or defaults
+function getInitialModules(): ModuleKey[] {
+  if (typeof window === "undefined") return DEFAULT_MODULES.filter(m => m.enabled).map(m => m.key);
+  try {
+    const stored = localStorage.getItem("aria_enabled_modules");
+    if (stored) return JSON.parse(stored) as ModuleKey[];
+  } catch { /* ignore */ }
+  return DEFAULT_MODULES.filter(m => m.enabled).map(m => m.key);
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
   // Auth
   user: null,
   setUser: (u) => set({ user: u, isAuthenticated: !!u, role: u?.role ?? "gm" }),
@@ -152,6 +280,27 @@ export const useAppStore = create<AppState>((set) => ({
       ? s.expandedMenus.filter((k) => k !== key)
       : [...s.expandedMenus, key]
   })),
+  // Module ON/OFF system
+  enabledModules: getInitialModules(),
+  setEnabledModules: (modules) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aria_enabled_modules", JSON.stringify(modules));
+    }
+    set({ enabledModules: modules });
+  },
+  toggleModule: (key) => {
+    const current = get().enabledModules;
+    const config = DEFAULT_MODULES.find(m => m.key === key);
+    if (config?.required) return; // Can't disable required modules
+    const updated = current.includes(key)
+      ? current.filter(k => k !== key)
+      : [...current, key];
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aria_enabled_modules", JSON.stringify(updated));
+    }
+    set({ enabledModules: updated });
+  },
+  isModuleEnabled: (key) => get().enabledModules.includes(key),
   // Refresh
   refreshTick: 0,
   triggerRefresh: () => set((s) => ({ refreshTick: s.refreshTick + 1 })),

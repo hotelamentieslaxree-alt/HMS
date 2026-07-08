@@ -1,4 +1,4 @@
-// ARIA HMS — Hospitality Management System
+// ARIA HMS — Hospitality Operating System
 // Prisma schema (SQLite). Note: SQLite has no native ENUM / array / JSONB,
 // so enums are stored as String with app-level validation, and arrays/objects
 // are stored as JSON strings.
@@ -55,6 +55,20 @@ model Property {
   deals             Deal[]
   campaigns         Campaign[]
   socialAccounts    SocialAccount[]
+  // Enterprise v2 relations
+  moduleConfigs     ModuleConfig[]
+  patients          Patient[]
+  doctors           Doctor[]
+  appointments      Appointment[]
+  stockItems        StockItem[]
+  vendors           Vendor[]
+  purchaseOrders    PurchaseOrder[]
+  invoices          Invoice[]
+  expenses          Expense[]
+  cashbookEntries   CashbookEntry[]
+  tasks             Task[]
+  documents         Document[]
+  integrationConfigs IntegrationConfig[]
 }
 
 model Department {
@@ -100,6 +114,13 @@ model User {
   organizedEvents CompanyEvent[]  @relation("EventOrganizer")
   assignedLeads   Lead[]          @relation("LeadAssignee")
   assignedDeals   Deal[]          @relation("DealAssignee")
+  // Enterprise v2 relations
+  sessions        Session[]
+  loginHistory    LoginHistory[]
+  userPermissions UserPermission[]
+  assignedTasks   Task[]           @relation("TaskAssignee")
+  createdTasks    Task[]           @relation("TaskAssigner")
+  uploadedDocs    Document[]       @relation("DocumentUploader")
 
   @@index([propertyId])
 }
@@ -842,4 +863,411 @@ model SocialAccount {
 
   @@unique([propertyId, platform, handle])
   @@index([propertyId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// MODULE SYSTEM — Module ON/OFF per property
+// ════════════════════════════════════════════════════════════════
+
+model ModuleConfig {
+  id          String   @id @default(cuid())
+  propertyId  String
+  moduleKey   String   // e.g. "hospital", "inventory", "finance"
+  enabled     Boolean  @default(false)
+  config      String   @default("{}") // JSON: module-specific config
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, moduleKey])
+  @@index([propertyId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// RBAC — Permissions & Role Templates
+// ════════════════════════════════════════════════════════════════
+
+model Permission {
+  id          String   @id @default(cuid())
+  moduleKey   String   // e.g. "reservations", "rooms"
+  action      String   // e.g. "create", "read", "update", "delete", "approve"
+  resource    String   // e.g. "reservation", "room", "folio"
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@unique([moduleKey, action, resource])
+  @@index([moduleKey])
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  role         String   // e.g. "fom", "receptionist"
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+model UserPermission {
+  id           String   @id @default(cuid())
+  userId       String
+  permissionId String
+  granted      Boolean  @default(true) // true = allow, false = deny (override)
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// SESSION & AUTH — Enterprise session management
+// ════════════════════════════════════════════════════════════════
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  deviceInfo  String?
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
+  lastActiveAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  revokedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model LoginHistory {
+  id          String   @id @default(cuid())
+  userId      String?
+  email       String?
+  action      String   // login | logout | failed_login | token_refresh | force_logout
+  ipAddress   String?
+  userAgent   String?
+  deviceInfo  String?
+  success     Boolean  @default(true)
+  failureReason String?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([email])
+  @@index([createdAt])
+}
+
+// ════════════════════════════════════════════════════════════════
+// HOSPITAL MODULE — Patients, Doctors, Appointments
+// ════════════════════════════════════════════════════════════════
+
+model Patient {
+  id              String   @id @default(cuid())
+  propertyId      String
+  patientId       String   @unique // auto-generated e.g. PAT-001
+  firstName       String
+  lastName        String
+  age             Int?
+  gender          String?
+  phone           String?
+  email           String?
+  address         String?
+  bloodGroup      String?
+  allergies       String   @default("[]") // JSON array
+  medicalHistory  String   @default("{}") // JSON
+  emergencyContact String?
+  insuranceProvider String?
+  insurancePolicy String?
+  status          String   @default("active") // active | discharged | deceased
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([propertyId])
+  @@index([patientId])
+}
+
+model Doctor {
+  id            String   @id @default(cuid())
+  propertyId    String
+  firstName     String
+  lastName      String
+  specialization String?
+  qualification String?
+  phone         String?
+  email         String?
+  department    String?
+  consultationFee Float  @default(0)
+  availableDays String   @default("[]") // JSON array: ["MON","TUE",...]
+  availableFrom String?  // e.g. "09:00"
+  availableTo   String?  // e.g. "17:00"
+  status        String   @default("active") // active | on_leave | inactive
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([propertyId])
+  @@index([specialization])
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  propertyId  String
+  patientId   String
+  doctorId    String
+  appointmentDate DateTime
+  timeSlot    String?  // e.g. "09:00-09:30"
+  type        String   @default("opd") // opd | ipd | emergency | follow_up
+  status      String   @default("scheduled") // scheduled | in_progress | completed | cancelled | no_show
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, appointmentDate])
+  @@index([doctorId, appointmentDate])
+  @@index([patientId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// INVENTORY MODULE — Stock, Procurement, Vendors
+// ════════════════════════════════════════════════════════════════
+
+model StockItem {
+  id             String   @id @default(cuid())
+  propertyId     String
+  name           String
+  sku            String?
+  category       String?  // food | beverage | linen | amenity | cleaning | stationary | engineering | medical
+  unit           String   @default("pcs") // pcs | kg | liter | box | pack | set
+  quantity       Float    @default(0)
+  reorderLevel   Float    @default(0)
+  maxStock       Float    @default(0)
+  unitCost       Float    @default(0)
+  sellingPrice   Float    @default(0)
+  location       String?  // warehouse | kitchen | bar | store
+  vendorId       String?
+  expiryDate     DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, category])
+  @@index([propertyId, name])
+}
+
+model Vendor {
+  id            String   @id @default(cuid())
+  propertyId    String
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  gstNumber     String?
+  panNumber     String?
+  category      String?  // food | beverage | amenity | maintenance | general
+  rating        Int      @default(5)
+  paymentTerms  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, category])
+  @@index([propertyId, name])
+}
+
+model PurchaseOrder {
+  id            String   @id @default(cuid())
+  propertyId    String
+  vendorId      String?
+  poNumber      String   @unique
+  status        String   @default("draft") // draft | submitted | approved | received | cancelled
+  totalAmount   Float    @default(0)
+  notes         String?
+  requestedById String?
+  approvedById  String?
+  orderedAt     DateTime?
+  receivedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([vendorId])
+}
+
+// ════════════════════════════════════════════════════════════════
+// FINANCE MODULE — Invoices, Expenses, GST
+// ════════════════════════════════════════════════════════════════
+
+model Invoice {
+  id              String   @id @default(cuid())
+  propertyId      String
+  invoiceNumber   String   @unique
+  invoiceType     String   @default("tax_invoice") // tax_invoice | proforma | credit_note | debit_note
+  partyName       String
+  partyGst        String?
+  amount          Float    @default(0)
+  cgst            Float    @default(0)
+  sgst            Float    @default(0)
+  igst            Float    @default(0)
+  totalAmount     Float    @default(0)
+  status          String   @default("draft") // draft | sent | paid | partial | overdue | cancelled
+  dueDate         DateTime?
+  paidAmount      Float    @default(0)
+  notes           String?
+  reservationId   String?
+  folioId         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([propertyId, invoiceType])
+  @@index([dueDate])
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  propertyId    String
+  category      String   // utilities | salary | supplies | maintenance | marketing | travel | food | miscellaneous
+  description   String
+  amount        Float
+  paidTo        String?
+  paymentMethod String   @default("cash") // cash | bank_transfer | upi | credit_card | cheque
+  receiptUrl    String?
+  expenseDate   DateTime
+  approvedById  String?
+  status        String   @default("pending") // pending | approved | rejected | paid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, category])
+  @@index([propertyId, expenseDate])
+  @@index([status])
+}
+
+model CashbookEntry {
+  id            String   @id @default(cuid())
+  propertyId    String
+  entryType     String   // receipt | payment | transfer | adjustment
+  account       String   // cash | bank | petty_cash
+  amount        Float
+  balance       Float    @default(0) // running balance
+  description   String?
+  referenceId   String?  // link to invoice/expense/payment
+  referenceType String?  // invoice | expense | payment | folio
+  entryDate     DateTime
+  createdAt     DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, account, entryDate])
+  @@index([propertyId, entryDate])
+}
+
+// ════════════════════════════════════════════════════════════════
+// TASKS & DOCUMENTS
+// ════════════════════════════════════════════════════════════════
+
+model Task {
+  id          String   @id @default(cuid())
+  propertyId  String
+  title       String
+  description String?
+  status      String   @default("todo") // todo | in_progress | done | cancelled
+  priority    String   @default("medium") // urgent | high | medium | low
+  assignedToId String?
+  assignedById String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  moduleKey   String?  // which module created this task
+  tags        String   @default("[]") // JSON array
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  assignedTo User?    @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedBy User?    @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, status])
+  @@index([assignedToId])
+  @@index([dueDate])
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  propertyId   String
+  name         String
+  category     String   @default("general") // contract | invoice | report | policy | template | general
+  fileType     String?  // pdf | docx | xlsx | jpg | png
+  fileUrl      String?
+  fileSize     Int      @default(0) // bytes
+  uploadedById String?
+  tags         String   @default("[]") // JSON
+  isTemplate   Boolean  @default(false)
+  version      Int      @default(1)
+  status       String   @default("active") // active | archived | deleted
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, category])
+  @@index([propertyId, name])
+}
+
+// ════════════════════════════════════════════════════════════════
+// INTEGRATION CONFIG
+// ════════════════════════════════════════════════════════════════
+
+model IntegrationConfig {
+  id           String   @id @default(cuid())
+  propertyId   String
+  provider     String   // booking_com | agoda | expedia | razorpay | stripe | whatsapp | gmail | tally | zoho
+  category     String   // ota | payment | communication | accounting
+  isActive     Boolean  @default(false)
+  credentials  String   @default("{}") // JSON: encrypted credentials
+  settings     String   @default("{}") // JSON: integration settings
+  lastSyncAt   DateTime?
+  syncStatus   String   @default("never") // never | syncing | success | error
+  syncError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, provider])
+  @@index([propertyId, category])
 }

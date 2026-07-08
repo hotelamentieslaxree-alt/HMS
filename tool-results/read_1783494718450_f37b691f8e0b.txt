@@ -1,0 +1,760 @@
+     1→// ARIA HMS — Seed script
+     2→// Populates a luxury hotel property with rooms, guests, reservations,
+     3→// F&B outlets/menu, housekeeping tasks, rates, staff, and audit logs.
+     4→// Run: bun run db:seed
+     5→
+     6→import { PrismaClient } from "@prisma/client";
+     7→import { addDays, addHours, startOfDay, subDays, format } from "date-fns";
+     8→
+     9→const db = new PrismaClient();
+    10→
+    11→function pick<T>(arr: T[]): T {
+    12→  return arr[Math.floor(Math.random() * arr.length)];
+    13→}
+    14→
+    15→function randInt(min: number, max: number) {
+    16→  return Math.floor(Math.random() * (max - min + 1)) + min;
+    17→}
+    18→
+    19→function uid(prefix = "id") {
+    20→  return `${prefix}_${Math.random().toString(36).slice(2, 11)}`;
+    21→}
+    22→
+    23→async function main() {
+    24→  console.log("🌱 Seeding ARIA HMS...");
+    25→
+    26→  // Clean slate
+    27→  await db.$transaction([
+    28→    db.nightAuditLog.deleteMany(),
+    29→    db.shiftHandover.deleteMany(),
+    30→    db.notification.deleteMany(),
+    31→    db.auditLog.deleteMany(),
+    32→    db.maintenanceTicket.deleteMany(),
+    33→    db.posOrderLine.deleteMany(),
+    34→    db.posOrder.deleteMany(),
+    35→    db.menuItem.deleteMany(),
+    36→    db.menuCategory.deleteMany(),
+    37→    db.restaurantTable.deleteMany(),
+    38→    db.outlet.deleteMany(),
+    39→    db.lostFound.deleteMany(),
+    40→    db.housekeepingTask.deleteMany(),
+    41→    db.payment.deleteMany(),
+    42→    db.folioLine.deleteMany(),
+    43→    db.folio.deleteMany(),
+    44→    db.reservation.deleteMany(),
+    45→    db.company.deleteMany(),
+    46→    db.guest.deleteMany(),
+    47→    db.roomStatusLog.deleteMany(),
+    48→    db.ratePlan.deleteMany(),
+    49→    db.room.deleteMany(),
+    50→    db.roomCategory.deleteMany(),
+    51→    db.user.deleteMany(),
+    52→    db.department.deleteMany(),
+    53→    db.property.deleteMany(),
+    54→  ]);
+    55→
+    56→  // ── Property ──────────────────────────────────────────────
+    57→  const property = await db.property.create({
+    58→    data: {
+    59→      name: "The Aurelian Grand",
+    60→      code: "AUR",
+    61→      city: "Mumbai",
+    62→      state: "Maharashtra",
+    63→      country: "IN",
+    64→      timezone: "Asia/Calcutta",
+    65→      currency: "INR",
+    66→      starRating: 5,
+    67→      totalRooms: 80,
+    68→      checkInTime: "14:00",
+    69→      checkOutTime: "12:00",
+    70→      gstNumber: "27AABCA1234L1Z5",
+    71→      taxId: "AABCA1234L",
+    72→      businessDate: startOfDay(new Date()),
+    73→    },
+    74→  });
+    75→
+    76→  // ── Departments ───────────────────────────────────────────
+    77→  const departments = await Promise.all(
+    78→    [
+    79→      { name: "Front Office", code: "FO" },
+    80→      { name: "Housekeeping", code: "HK" },
+    81→      { name: "Food & Beverage", code: "FB" },
+    82→      { name: "Engineering", code: "ENG" },
+    83→      { name: "Human Resources", code: "HR" },
+    84→      { name: "Finance", code: "FIN" },
+    85→      { name: "Security", code: "SEC" },
+    86→      { name: "Sales", code: "SALES" },
+    87→      { name: "Marketing", code: "MKT" },
+    88→    ].map((d) =>
+    89→      db.department.create({ data: { ...d, propertyId: property.id } })
+    90→    )
+    91→  );
+    92→  const deptByCode = Object.fromEntries(departments.map((d) => [d.code, d]));
+    93→
+    94→  // ── Staff / Users ─────────────────────────────────────────
+    95→  const staffSeeds = [
+    96→    { first: "Vikram", last: "Mehta", role: "owner", level: 1, dept: null, email: "vikram.mehta@aurelian.com", code: "OWNER" },
+    97→    { first: "Anita", last: "Rao", role: "gm", level: 2, dept: null, email: "anita.rao@aurelian.com", code: "GM001" },
+    98→    { first: "Rajesh", last: "Iyer", role: "fom", level: 3, dept: "FO", email: "rajesh.iyer@aurelian.com", code: "FOM01" },
+    99→    { first: "Priya", last: "Nair", role: "hk_mgr", level: 3, dept: "HK", email: "priya.nair@aurelian.com", code: "HKM01" },
+   100→    { first: "Sanjay", last: "Kapoor", role: "fb_mgr", level: 3, dept: "FB", email: "sanjay.kapoor@aurelian.com", code: "FBM01" },
+   101→    { first: "Meera", last: "Joshi", role: "rev_mgr", level: 3, dept: "FO", email: "meera.joshi@aurelian.com", code: "REV01" },
+   102→    { first: "Arvind", last: "Shetty", role: "fin_mgr", level: 3, dept: "FIN", email: "arvind.shetty@aurelian.com", code: "FIN01" },
+   103→    { first: "Deepak", last: "Reddy", role: "eng_mgr", level: 3, dept: "ENG", email: "deepak.reddy@aurelian.com", code: "ENG01" },
+   104→    { first: "Sunita", last: "Pillai", role: "hr_mgr", level: 3, dept: "HR", email: "sunita.pillai@aurelian.com", code: "HRM01" },
+   105→    { first: "Karthik", last: "Subram", role: "receptionist", level: 4, dept: "FO", email: "karthik.s@aurelian.com", code: "FOS01" },
+   106→    { first: "Neha", last: "Gupta", role: "receptionist", level: 4, dept: "FO", email: "neha.gupta@aurelian.com", code: "FOS02" },
+   107→    { first: "Lakshmi", last: "Devi", role: "hk_attendant", level: 4, dept: "HK", email: "lakshmi.d@aurelian.com", code: "HKS01" },
+   108→    { first: "Mohammed", last: "Ali", role: "hk_attendant", level: 4, dept: "HK", email: "mohammed.a@aurelian.com", code: "HKS02" },
+   109→    { first: "Ravi", last: "Kumar", role: "waiter", level: 4, dept: "FB", email: "ravi.k@aurelian.com", code: "FBS01" },
+   110→    { first: "Fatima", last: "Sheikh", role: "waiter", level: 4, dept: "FB", email: "fatima.s@aurelian.com", code: "FBS02" },
+   111→    { first: "Imran", last: "Khan", role: "technician", level: 4, dept: "ENG", email: "imran.k@aurelian.com", code: "ENG02" },
+   112→    { first: "Aditya", last: "Sharma", role: "sales_mgr", level: 3, dept: "SALES", email: "aditya.sharma@aurelian.com", code: "SLM01" },
+   113→    { first: "Pooja", last: "Bansal", role: "sales_exec", level: 4, dept: "SALES", email: "pooja.b@aurelian.com", code: "SLS01" },
+   114→    { first: "Kavita", last: "Menon", role: "mkt_mgr", level: 3, dept: "MKT", email: "kavita.menon@aurelian.com", code: "MKM01" },
+   115→    { first: "Rahul", last: "Mehra", role: "mkt_exec", level: 4, dept: "MKT", email: "rahul.m@aurelian.com", code: "MKS01" },
+   116→  ];
+   117→
+   118→  const users = await Promise.all(
+   119→    staffSeeds.map((s) =>
+   120→      db.user.create({
+   121→        data: {
+   122→          propertyId: property.id,
+   123→          email: s.email,
+   124→          firstName: s.first,
+   125→          lastName: s.last,
+   126→          role: s.role,
+   127→          roleLevel: s.level,
+   128→          departmentId: s.dept ? deptByCode[s.dept].id : null,
+   129→          employeeCode: s.code,
+   130→          phone: `+91 98${randInt(10000000, 99999999)}`,
+   131→          avatarUrl: null,
+   132→        },
+   133→      })
+   134→    )
+   135→  );
+   136→  const userByRole = Object.fromEntries(users.map((u) => [u.role, u]));
+   137→  const hkAttendants = users.filter((u) => u.role === "hk_attendant");
+   138→  const waiters = users.filter((u) => u.role === "waiter");
+   139→  const receptionists = users.filter((u) => u.role === "receptionist");
+   140→
+   141→  // ── Room Categories ───────────────────────────────────────
+   142→  const categories = await Promise.all(
+   143→    [
+   144→      { name: "Deluxe King", code: "DLK", maxAdults: 2, maxChildren: 1, baseRate: 8500, amenities: ["King bed","Free WiFi","Rain shower","Smart TV","City view","Mini bar"] },
+   145→      { name: "Deluxe Twin", code: "DLT", maxAdults: 2, maxChildren: 1, baseRate: 8500, amenities: ["Twin beds","Free WiFi","Rain shower","Smart TV","City view","Mini bar"] },
+   146→      { name: "Premier Suite", code: "PRS", maxAdults: 3, maxChildren: 2, baseRate: 16500, amenities: ["King bed","Living room","Free WiFi","Bathtub","Espresso machine","Lounge access","Sea view"] },
+   147→      { name: "Executive Club", code: "EXC", maxAdults: 2, maxChildren: 1, baseRate: 12500, amenities: ["King bed","Club lounge access","Free WiFi","Rain shower","Espresso machine","Evening cocktails"] },
+   148→      { name: "Presidential Suite", code: "PSC", maxAdults: 4, maxChildren: 2, baseRate: 45000, amenities: ["2 bedrooms","Private terrace","Butler service","Jacuzzi","Dining room","Panoramic view","Private bar"] },
+   149→    ].map((c) =>
+   150→      db.roomCategory.create({
+   151→        data: {
+   152→          propertyId: property.id,
+   153→          name: c.name,
+   154→          code: c.code,
+   155→          maxAdults: c.maxAdults,
+   156→          maxChildren: c.maxChildren,
+   157→          baseRate: c.baseRate,
+   158→          amenities: JSON.stringify(c.amenities),
+   159→        },
+   160→      })
+   161→    )
+   162→  );
+   163→  const catByCode = Object.fromEntries(categories.map((c) => [c.code, c]));
+   164→
+   165→  // ── Rooms (floors 1–8) ────────────────────────────────────
+   166→  const roomStatuses = ["vacant_clean","vacant_dirty","occupied_clean","occupied_dirty","vacant_clean","vacant_clean","occupied_clean","vacant_clean","out_of_order"];
+   167→  const rooms: any[] = [];
+   168→  for (let floor = 1; floor <= 8; floor++) {
+   169→    for (let n = 1; n <= 10; n++) {
+   170→      const roomNumber = `${floor}${n.toString().padStart(2, "0")}`;
+   171→      // Distribute categories by floor
+   172→      let code = "DLK";
+   173→      if (n >= 8) code = "EXC";
+   174→      if (floor === 8 && n === 10) code = "PSC";
+   175→      if (floor === 8 && (n === 7 || n === 8 || n === 9)) code = "PRS";
+   176→      if (n === 9) code = floor % 2 === 0 ? "DLT" : "DLK";
+   177→      const isAccessible = floor === 1 && n <= 2;
+   178→      const status = roomStatuses[(floor + n) % roomStatuses.length];
+   179→      const room = await db.room.create({
+   180→        data: {
+   181→          propertyId: property.id,
+   182→          categoryId: catByCode[code].id,
+   183→          roomNumber,
+   184→          floor,
+   185→          wing: floor <= 4 ? "West" : "East",
+   186→          currentStatus: status,
+   187→          isSmoking: false,
+   188→          isAccessible,
+   189→        },
+   190→      });
+   191→      rooms.push(room);
+   192→    }
+   193→  }
+   194→  // Block one room
+   195→  await db.room.update({
+   196→    where: { id: rooms[14].id },
+   197→    data: { currentStatus: "out_of_order", blockedReason: "AC compressor replacement", blockedUntil: addDays(new Date(), 2) },
+   198→  });
+   199→
+   200→  // ── Rate Plans ────────────────────────────────────────────
+   201→  const ratePlans = await Promise.all(
+   202→    [
+   203→      { name: "Best Available Rate", code: "BAR", mealPlan: "ep", refundable: true, markup: 0 },
+   204→      { name: "Bed & Breakfast", code: "BB", mealPlan: "cp", refundable: true, markup: 1200 },
+   205→      { name: "Half Board", code: "MAP", mealPlan: "map", refundable: true, markup: 2800 },
+   206→      { name: "Non-Refundable Saver", code: "NRF", mealPlan: "ep", refundable: false, markup: -800 },
+   207→      { name: "Corporate Negotiated", code: "CORP", mealPlan: "cp", refundable: true, markup: 600 },
+   208→      { name: "Weekend Getaway", code: "WKND", mealPlan: "map", refundable: true, markup: 1800 },
+   209→    ].map((rp) =>
+   210→      db.ratePlan.create({
+   211→        data: {
+   212→          propertyId: property.id,
+   213→          name: rp.name,
+   214→          code: rp.code,
+   215→          mealPlan: rp.mealPlan,
+   216→          isRefundable: rp.refundable,
+   217→          advancePurchaseDays: rp.code === "NRF" ? 7 : 0,
+   218→          minStayNights: rp.code === "WKND" ? 2 : 1,
+   219→          maxStayNights: 30,
+   220→          validFrom: subDays(new Date(), 30),
+   221→          validTo: addDays(new Date(), 365),
+   222→          markupPercent: rp.markup,
+   223→          categories: { connect: categories.map((c) => ({ id: c.id })) },
+   224→        },
+   225→      })
+   226→    )
+   227→  );
+   228→  const rpByCode = Object.fromEntries(ratePlans.map((r) => [r.code, r]));
+   229→
+   230→  // ── Companies ─────────────────────────────────────────────
+   231→  const companies = await Promise.all(
+   232→    [
+   233→      { name: "Tata Consultancy Services", gst: "27AAACT2727Q1ZW", terms: "Net 30", credit: 500000, rate: 11000 },
+   234→      { name: "Infosys Limited", gst: "29AAACI4799L1ZB", terms: "Net 45", credit: 750000, rate: 11500 },
+   235→      { name: "Reliance Industries", gst: "27AAACR5055K1Z5", terms: "Net 30", credit: 1000000, rate: 12000 },
+   236→      { name: "HDFC Bank", gst: "27AAACH2702H1Z5", terms: "Net 15", credit: 400000, rate: 10000 },
+   237→    ].map((c) =>
+   238→      db.company.create({
+   239→        data: {
+   240→          name: c.name,
+   241→          gstNumber: c.gst,
+   242→          address: "Mumbai, Maharashtra",
+   243→          creditLimit: c.credit,
+   244→          paymentTerms: c.terms,
+   245→          negotiatedRate: c.rate,
+   246→          contactName: "Travel Desk",
+   247→          contactEmail: "travel@" + c.name.split(" ")[0].toLowerCase() + ".com",
+   248→        },
+   249→      })
+   250→    )
+   251→  );
+   252→
+   253→  // ── Guests ────────────────────────────────────────────────
+   254→  const firstNames = ["Aarav","Vivaan","Aditya","Vihaan","Arjun","Sai","Reyansh","Krishna","Ishaan","Rohan","Ananya","Diya","Saanvi","Aadhya","Pari","Myra","Riya","Sara","Anika","Kiara","James","Emily","Michael","Sophia","Daniel","Olivia","David","Emma","John","Sarah","Chen","Wei","Yuki","Tanaka","Hiroshi","Mei","Lin","Fatima","Omar","Hassan","Aisha","Yusuf","Layla","Ibrahim","Noor"];
+   255→  const lastNames = ["Sharma","Verma","Patel","Reddy","Nair","Iyer","Kapoor","Malhotra","Chopra","Gupta","Joshi","Mehta","Rao","Kumar","Singh","Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Rodriguez","Martinez","Wilson","Anderson","Taylor","Thomas","Lee","Wang","Liu","Suzuki","Tanaka","Kim","Park","Khan","Sheikh","Ali","Hassan","Rahman","Patel","Shah","Desai"];
+   256→  const nationalities = ["IN","IN","IN","IN","US","GB","AE","SG","JP","AU","DE","FR","CA"];
+   257→  const titles = ["Mr","Mrs","Ms","Dr","Prof"];
+   258→  const tiers = ["silver","silver","silver","gold","gold","platinum","none","silver","gold","silver"];
+   259→
+   260→  const guests: any[] = [];
+   261→  for (let i = 0; i < 120; i++) {
+   262→    const fn = pick(firstNames);
+   263→    const ln = pick(lastNames);
+   264→    const nat = pick(nationalities);
+   265→    const g = await db.guest.create({
+   266→      data: {
+   267→        title: pick(titles),
+   268→        firstName: fn,
+   269→        lastName: ln,
+   270→        email: `${fn.toLowerCase()}.${ln.toLowerCase().replace(/[^a-z]/g,"")}${randInt(1,99)}@example.com`,
+   271→        phone: `+91 9${randInt(100000000, 999999999)}`,
+   272→        nationality: nat,
+   273→        idType: nat === "IN" ? pick(["aadhaar","driving_license","passport"]) : "passport",
+   274→        idNumber: uid("ID"),
+   275→        address: `${randInt(1,200)}, Bandra West, Mumbai`,
+   276→        city: "Mumbai",
+   277→        state: "Maharashtra",
+   278→        country: "IN",
+   279→        loyaltyTier: pick(tiers),
+   280→        loyaltyPoints: randInt(0, 25000),
+   281→        preferences: JSON.stringify({
+   282→          floor: pick(["high","low","any"]),
+   283→          pillow: pick(["soft","firm"]),
+   284→          dietary: pick(["none","vegetarian","vegan","jain"]),
+   285→          newspaper: pick(["none","Times of India","Economic Times"]),
+   286→        }),
+   287→        vipStatus: Math.random() < 0.12,
+   288→        totalStays: randInt(1, 24),
+   289→        totalRevenue: randInt(15000, 850000),
+   290→      },
+   291→    });
+   292→    guests.push(g);
+   293→  }
+   294→
+   295→  // ── Reservations (spread across past/today/future) ────────
+   296→  const sources = ["direct","direct","direct","booking_com","expedia","makemytrip","goibibo","corporate","walk_in","phone"];
+   297→  const today = startOfDay(new Date());
+   298→  let confCounter = 1000;
+   299→
+   300→  const reservationDates: { offset: number; status: string }[] = [
+   301→    ...Array.from({ length: 8 }, () => ({ offset: -randInt(2, 10), status: "checked_out" })),
+   302→    ...Array.from({ length: 18 }, () => ({ offset: 0, status: pick(["checked_in","confirmed","confirmed","checked_in"]) })),
+   303→    ...Array.from({ length: 4 }, () => ({ offset: 0, status: pick(["cancelled","no_show"]) })),
+   304→    ...Array.from({ length: 22 }, () => ({ offset: randInt(1, 14), status: "confirmed" })),
+   305→    ...Array.from({ length: 3 }, () => ({ offset: randInt(1, 14), status: "tentative" })),
+   306→  ];
+   307→
+   308→  for (const r of reservationDates) {
+   309→    const guest = pick(guests);
+   310→    const cat = pick(categories);
+   311→    const nights = r.status === "checked_out" ? randInt(1, 4) : randInt(1, 5);
+   312→    const checkIn = addDays(today, r.offset);
+   313→    const checkOut = addDays(checkIn, nights);
+   314→    const rp = pick(ratePlans);
+   315→    const source = pick(sources);
+   316→    const rate = cat.baseRate + rp.markupPercent;
+   317→    const adults = randInt(1, cat.maxAdults);
+   318→    const children = randInt(0, cat.maxChildren);
+   319→    const otaPct = source === "direct" || source === "corporate" || source === "walk_in" || source === "phone" ? 0 : pick([10,12.5,15,18,20]);
+   320→    const grossRevenue = rate * nights;
+   321→    const otaCommissionAmount = Math.round((grossRevenue * otaPct) / 100);
+   322→    const netRevenue = grossRevenue - otaCommissionAmount;
+   323→    const company = source === "corporate" ? pick(companies) : null;
+   324→    const confirmationNumber = `AUR-${++confCounter}`;
+   325→
+   326→    // Assign a room if checked-in or checked-out
+   327→    let assignedRoom: any = null;
+   328→    if (r.status === "checked_in" || r.status === "checked_out") {
+   329→      assignedRoom = rooms.find((rm) => rm.categoryId === cat.id && (rm.currentStatus === "occupied_clean" || rm.currentStatus === "occupied_dirty"));
+   330→      if (!assignedRoom) assignedRoom = pick(rooms.filter((rm) => rm.categoryId === cat.id));
+   331→    }
+   332→
+   333→    const actualCheckIn = r.status === "checked_in" || r.status === "checked_out" ? addHours(checkIn, randInt(13, 22)) : null;
+   334→    const actualCheckOut = r.status === "checked_out" ? addHours(checkOut, randInt(8, 12)) : null;
+   335→
+   336→    const reservation = await db.reservation.create({
+   337→      data: {
+   338→        propertyId: property.id,
+   339→        confirmationNumber,
+   340→        bookingSource: source,
+   341→        status: r.status,
+   342→        primaryGuestId: guest.id,
+   343→        companyId: company?.id ?? null,
+   344→        categoryId: cat.id,
+   345→        roomId: assignedRoom?.id ?? null,
+   346→        ratePlanId: rp.id,
+   347→        ratePerNight: rate,
+   348→        totalNights: nights,
+   349→        checkInDate: checkIn,
+   350→        checkOutDate: checkOut,
+   351→        actualCheckIn,
+   352→        actualCheckOut,
+   353→        adults,
+   354→        children,
+   355→        infants: 0,
+   356→        specialRequests: pick(["High floor please","Quiet room","Late check-in","Anniversary stay","Baby cot required",""]),
+   357→        internalNotes: Math.random() < 0.2 ? "VIP guest — inform GM on arrival" : null,
+   358→        otaCommissionPercent: otaPct,
+   359→        otaCommissionAmount,
+   360→        netRevenue,
+   361→        depositAmount: source === "direct" ? Math.round(grossRevenue * 0.2) : 0,
+   362→        cancellationReason: r.status === "cancelled" ? "Guest changed travel plans" : r.status === "no_show" ? "Did not arrive" : null,
+   363→        cancelledAt: r.status === "cancelled" || r.status === "no_show" ? addHours(checkIn, 10) : null,
+   364→        cancelledBy: r.status === "cancelled" || r.status === "no_show" ? userByRole.fom.id : null,
+   365→      },
+   366→    });
+   367→
+   368→    // Folio for checked-in / checked-out
+   369→    if (r.status === "checked_in" || r.status === "checked_out") {
+   370→      const roomCharges = rate * nights;
+   371→      const taxAmount = Math.round(roomCharges * 0.12);
+   372→      // Extra charges (F&B, minibar)
+   373→      const fbCharge = randInt(0, 1) === 1 ? randInt(800, 4500) : 0;
+   374→      const minibarCharge = randInt(0, 1) === 1 ? randInt(250, 1200) : 0;
+   375→      const laundryCharge = randInt(0, 1) === 1 ? randInt(400, 1800) : 0;
+   376→      const subtotal = roomCharges + fbCharge + minibarCharge + laundryCharge;
+   377→      const totalTax = taxAmount + Math.round((fbCharge + minibarCharge + laundryCharge) * 0.05);
+   378→      const total = subtotal + totalTax;
+   379→
+   380→      const folio = await db.folio.create({
+   381→        data: {
+   382→          reservationId: reservation.id,
+   383→          folioNumber: `F-${confirmationNumber}`,
+   384→          folioType: "room",
+   385→          status: r.status === "checked_out" ? "closed" : "open",
+   386→          subtotal,
+   387→          taxAmount: totalTax,
+   388→          totalAmount: total,
+   389→          paidAmount: r.status === "checked_out" ? total : Math.round(total * 0.3),
+   390→          balance: r.status === "checked_out" ? 0 : total - Math.round(total * 0.3),
+   391→          closedAt: r.status === "checked_out" ? actualCheckOut : null,
+   392→          closedBy: r.status === "checked_out" ? userByRole.receptionist[0]?.id ?? userByRole.fom.id : null,
+   393→        },
+   394→      });
+   395→
+   396→      await db.folioLine.createMany({
+   397→        data: [
+   398→          { folioId: folio.id, transactionType: "charge", description: `Room charge — ${cat.name} × ${nights} nights`, amount: roomCharges, taxCode: "GST12", taxAmount, departmentCode: "ROOM", postedBy: userByRole.fom.id, referenceType: "room_rate" },
+   399→          ...(fbCharge ? [{ folioId: folio.id, transactionType: "charge" as const, description: "F&B — The Saffron Restaurant", amount: fbCharge, taxCode: "GST5", taxAmount: Math.round(fbCharge*0.05), departmentCode: "FB", outletCode: "SAF", postedBy: userByRole.fb_mgr.id, referenceType: "pos_order" }] : []),
+   400→          ...(minibarCharge ? [{ folioId: folio.id, transactionType: "charge" as const, description: "Minibar consumption", amount: minibarCharge, taxCode: "GST5", taxAmount: Math.round(minibarCharge*0.05), departmentCode: "MINIBAR", postedBy: userByRole.hk_mgr.id, referenceType: "minibar" }] : []),
+   401→          ...(laundryCharge ? [{ folioId: folio.id, transactionType: "charge" as const, description: "Laundry service", amount: laundryCharge, taxCode: "GST18", taxAmount: Math.round(laundryCharge*0.18), departmentCode: "LAUNDRY", postedBy: userByRole.hk_mgr.id, referenceType: "manual" }] : []),
+   402→        ],
+   403→      });
+   404→
+   405→      if (folio.paidAmount > 0) {
+   406→        await db.payment.create({
+   407→          data: {
+   408→            folioId: folio.id,
+   409→            amount: folio.paidAmount,
+   410→            paymentMethod: pick(["credit_card","upi","cash","debit_card"]),
+   411→            cardLast4: randInt(1000,9999).toString(),
+   412→            cardType: pick(["Visa","Mastercard","Amex"]),
+   413→            status: "completed",
+   414→            processedBy: userByRole.receptionist[0]?.id ?? userByRole.fom.id,
+   415→            paymentReference: uid("PAY"),
+   416→          },
+   417→        });
+   418→      }
+   419→    }
+   420→
+   421→    // If checked-in, update room status to occupied
+   422→    if (r.status === "checked_in" && assignedRoom) {
+   423→      await db.room.update({
+   424→        where: { id: assignedRoom.id },
+   425→        data: { currentStatus: "occupied_clean" },
+   426→      });
+   427→    }
+   428→    if (r.status === "checked_out" && assignedRoom) {
+   429→      await db.room.update({
+   430→        where: { id: assignedRoom.id },
+   431→        data: { currentStatus: "vacant_dirty" },
+   432→      });
+   433→    }
+   434→  }
+   435→
+   436→  // ── Housekeeping tasks ────────────────────────────────────
+   437→  const hkTypes = ["checkout_cleaning","stayover","turndown","deep_clean","inspection"];
+   438→  const hkPriorities = ["urgent","high","normal","normal","low"];
+   439→  const dirtyOrOccRooms = rooms.filter((r) => ["vacant_dirty","occupied_dirty","occupied_clean"].includes(r.currentStatus));
+   440→  for (let i = 0; i < 24; i++) {
+   441→    const room = pick(dirtyOrOccRooms.length ? dirtyOrOccRooms : rooms);
+   442→    const taskType = room.currentStatus === "vacant_dirty" ? "checkout_cleaning" : pick(hkTypes);
+   443→    const status = pick(["pending","in_progress","completed","completed","inspected"]);
+   444→    await db.housekeepingTask.create({
+   445→      data: {
+   446→        propertyId: property.id,
+   447→        roomId: room.id,
+   448→        taskType,
+   449→        assignedToId: pick(hkAttendants).id,
+   450→        priority: pick(hkPriorities),
+   451→        status,
+   452→        scheduledFor: today,
+   453→        startedAt: status !== "pending" ? addHours(new Date(), -randInt(1,4)) : null,
+   454→        completedAt: status === "completed" || status === "inspected" ? addHours(new Date(), -randInt(0,3)) : null,
+   455→        inspectedById: status === "inspected" ? userByRole.hk_mgr.id : null,
+   456→        inspectedAt: status === "inspected" ? addHours(new Date(), -randInt(0,2)) : null,
+   457→        checklist: JSON.stringify([
+   458→          { item: "Bed linen changed", done: true },
+   459→          { item: "Bathroom sanitized", done: true },
+   460→          { item: "Towels replaced", done: status !== "pending" },
+   461→          { item: "Amenities restocked", done: status !== "pending" },
+   462→          { item: "Floor vacuumed", done: status === "completed" || status === "inspected" },
+   463→          { item: "Minibar checked", done: status === "completed" || status === "inspected" },
+   464→        ]),
+   465→        notes: pick(["","Guest requested extra pillows","VIP room — champagne setup",""]),
+   466→      },
+   467→    });
+   468→  }
+   469→
+   470→  // ── Outlets & Menu ────────────────────────────────────────
+   471→  const outletData = [
+   472→    { name: "The Saffron", code: "SAF", type: "restaurant", tables: 16 },
+   473→    { name: "Skyline Bar", code: "SKY", type: "bar", tables: 12 },
+   474→    { name: "Atrium Café", code: "ATR", type: "cafe", tables: 8 },
+   475→    { name: "24h In-Room Dining", code: "IRD", type: "room_service", tables: 0 },
+   476→    { name: "Poolside Grill", code: "POOL", type: "pool_bar", tables: 10 },
+   477→  ];
+   478→  const outlets: any[] = [];
+   479→  for (const o of outletData) {
+   480→    const outlet = await db.outlet.create({
+   481→      data: { propertyId: property.id, name: o.name, code: o.code, type: o.type, tableCount: o.tables },
+   482→    });
+   483→    outlets.push(outlet);
+   484→    // Tables
+   485→    for (let t = 1; t <= o.tables; t++) {
+   486→      await db.restaurantTable.create({
+   487→        data: {
+   488→          outletId: outlet.id,
+   489→          tableNumber: `T${t}`,
+   490→          capacity: pick([2, 2, 4, 4, 4, 6, 8]),
+   491→          status: pick(["available","available","available","occupied","reserved"]),
+   492→          section: o.tables > 12 ? pick(["Window","Center","Patio"]) : null,
+   493→        },
+   494→      });
+   495→    }
+   496→  }
+   497→  const restaurantOutlet = outlets.find((o) => o.code === "SAF")!;
+   498→  const barOutlet = outlets.find((o) => o.code === "SKY")!;
+   499→  const cafeOutlet = outlets.find((o) => o.code === "ATR")!;
+   500→
+   501→  const menuData: { outlet: any; categories: { name: string; items: { name: string; desc?: string; price: number; type: string; diet: string; time?: number; featured?: boolean }[] }[] }[] = [
+   502→    {
+   503→      outlet: restaurantOutlet,
+   504→      categories: [
+   505→        { name: "Breakfast", items: [
+   506→          { name: "Masala Dosa", desc: "Crispy rice crepe, spiced potato, sambar, chutney", price: 380, type: "food", diet: "veg", time: 12, featured: true },
+   507→          { name: "Eggs Benedict", desc: "Poached eggs, hollandaise, English muffin", price: 520, type: "food", diet: "contains_egg", time: 15 },
+   508→          { name: "Avocado Toast", desc: "Sourdough, smashed avocado, chili flakes", price: 480, type: "food", diet: "veg", time: 10 },
+   509→          { name: "Idli Sambar", desc: "Steamed rice cakes, lentil broth", price: 280, type: "food", diet: "veg", time: 10 },
+   510→          { name: "Fresh Fruit Platter", desc: "Seasonal fruits with honey yogurt", price: 340, type: "food", diet: "veg", time: 8 },
+   511→        ]},
+   512→        { name: "Starters", items: [
+   513→          { name: "Paneer Tikka", desc: "Char-grilled cottage cheese, mint chutney", price: 560, type: "food", diet: "veg", time: 18, featured: true },
+   514→          { name: "Tandoori Prawns", desc: "Clay oven prawns, ajwain, lemon", price: 780, type: "food", diet: "non_veg", time: 20 },
+   515→          { name: "Burrata & Heirloom Tomato", desc: "Burrata, basil oil, balsamic pearls", price: 720, type: "food", diet: "veg", time: 12 },
+   516→          { name: "Crispy Corn Kernels", desc: "Spiced fried corn, curry leaves", price: 420, type: "food", diet: "veg", time: 14 },
+   517→        ]},
+   518→        { name: "Mains", items: [
+   519→          { name: "Butter Chicken", desc: "Tandoor chicken, tomato cream curry", price: 720, type: "food", diet: "non_veg", time: 22, featured: true },
+   520→          { name: "Dal Makhani", desc: "Black lentils, butter, slow-cooked overnight", price: 480, type: "food", diet: "veg", time: 15 },
+   521→          { name: "Grilled Sea Bass", desc: "Mediterranean vegetables, lemon butter", price: 1240, type: "food", diet: "non_veg", time: 25 },
+   522→          { name: "Wild Mushroom Risotto", desc: "Arborio rice, parmesan, truffle oil", price: 780, type: "food", diet: "veg", time: 22 },
+   523→          { name: "Lamb Rogan Josh", desc: "Kashmiri lamb curry, aromatic spices", price: 980, type: "food", diet: "non_veg", time: 28 },
+   524→        ]},
+   525→        { name: "Desserts", items: [
+   526→          { name: "Gulab Jamun", desc: "Warm milk dumplings, saffron syrup", price: 320, type: "food", diet: "veg", time: 8, featured: true },
+   527→          { name: "Molten Chocolate Lava Cake", desc: "Vanilla ice cream, berry compote", price: 420, type: "food", diet: "veg", time: 12 },
+   528→          { name: "Tiramisu", desc: "Coffee mascarpone, cocoa", price: 380, type: "food", diet: "contains_egg", time: 6 },
+   529→        ]},
+   530→      ],
+   531→    },
+   532→    {
+   533→      outlet: barOutlet,
+   534→      categories: [
+   535→        { name: "Signature Cocktails", items: [
+   536→          { name: "Aurelian Martini", desc: "Gin, elderflower, cucumber, lime", price: 680, type: "beverage", diet: "contains_alcohol", time: 6, featured: true },
+   537→          { name: "Mumbai Mule", desc: "Vodka, ginger beer, mint, lime", price: 620, type: "beverage", diet: "contains_alcohol", time: 5 },
+   538→          { name: "Saffron Sour", desc: "Bourbon, saffron, lemon, egg white", price: 720, type: "beverage", diet: "contains_alcohol", time: 7 },
+   539→        ]},
+   540→        { name: "Wine by Glass", items: [
+   541→          { name: "Sauvignon Blanc", desc: "Crisp, citrus, Marlborough NZ", price: 540, type: "beverage", diet: "contains_alcohol", time: 3 },
+   542→          { name: "Shiraz", desc: "Full-bodied, dark fruit, Australia", price: 580, type: "beverage", diet: "contains_alcohol", time: 3 },
+   543→          { name: "Prosecco", desc: "Sparkling, Veneto Italy", price: 520, type: "beverage", diet: "contains_alcohol", time: 3 },
+   544→        ]},
+   545→        { name: "Bar Bites", items: [
+   546→          { name: "Truffle Fries", desc: "Parmesan, truffle oil, herbs", price: 380, type: "food", diet: "veg", time: 10, featured: true },
+   547→          { name: "Chicken Satay", desc: "Skewers, peanut sauce, pickled cucumber", price: 520, type: "food", diet: "non_veg", time: 14 },
+   548→          { name: "Loaded Nachos", desc: "Cheese, jalapeños, salsa, guacamole", price: 460, type: "food", diet: "veg", time: 12 },
+   549→        ]},
+   550→      ],
+   551→    },
+   552→    {
+   553→      outlet: cafeOutlet,
+   554→      categories: [
+   555→        { name: "Coffee", items: [
+   556→          { name: "Single Origin Espresso", desc: "Arabica blend, Coorg", price: 180, type: "beverage", diet: "veg", time: 4, featured: true },
+   557→          { name: "Cappuccino", desc: "Double shot, steamed milk, foam", price: 220, type: "beverage", diet: "veg", time: 5 },
+   558→          { name: "Cold Brew", desc: "18-hour steep, smooth", price: 260, type: "beverage", diet: "veg", time: 4 },
+   559→          { name: "Masala Chai", desc: "Spiced Assam tea, milk", price: 140, type: "beverage", diet: "veg", time: 5 },
+   560→        ]},
+   561→        { name: "Bakery", items: [
+   562→          { name: "Almond Croissant", desc: "Buttery, almond cream, toasted", price: 280, type: "food", diet: "veg", time: 3, featured: true },
+   563→          { name: "Blueberry Muffin", desc: "Fresh blueberries, vanilla", price: 220, type: "food", diet: "veg", time: 3 },
+   564→          { name: "Avocado Toast", desc: "Sourdough, chili flakes, lime", price: 380, type: "food", diet: "veg", time: 8 },
+   565→        ]},
+   566→      ],
+   567→    },
+   568→  ];
+   569→
+   570→  for (const od of menuData) {
+   571→    for (let ci = 0; ci < od.categories.length; ci++) {
+   572→      const c = od.categories[ci];
+   573→      const cat = await db.menuCategory.create({
+   574→        data: { outletId: od.outlet.id, name: c.name, sortOrder: ci, mealPeriod: JSON.stringify([]) },
+   575→      });
+   576→      for (const it of c.items) {
+   577→        await db.menuItem.create({
+   578→          data: {
+   579→            categoryId: cat.id,
+   580→            name: it.name,
+   581→            description: it.desc,
+   582→            price: it.price,
+   583→            itemType: it.type,
+   584→            dietType: it.diet,
+   585→            allergens: JSON.stringify([]),
+   586→            preparationTimeMinutes: it.time ?? 12,
+   587→            isAvailable: true,
+   588→            isFeatured: it.featured ?? false,
+   589→            recipeCost: Math.round(it.price * 0.35),
+   590→          },
+   591→        });
+   592→      }
+   593→    }
+   594→  }
+   595→
+   596→  // ── A few POS orders ──────────────────────────────────────
+   597→  const restaurantTables = await db.restaurantTable.findMany({ where: { outletId: restaurantOutlet.id } });
+   598→  const restaurantMenu = await db.menuItem.findMany({
+   599→    where: { category: { outletId: restaurantOutlet.id } },
+   600→  });
+   601→  for (let i = 0; i < 8; i++) {
+   602→    const table = pick(restaurantTables);
+   603→    const status = pick(["draft","sent_to_kitchen","in_preparation","ready","served","billed","paid","void"]);
+   604→    const numItems = randInt(2, 5);
+   605→    const chosen = Array.from({ length: numItems }, () => pick(restaurantMenu));
+   606→    let subtotal = 0;
+   607→    const order = await db.posOrder.create({
+   608→      data: {
+   609→        outletId: restaurantOutlet.id,
+   610→        tableId: table.id,
+   611→        orderType: "dine_in",
+   612→        status,
+   613→        waiterId: pick(waiters).id,
+   614→        guestsCount: randInt(1, 4),
+   615→        notes: pick(["","No spice","Tableside service",""]),
+   616→        kotNumber: status !== "draft" ? randInt(1001, 1099) : null,
+   617→        billedAt: ["billed","paid"].includes(status) ? addHours(new Date(), -randInt(0,2)) : null,
+   618→        paidAt: status === "paid" ? addHours(new Date(), -randInt(0,1)) : null,
+   619→      },
+   620→    });
+   621→    for (const item of chosen) {
+   622→      const qty = randInt(1, 3);
+   623→      subtotal += item.price * qty;
+   624→      await db.posOrderLine.create({
+   625→        data: {
+   626→          orderId: order.id,
+   627→          itemId: item.id,
+   628→          quantity: qty,
+   629→          unitPrice: item.price,
+   630→          status: ["draft","sent_to_kitchen"].includes(status) ? "pending" : "served",
+   631→        },
+   632→      });
+   633→    }
+   634→    const tax = Math.round(subtotal * 0.05);
+   635→    await db.posOrder.update({
+   636→      where: { id: order.id },
+   637→      data: { subtotal, taxAmount: tax, totalAmount: subtotal + tax },
+   638→    });
+   639→  }
+   640→
+   641→  // ── Maintenance tickets ───────────────────────────────────
+   642→  const maintTickets = [
+   643→    { title: "AC not cooling in room 305", category: "hvac", priority: "high", room: rooms[34] },
+   644→    { title: "Leaking faucet — room 412", category: "plumbing", priority: "normal", room: rooms[51] },
+   645→    { title: "Replace corridor lights floor 6", category: "electrical", priority: "low", room: null },
+   646→    { title: "Elevator 2 making noise", category: "electrical", priority: "urgent", room: null },
+   647→    { title: "TV remote not working room 208", category: "av", priority: "low", room: rooms[17] },
+   648→  ];
+   649→  for (const t of maintTickets) {
+   650→    await db.maintenanceTicket.create({
+   651→      data: {
+   652→        propertyId: property.id,
+   653→        roomId: t.room?.id ?? null,
+   654→        title: t.title,
+   655→        description: "Reported by Front Office",
+   656→        priority: t.priority,
+   657→        status: pick(["open","in_progress","completed"]),
+   658→        category: t.category,
+   659→        raisedBy: userByRole.fom.id,
+   660→        assignedTo: userByRole.technician?.id ?? userByRole.eng_mgr.id,
+   661→        completedAt: Math.random() < 0.3 ? addHours(new Date(), -randInt(1, 24)) : null,
+   662→      },
+   663→    });
+   664→  }
+   665→
+   666→  // ── Audit logs ────────────────────────────────────────────
+   667→  const rec1 = receptionists[0] ?? userByRole.fom;
+   668→  const auditActions = [
+   669→    { action: "LOGIN", entity: "auth", by: userByRole.fom },
+   670→    { action: "RESERVATION_CREATED", entity: "reservation", by: rec1 },
+   671→    { action: "CHECKIN", entity: "reservation", by: rec1 },
+   672→    { action: "RATE_OVERRIDE", entity: "rate_plan", by: userByRole.rev_mgr },
+   673→    { action: "ROOM_STATUS_CHANGED", entity: "room", by: userByRole.hk_mgr },
+   674→    { action: "PAYMENT_PROCESSED", entity: "payment", by: rec1 },
+   675→    { action: "VOID_LINE", entity: "folio_line", by: userByRole.fom },
+   676→    { action: "CHECKOUT", entity: "reservation", by: rec1 },
+   677→    { action: "DISCOUNT_APPLIED", entity: "folio", by: userByRole.fom },
+   678→    { action: "HK_TASK_ASSIGNED", entity: "housekeeping_task", by: userByRole.hk_mgr },
+   679→    { action: "MENU_PRICE_UPDATED", entity: "menu_item", by: userByRole.fb_mgr },
+   680→    { action: "LOGIN", entity: "auth", by: userByRole.gm },
+   681→  ];
+   682→  for (let i = 0; i < 40; i++) {
+   683→    const a = pick(auditActions);
+   684→    await db.auditLog.create({
+   685→      data: {
+   686→        propertyId: property.id,
+   687→        userId: a.by.id,
+   688→        userRole: a.by.role,
+   689→        user_email: a.by.email,
+   690→        action: a.action,
+   691→        entityType: a.entity,
+   692→        entityId: uid("E"),
+   693→        oldValue: Math.random() < 0.5 ? JSON.stringify({ value: pick([1,2,3]) }) : null,
+   694→        newValue: JSON.stringify({ value: pick([4,5,6]) }),
+   695→        ipAddress: `192.168.1.${randInt(2, 254)}`,
+   696→        occurredAt: addHours(new Date(), -randInt(0, 72)),
+   697→      },
+   698→    });
+   699→  }
+   700→
+   701→  // ── Notifications ─────────────────────────────────────────
+   702→  const notifs = [
+   703→    { type: "approval", title: "Rate override needs approval", message: "Front Office requested 25% discount on BAR for reservation AUR-1056" },
+   704→    { type: "alert", title: "VIP arrival in 2 hours", message: "Mr. James Smith (Platinum) arriving — Premier Suite 807" },
+   705→    { type: "warning", title: "Room 305 AC issue", message: "Maintenance ticket raised — guest requested room change" },
+   706→    { type: "info", title: "Night audit pending", message: "Today's night audit has not been initiated yet" },
+   707→    { type: "success", title: "Channel sync complete", message: "Booking.com inventory synced — 80 rooms pushed" },
+   708→    { type: "alert", title: "Low minibar stock", message: "Floor 3 minibar cart below 30% stock" },
+   709→  ];
+   710→  for (const n of notifs) {
+   711→    await db.notification.create({
+   712→      data: { propertyId: property.id, type: n.type, title: n.title, message: n.message, isRead: Math.random() < 0.3 },
+   713→    });
+   714→  }
+   715→
+   716→  // ── Shift handover ────────────────────────────────────────
+   717→  await db.shiftHandover.create({
+   718→    data: {
+   719→      propertyId: property.id,
+   720→      fromUser: userByRole.fom.id,
+   721→      toUser: userByRole.fom.id,
+   722→      shift: "morning",
+   723→      notes: "Morning shift smooth. 14 arrivals, 9 departures processed. Room 305 AC issue escalated to engineering. Corporate booking for TCS — 8 rooms block for next week.",
+   724→      openIssues: "VIP arrival James Smith at 4 PM — Premier Suite prep in progress",
+   725→    },
+   726→  });
+   727→
+   728→  // ── Past night audit logs ─────────────────────────────────
+   729→  for (let d = 1; d <= 3; d++) {
+   730→    await db.nightAuditLog.create({
+   731→      data: {
+   732→        propertyId: property.id,
+   733→        businessDate: subDays(today, d),
+   734→        status: "completed",
+   735→        startedAt: subDays(addHours(today, 23), d),
+   736→        completedAt: subDays(addHours(today, 23.5), d),
+   737→        startedBy: userByRole.fom.id,
+   738→        postingsCount: randInt(28, 42),
+   739→        revenuePosted: randInt(285000, 425000),
+   740→      },
+   741→    });
+   742→  }
+   743→
+   744→  console.log(`✅ Seeded complete.`);
+   745→  console.log(`   Property: ${property.name}`);
+   746→  console.log(`   Rooms: ${rooms.length}`);
+   747→  console.log(`   Staff: ${users.length}`);
+   748→  console.log(`   Guests: ${guests.length}`);
+   749→  console.log(`   Outlets: ${outlets.length}`);
+   750→}
+   751→
+   752→main()
+   753→  .catch((e) => {
+   754→    console.error(e);
+   755→    process.exit(1);
+   756→  })
+   757→  .finally(async () => {
+   758→    await db.$disconnect();
+   759→  });
+   760→
