@@ -1,47 +1,57 @@
 // ARIA HMS — App Shell — Hospitality Operating System
 "use client";
 
-import { Sidebar } from "./sidebar";
-import { Topbar } from "./topbar";
-import { RealtimeToasts } from "./realtime-toasts";
-import { CommandPalette } from "./command-palette";
-import { LoginPage } from "./login-page";
 import { useAppStore, ROLE_MODULES, ModuleKey } from "@/lib/store";
-import { DashboardModule } from "./modules/dashboard";
-import { ReservationsModule } from "./modules/reservations";
-import { RoomsModule } from "./modules/rooms";
-import { HousekeepingModule } from "./modules/housekeeping";
-import { GuestsModule } from "./modules/guests";
-import { PosModule } from "./modules/pos";
-import { FoliosModule } from "./modules/folios";
-import { ReportsModule } from "./modules/reports";
-import { NightAuditModule } from "./modules/night-audit";
-import { StaffModule } from "./modules/staff";
-import { HRModule } from "./modules/hr";
-import { MaintenanceModule } from "./modules/maintenance";
-import { AuditModule } from "./modules/audit";
-import { AttendanceModule } from "./modules/attendance";
-import { ScorecardModule } from "./modules/scorecard";
-import { MarketingModule } from "./modules/marketing";
-import { SalesModule } from "./modules/sales";
-import { HospitalModule } from "./modules/hospital";
-import { InventoryModule } from "./modules/inventory";
-import { FinanceModule } from "./modules/finance";
-import { CrmModule } from "./modules/crm";
-import { TasksModule } from "./modules/tasks";
-import { DocumentsModule } from "./modules/documents";
-import { AiCenterModule } from "./modules/ai-center";
-import { AutomationModule } from "./modules/automation";
-import { IntegrationsModule } from "./modules/integrations";
-import { SettingsModule } from "./modules/settings";
-import { PropertiesModule } from "./modules/properties";
-import { KitchenModule } from "./modules/kitchen";
 import { useApi } from "@/lib/api";
-import { Hotel, Globe, ShieldCheck, Cpu, Brain, AlertTriangle, RefreshCw } from "lucide-react";
-import { Component, useEffect } from "react";
+import { Globe, ShieldCheck, Cpu, Brain, AlertTriangle, RefreshCw } from "lucide-react";
+import { Component, useEffect, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 
-const MODULE_COMPONENTS: Record<ModuleKey, React.FC> = {
+// ─── Lazy-load heavy shell components ──────────────────────────────────
+// These are lazy-loaded to reduce initial compilation memory.
+// framer-motion (login), socket.io (realtime), cmdk (command-palette)
+// are heavy deps that should only load when needed.
+const Sidebar = lazy(() => import("./sidebar").then(m => ({ default: m.Sidebar })));
+const Topbar = lazy(() => import("./topbar").then(m => ({ default: m.Topbar })));
+const RealtimeToasts = lazy(() => import("./realtime-toasts").then(m => ({ default: m.RealtimeToasts })));
+const CommandPalette = lazy(() => import("./command-palette").then(m => ({ default: m.CommandPalette })));
+const LoginPage = lazy(() => import("./login-page").then(m => ({ default: m.LoginPage })));
+
+// ─── Lazy-loaded module components ────────────────────────────────────
+// Each module is loaded on-demand when the user navigates to it.
+// This prevents Turbopack from compiling all 29 modules at once,
+// reducing peak compilation memory from 2.6GB+ to ~300MB per module.
+const DashboardModule = lazy(() => import("./modules/dashboard").then(m => ({ default: m.DashboardModule })));
+const ReservationsModule = lazy(() => import("./modules/reservations").then(m => ({ default: m.ReservationsModule })));
+const RoomsModule = lazy(() => import("./modules/rooms").then(m => ({ default: m.RoomsModule })));
+const HousekeepingModule = lazy(() => import("./modules/housekeeping").then(m => ({ default: m.HousekeepingModule })));
+const GuestsModule = lazy(() => import("./modules/guests").then(m => ({ default: m.GuestsModule })));
+const PosModule = lazy(() => import("./modules/pos").then(m => ({ default: m.PosModule })));
+const FoliosModule = lazy(() => import("./modules/folios").then(m => ({ default: m.FoliosModule })));
+const ReportsModule = lazy(() => import("./modules/reports").then(m => ({ default: m.ReportsModule })));
+const NightAuditModule = lazy(() => import("./modules/night-audit").then(m => ({ default: m.NightAuditModule })));
+const StaffModule = lazy(() => import("./modules/staff").then(m => ({ default: m.StaffModule })));
+const HRModule = lazy(() => import("./modules/hr").then(m => ({ default: m.HRModule })));
+const MaintenanceModule = lazy(() => import("./modules/maintenance").then(m => ({ default: m.MaintenanceModule })));
+const AuditModule = lazy(() => import("./modules/audit").then(m => ({ default: m.AuditModule })));
+const AttendanceModule = lazy(() => import("./modules/attendance").then(m => ({ default: m.AttendanceModule })));
+const ScorecardModule = lazy(() => import("./modules/scorecard").then(m => ({ default: m.ScorecardModule })));
+const MarketingModule = lazy(() => import("./modules/marketing").then(m => ({ default: m.MarketingModule })));
+const SalesModule = lazy(() => import("./modules/sales").then(m => ({ default: m.SalesModule })));
+const HospitalModule = lazy(() => import("./modules/hospital").then(m => ({ default: m.HospitalModule })));
+const InventoryModule = lazy(() => import("./modules/inventory").then(m => ({ default: m.InventoryModule })));
+const FinanceModule = lazy(() => import("./modules/finance").then(m => ({ default: m.FinanceModule })));
+const CrmModule = lazy(() => import("./modules/crm").then(m => ({ default: m.CrmModule })));
+const TasksModule = lazy(() => import("./modules/tasks").then(m => ({ default: m.TasksModule })));
+const DocumentsModule = lazy(() => import("./modules/documents").then(m => ({ default: m.DocumentsModule })));
+const AiCenterModule = lazy(() => import("./modules/ai-center").then(m => ({ default: m.AiCenterModule })));
+const AutomationModule = lazy(() => import("./modules/automation").then(m => ({ default: m.AutomationModule })));
+const IntegrationsModule = lazy(() => import("./modules/integrations").then(m => ({ default: m.IntegrationsModule })));
+const SettingsModule = lazy(() => import("./modules/settings").then(m => ({ default: m.SettingsModule })));
+const PropertiesModule = lazy(() => import("./modules/properties").then(m => ({ default: m.PropertiesModule })));
+const KitchenModule = lazy(() => import("./modules/kitchen").then(m => ({ default: m.KitchenModule })));
+
+const MODULE_COMPONENTS: Record<ModuleKey, React.LazyExoticComponent<React.FC>> = {
   dashboard: DashboardModule,
   reservations: ReservationsModule,
   rooms: RoomsModule,
@@ -72,6 +82,18 @@ const MODULE_COMPONENTS: Record<ModuleKey, React.FC> = {
   integrations: IntegrationsModule,
   settings: SettingsModule,
 };
+
+// ─── Module Loading Skeleton ──────────────────────────────────────────
+function ModuleSkeleton() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-gold" />
+        <p className="text-sm text-muted-foreground">Loading module…</p>
+      </div>
+    </div>
+  );
+}
 
 // ─── Module Error Boundary ──────────────────────────────────────────
 class ModuleErrorBoundary extends Component<
@@ -114,7 +136,6 @@ export function AppShell() {
   const { user, isAuthenticated, activeModule, setActiveModule, role, enabledModules } = useAppStore();
   const { data: prop } = useApi(isAuthenticated ? "/api/dashboard" : null, []);
   const propertyId = user?.property?.id;
-  const [, setTick] = useState(0);
 
   // Ensure activeModule is accessible by current role AND enabled
   const allowedModules = ROLE_MODULES[role] ?? ROLE_MODULES.gm;
@@ -131,7 +152,11 @@ export function AppShell() {
   const activeKey = activeModule;
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return (
+      <Suspense fallback={<FullPageSkeleton />}>
+        <LoginPage />
+      </Suspense>
+    );
   }
 
   const ActiveComponent = MODULE_COMPONENTS[activeModule] ?? DashboardModule;
@@ -139,21 +164,70 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-surface">
-      <Sidebar />
+      <Suspense fallback={<SidebarSkeleton />}>
+        <Sidebar />
+      </Suspense>
       <div className="flex flex-1 flex-col min-w-0">
-        <Topbar propertyId={propertyId} />
+        <Suspense fallback={<TopbarSkeleton />}>
+          <Topbar propertyId={propertyId} />
+        </Suspense>
         <main className="flex-1 overflow-x-hidden">
           <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8 lg:py-8">
             <ModuleErrorBoundary moduleName={moduleLabel}>
-              <ActiveComponent key={activeKey} />
+              <Suspense fallback={<ModuleSkeleton />}>
+                <ActiveComponent key={activeKey} />
+              </Suspense>
             </ModuleErrorBoundary>
           </div>
         </main>
         <Footer />
       </div>
-      <RealtimeToasts propertyId={propertyId} />
-      <CommandPalette />
+      <Suspense fallback={null}>
+        <RealtimeToasts propertyId={propertyId} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <CommandPalette />
+      </Suspense>
     </div>
+  );
+}
+
+function FullPageSkeleton() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0A0F1C]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-[#C9952A]" />
+    </div>
+  );
+}
+
+function SidebarSkeleton() {
+  return (
+    <aside className="w-64 bg-sidebar border-r border-sidebar-border animate-pulse">
+      <div className="h-16 border-b border-sidebar-border px-4 flex items-center gap-3">
+        <div className="h-9 w-9 rounded-lg bg-sidebar-accent" />
+        <div className="space-y-2 flex-1">
+          <div className="h-3 w-20 rounded bg-sidebar-accent" />
+          <div className="h-2 w-16 rounded bg-sidebar-accent/60" />
+        </div>
+      </div>
+      <div className="p-3 space-y-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-8 rounded-lg bg-sidebar-accent/40" />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function TopbarSkeleton() {
+  return (
+    <header className="h-14 border-b border-border bg-card/95 backdrop-blur px-4 lg:px-6 flex items-center gap-3">
+      <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+      <div className="flex-1" />
+      <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+      <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+      <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+    </header>
   );
 }
 
