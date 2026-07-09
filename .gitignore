@@ -62,4 +62,6 @@ server.log
 *.jpg
 *.jpeg
 worklog.md
-Caddyfile
+Caddyfile.zscripts/
+db/custom.db
+db/custom.db-journal
