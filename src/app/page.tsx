@@ -1,6 +1,7 @@
 // ARIA HMS — Hospitality Operating System
-// This page is fully client-rendered (ssr: false) to minimize server memory.
-// All modules, sidebar, etc. are lazy-loaded on the client side.
+// Minimal page — entire app is client-rendered via dynamic import.
+// The server only serves a static HTML shell with zero JS dependencies.
+// This prevents OOM during server-side compilation.
 
 "use client";
 
@@ -8,7 +9,6 @@ import dynamic from "next/dynamic";
 import { Component, ReactNode } from "react";
 
 // ─── Global Error Boundary ──────────────────────────────────────────
-// Prevents white blank page if any component crashes during render
 class GlobalErrorBoundary extends Component<
   { children: ReactNode },
   { hasError: boolean; error: Error | null }
@@ -57,8 +57,11 @@ class GlobalErrorBoundary extends Component<
   }
 }
 
+// ─── Dynamic AppShell — loaded ONLY on client, NOT on server ────────
+// ssr: false means the server never resolves the dependency tree.
+// The client fetches the shell chunk after hydration.
 const AppShell = dynamic(
-  () => import("@/components/hms/app-shell").then((m) => ({ default: m.AppShell })),
+  () => import("@/components/hms/app-shell").then(m => ({ default: m.AppShell })),
   {
     ssr: false,
     loading: () => (
