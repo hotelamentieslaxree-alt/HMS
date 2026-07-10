@@ -1,7 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
-import { execSync } from 'child_process'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -36,16 +35,16 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 
 /**
  * On Vercel serverless, each cold start gets a fresh /tmp filesystem.
- * We need to set up the database schema before queries can run.
- * 
- * Strategy: Run `prisma db push` at runtime using the CLI that's already
- * in node_modules. This creates all tables matching the Prisma schema
- * exactly, then the auto-seeding in PROPERTY_ID() populates demo data.
+ * Strategy: Download the seed database (pre-built with schema + no data)
+ * from the app's own static assets, copy to /tmp, then let auto-seeding
+ * populate the demo data.
  */
 export async function ensureDbReady() {
   if (globalForPrisma._dbInitialized) return
   if (process.env.TURSO_DATABASE_URL) return // Turso is persistent
   if (!process.env.VERCEL) return // Local dev — file persists
+
+  const dbPath = '/tmp/hms.db'
 
   // Quick check if tables already exist (warm invocation)
   try {
@@ -57,17 +56,45 @@ export async function ensureDbReady() {
   }
 
   try {
-    // Use the Prisma CLI binary directly from node_modules
-    const prismaBin = path.join(process.cwd(), 'node_modules', '.bin', 'prisma')
-    execSync(`"${prismaBin}" db push --accept-data-loss --skip-generate 2>&1`, {
-      stdio: 'pipe',
-      timeout: 30000,
-      env: { ...process.env },
-    })
-    console.log('[DB] Schema pushed successfully')
+    // Download the seed DB from our own static hosting
+    // The build script puts the seed DB at public/hms-seed.db
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://my-project-steel-omega.vercel.app'
+    
+    const response = await fetch(`${baseUrl}/hms-seed.db`)
+    if (response.ok) {
+      const buffer = Buffer.from(await response.arrayBuffer())
+      fs.writeFileSync(dbPath, buffer)
+      console.log('[DB] Downloaded seed DB:', buffer.length, 'bytes')
+    } else {
+      console.error('[DB] Failed to download seed DB:', response.status)
+      // Fallback: try to find it in the bundled files
+      const possiblePaths = [
+        path.join(process.cwd(), 'public', 'hms-seed.db'),
+        path.join(process.cwd(), '.next', 'server', 'public', 'hms-seed.db'),
+      ]
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          fs.copyFileSync(p, dbPath)
+          console.log('[DB] Copied seed DB from', p)
+          break
+        }
+      }
+    }
+    
+    // Re-create PrismaClient pointing to the now-existing DB
+    const { PrismaClient } = require('@prisma/client')
+    if (globalForPrisma.prisma) {
+      try { await globalForPrisma.prisma.$disconnect() } catch {}
+    }
+    globalForPrisma.prisma = new PrismaClient({ log: ['error', 'warn'] })
+    
+    // Verify it works
+    await db.property.findFirst()
+    console.log('[DB] Database ready')
   } catch (e: any) {
-    const output = e.stdout?.toString() || e.stderr?.toString() || e.message || ''
-    console.error('[DB] Schema push failed:', output.slice(0, 300))
+    console.error('[DB] Setup failed:', e.message?.slice(0, 300))
   }
 
   globalForPrisma._dbInitialized = true
