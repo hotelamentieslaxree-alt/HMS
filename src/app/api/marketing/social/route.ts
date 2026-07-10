@@ -1,6 +1,6 @@
 // ARIA HMS — Social Accounts API
-import { NextRequest, NextResponse } from "next/server";
-import { withHandler } from "@/lib/hms";
+import { NextRequest } from "next/server";
+import { ok, parseBody, withHandler } from "@/lib/hms";
 
 // Mock social accounts data
 const socialAccounts = [
@@ -20,11 +20,11 @@ export const GET = withHandler(async (req: NextRequest) => {
   let filtered = [...socialAccounts];
   if (platform) filtered = filtered.filter(a => a.platform === platform);
 
-  return NextResponse.json({ success: true, data: filtered, meta: { total: filtered.length } });
+  return ok(filtered, { total: filtered.length });
 });
 
 export const POST = withHandler(async (req: NextRequest) => {
-  const body = await req.json();
+  const body = await parseBody(req);
   const newAccount = {
     id: `sa${Date.now()}`,
     propertyId: "prop1",
@@ -33,5 +33,5 @@ export const POST = withHandler(async (req: NextRequest) => {
     isActive: true, lastSyncedAt: null,
   };
   socialAccounts.push(newAccount);
-  return NextResponse.json({ success: true, data: newAccount }, { status: 201 });
+  return ok(newAccount);
 });

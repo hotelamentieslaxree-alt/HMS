@@ -2,13 +2,164 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+// ─── Safe JSON parse ────────────────────────────────────────────────────────
+export function safeJsonParse<T>(str: string | null | undefined, fallback: T): T {
+  if (!str) return fallback;
+  try { return JSON.parse(str); } catch { return fallback; }
+}
+
 // ─── Property ID cache (H9: avoid findFirst on every API call) ────────────────
 let _cachedPropertyId: string | null = null;
 
+/** Auto-seed a demo property if none exists (first run / Vercel cold start) */
+async function ensureProperty() {
+  let p = await db.property.findFirst({ orderBy: { createdAt: "asc" } });
+  if (p) return p;
+  // No property exists — create the demo property
+  p = await db.property.create({
+    data: {
+      name: "The Aurelian Grand",
+      code: "TAG",
+      city: "Mumbai",
+      state: "Maharashtra",
+      country: "India",
+      timezone: "Asia/Calcutta",
+      currency: "INR",
+      starRating: 5,
+      totalRooms: 26,
+      checkInTime: "14:00",
+      checkOutTime: "12:00",
+      businessDate: new Date(),
+    },
+  });
+  // Seed essential data: room categories + rooms + demo users
+  await seedDemoData(p.id);
+  return p;
+}
+
+/** Seed demo data for the property — runs once on first access */
+async function seedDemoData(propertyId: string) {
+  // Room categories
+  const cats = await db.roomCategory.createMany({
+    data: [
+      { id: "cat-deluxe", propertyId, name: "Deluxe Room", code: "DLX", baseRate: 4500, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar"]), roomCount: 10 },
+      { id: "cat-suite", propertyId, name: "Executive Suite", code: "EXE", baseRate: 8500, maxOccupancy: 3, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Bathtub", "Lounge"]), roomCount: 8 },
+      { id: "cat-premium", propertyId, name: "Premium Room", code: "PRM", baseRate: 6500, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Coffee Machine"]), roomCount: 6 },
+      { id: "cat-standard", propertyId, name: "Standard Room", code: "STD", baseRate: 3000, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC"]), roomCount: 2 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // Rooms
+  const roomData: any[] = [];
+  const catConfigs = [
+    { catId: "cat-deluxe", prefix: "1", count: 10, floor: 1 },
+    { catId: "cat-suite", prefix: "2", count: 8, floor: 2 },
+    { id: "cat-premium", catId: "cat-premium", prefix: "3", count: 6, floor: 3 },
+    { catId: "cat-standard", prefix: "4", count: 2, floor: 4 },
+  ];
+  for (const cfg of catConfigs) {
+    for (let i = 1; i <= cfg.count; i++) {
+      const num = `${cfg.prefix}${String(i).padStart(2, "0")}`;
+      roomData.push({
+        propertyId,
+        roomCategoryId: cfg.catId,
+        number: num,
+        floor: cfg.floor,
+        status: i <= 4 ? "occupied" : i === 5 ? "maintenance" : "available",
+        rate: 4500 + (cfg.floor - 1) * 2000,
+      });
+    }
+  }
+  await db.room.createMany({ data: roomData, skipDuplicates: true });
+
+  // Demo users (one per role)
+  const roles = [
+    { email: "owner@aurelian.com", firstName: "Vikram", lastName: "Mehta", role: "owner", department: "Management" },
+    { email: "gm@aurelian.com", firstName: "Priya", lastName: "Sharma", role: "gm", department: "Management" },
+    { email: "fom@aurelian.com", firstName: "Rahul", lastName: "Kumar", role: "fom", department: "Front Office" },
+    { email: "receptionist@aurelian.com", firstName: "Anita", lastName: "Patel", role: "receptionist", department: "Front Office" },
+    { email: "hk_mgr@aurelian.com", firstName: "Sunita", lastName: "Devi", role: "hk_mgr", department: "Housekeeping" },
+    { email: "fb_mgr@aurelian.com", firstName: "Chef", lastName: "Rajan", role: "fb_mgr", department: "F&B" },
+    { email: "fin_mgr@aurelian.com", firstName: "Arun", lastName: "Gupta", role: "fin_mgr", department: "Finance" },
+    { email: "eng_mgr@aurelian.com", firstName: "Deepak", lastName: "Singh", role: "eng_mgr", department: "Engineering" },
+    { email: "rev_mgr@aurelian.com", firstName: "Neha", lastName: "Jain", role: "rev_mgr", department: "Revenue" },
+    { email: "hr_mgr@aurelian.com", firstName: "Meera", lastName: "Reddy", role: "hr_mgr", department: "HR" },
+    { email: "sales_mgr@aurelian.com", firstName: "Raj", lastName: "Malhotra", role: "sales_mgr", department: "Sales" },
+    { email: "mkt_mgr@aurelian.com", firstName: "Kavita", lastName: "Nair", role: "mkt_mgr", department: "Marketing" },
+    { email: "waiter@aurelian.com", firstName: "Amit", lastName: "Kumar", role: "waiter", department: "F&B" },
+    { email: "technician@aurelian.com", firstName: "Sunil", lastName: "Yadav", role: "technician", department: "Engineering" },
+    { email: "hk_attendant@aurelian.com", firstName: "Lakshmi", lastName: "Bai", role: "hk_attendant", department: "Housekeeping" },
+    { email: "sales_exec@aurelian.com", firstName: "Vivek", lastName: "Rao", role: "sales_exec", department: "Sales" },
+    { email: "mkt_exec@aurelian.com", firstName: "Pooja", lastName: "Das", role: "mkt_exec", department: "Marketing" },
+  ];
+  await db.user.createMany({
+    data: roles.map((r, i) => ({
+      propertyId,
+      email: r.email,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      role: r.role,
+      department: r.department,
+      phone: `+91-98765${String(1000 + i).slice(-5)}`,
+      status: "active",
+    })),
+    skipDuplicates: true,
+  });
+
+  // Departments
+  const depts = ["Management", "Front Office", "Housekeeping", "F&B", "Finance", "Engineering", "Revenue", "HR", "Sales", "Marketing"];
+  await db.department.createMany({
+    data: depts.map((name, i) => ({
+      propertyId,
+      name,
+      code: name.slice(0, 3).toUpperCase(),
+      headRole: roles[i]?.role || "owner",
+    })),
+    skipDuplicates: true,
+  });
+
+  // Rate plan
+  await db.ratePlan.createMany({
+    data: [
+      { propertyId, name: "Standard Rate", code: "RACK", roomCategoryId: "cat-deluxe", baseRate: 4500, mealPlan: "EP", season: "default" },
+      { propertyId, name: "Suite Rate", code: "SUITE", roomCategoryId: "cat-suite", baseRate: 8500, mealPlan: "CP", season: "default" },
+    ],
+    skipDuplicates: true,
+  });
+
+  // Demo reservations
+  const rooms = await db.room.findMany({ where: { propertyId, status: "occupied" }, take: 4 });
+  const today = new Date();
+  for (let i = 0; i < rooms.length; i++) {
+    const room = rooms[i];
+    const cat = await db.roomCategory.findUnique({ where: { id: room.roomCategoryId } });
+    await db.reservation.create({
+      data: {
+        propertyId,
+        confirmationNumber: `AUR-${1001 + i}`,
+        guestName: ["Arjun Reddy", "Sanjay Gupta", "Priya Nair", "Rohan Singh"][i],
+        guestEmail: [`arjun@demo.com`, `sanjay@demo.com`, `priya@demo.com`, `rohan@demo.com`][i],
+        guestPhone: `+91-99999${1000 + i}`,
+        roomId: room.id,
+        roomCategoryId: room.roomCategoryId,
+        checkIn: new Date(today.getTime() - (i + 1) * 86400000),
+        checkOut: new Date(today.getTime() + (3 - i) * 86400000),
+        adults: 2,
+        children: 0,
+        rate: cat?.baseRate ?? 4500,
+        ratePlanCode: "RACK",
+        status: "checked_in",
+        source: ["Walk-in", "Booking.com", "Direct", "MakeMyTrip"][i],
+        specialRequests: ["Late checkout", "", "Extra pillow", ""],
+      },
+    });
+  }
+}
+
 export const PROPERTY_ID = async () => {
   if (_cachedPropertyId) return _cachedPropertyId;
-  const p = await db.property.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!p) throw new Error("No property configured");
+  const p = await ensureProperty();
   _cachedPropertyId = p.id;
   return p.id;
 };
@@ -128,6 +279,8 @@ export async function nextNumber(
 
 // ─── Real-time broadcast (best-effort) ───────────────────────────────────────
 export async function broadcast(event: string, payload: any, propertyId?: string) {
+  // Skip broadcast on Vercel — no local websocket server available
+  if (process.env.VERCEL) return;
   try {
     const body = JSON.stringify({ event, payload, propertyId });
     await fetch("http://localhost:3003/broadcast", {

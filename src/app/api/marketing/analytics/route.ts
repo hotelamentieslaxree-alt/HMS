@@ -1,6 +1,6 @@
 // ARIA HMS — Marketing Analytics API
-import { NextRequest, NextResponse } from "next/server";
-import { withHandler } from "@/lib/hms";
+import { NextRequest } from "next/server";
+import { ok, withHandler } from "@/lib/hms";
 
 export const GET = withHandler(async (req: NextRequest) => {
   const url = new URL(req.url);
@@ -54,5 +54,5 @@ export const GET = withHandler(async (req: NextRequest) => {
     },
   };
 
-  return NextResponse.json({ success: true, data: analytics });
+  return ok(analytics);
 });

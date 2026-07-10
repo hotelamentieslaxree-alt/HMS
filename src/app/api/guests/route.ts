@@ -1,6 +1,6 @@
 // /api/guests — list (search) + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, withHandler } from "@/lib/hms";
+import { ok, fail, parseBody, safeJsonParse, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export const GET = withHandler(async (req: Request) => {
     doNotDisturb: g.doNotDisturb,
     totalStays: g.totalStays,
     totalRevenue: g.totalRevenue,
-    preferences: g.preferences ? JSON.parse(g.preferences) : {},
+    preferences: safeJsonParse(g.preferences, {}),
     reservationCount: g.primaryReservations.length,
     blacklisted: g.blacklisted,
   })));

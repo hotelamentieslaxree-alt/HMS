@@ -1,6 +1,6 @@
 // /api/housekeeping — task list + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, broadcast, PROPERTY_ID, withHandler } from "@/lib/hms";
+import { ok, fail, parseBody, broadcast, safeJsonParse, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export const GET = withHandler(async (req: Request) => {
       completedAt: t.completedAt,
       inspectedAt: t.inspectedAt,
       notes: t.notes,
-      checklist: t.checklist ? JSON.parse(t.checklist) : [],
+      checklist: safeJsonParse(t.checklist, []),
       rejectionReason: t.rejectionReason,
       room: {
         id: t.room.id,

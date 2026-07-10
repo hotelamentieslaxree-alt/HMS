@@ -1,6 +1,6 @@
 // ARIA HMS — Marketing Campaigns API
-import { NextRequest, NextResponse } from "next/server";
-import { withHandler } from "@/lib/hms";
+import { NextRequest } from "next/server";
+import { ok, parseBody, withHandler } from "@/lib/hms";
 
 // Mock campaigns data
 const campaigns = [
@@ -25,11 +25,11 @@ export const GET = withHandler(async (req: NextRequest) => {
   if (platform) filtered = filtered.filter(c => c.platform === platform);
   if (type) filtered = filtered.filter(c => c.type === type);
 
-  return NextResponse.json({ success: true, data: filtered, meta: { total: filtered.length } });
+  return ok(filtered, { total: filtered.length });
 });
 
 export const POST = withHandler(async (req: NextRequest) => {
-  const body = await req.json();
+  const body = await parseBody(req);
   const newCampaign = {
     id: `c${Date.now()}`,
     propertyId: "prop1",
@@ -37,5 +37,5 @@ export const POST = withHandler(async (req: NextRequest) => {
     spent: 0, impressions: 0, clicks: 0, conversions: 0, leads: 0, revenue: 0,
   };
   campaigns.push(newCampaign);
-  return NextResponse.json({ success: true, data: newCampaign }, { status: 201 });
+  return ok(newCampaign);
 });
