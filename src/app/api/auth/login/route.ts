@@ -1,5 +1,5 @@
 // Auth — Login
-import { db } from "@/lib/db";
+import { db, ensureDbReady } from "@/lib/db";
 import { ok, fail } from "@/lib/hms";
 import { NextRequest } from "next/server";
 import { createHmac } from "crypto";
@@ -14,6 +14,9 @@ function hashPassword(password: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // Ensure DB is ready on Vercel serverless
+    await ensureDbReady();
+    
     const body = await req.json();
     const { email, password } = body;
 
@@ -35,7 +38,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (!user || !user.isActive) {
+    if (!user || user.status !== "active") {
       return fail("Invalid email or password", "AUTH_INVALID", 401);
     }
 
@@ -48,8 +51,8 @@ export async function POST(req: NextRequest) {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      roleLevel: user.roleLevel,
-      employeeCode: user.employeeCode,
+      roleLevel: user.roleLevel || 1,
+      employeeCode: user.employeeCode || "",
       phone: user.phone,
       avatarUrl: user.avatarUrl,
       department: user.department ? { id: user.department.id, name: user.department.name, code: user.department.code } : null,

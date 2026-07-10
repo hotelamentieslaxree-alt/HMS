@@ -206,6 +206,8 @@ export function withHandler<
 >(fn: (...args: A) => R) {
   return async (...args: A): Promise<Response> => {
     try {
+      // Ensure DB is ready on Vercel serverless (creates tables if needed)
+      await ensureDbReady();
       return await fn(...args);
     } catch (e: any) {
       const message = e?.message || "Internal server error";
