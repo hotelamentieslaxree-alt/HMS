@@ -1,6 +1,6 @@
 // ARIA HMS — API helpers
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, ensureDbReady } from "@/lib/db";
 
 // ─── Safe JSON parse ────────────────────────────────────────────────────────
 export function safeJsonParse<T>(str: string | null | undefined, fallback: T): T {
@@ -159,6 +159,8 @@ async function seedDemoData(propertyId: string) {
 
 export const PROPERTY_ID = async () => {
   if (_cachedPropertyId) return _cachedPropertyId;
+  // Ensure DB schema is ready (Vercel serverless cold start)
+  await ensureDbReady();
   const p = await ensureProperty();
   _cachedPropertyId = p.id;
   return p.id;
