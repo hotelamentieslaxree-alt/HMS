@@ -34,21 +34,61 @@ export const db = globalForPrisma.prisma ?? createPrismaClient()
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 
 /**
+ * Reconnect PrismaClient to a different database file.
+ * Used after downloading the seed DB to /tmp on Vercel.
+ */
+function reconnectPrismaClient() {
+  if (globalForPrisma.prisma) {
+    try { globalForPrisma.prisma.$disconnect(); } catch {}
+  }
+  // Force a new PrismaClient that will read the now-existing /tmp/hms.db
+  globalForPrisma.prisma = new PrismaClient({ log: ['error', 'warn'] })
+  // Replace the exported `db` — since it's a const, we use a getter pattern
+  // Actually, we need to make `db` dynamic. Let's use a Proxy.
+}
+
+// Use a Proxy so that db calls always go through the current globalForPrisma.prisma
+const dbProxy = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = globalForPrisma.prisma ?? createPrismaClient()
+    if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = client
+    const value = (client as any)[prop]
+    if (typeof value === 'function') {
+      return value.bind(client)
+    }
+    return value
+  }
+})
+
+// Override the const db export — we need to change the approach
+// Actually, let's just make `db` a getter
+// The simplest approach: re-export from a mutable reference
+
+let _db: PrismaClient = globalForPrisma.prisma ?? createPrismaClient()
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = _db
+
+export { _db as db }
+
+/** Replace the active database client (used after seed DB download) */
+export function replaceDbClient(newClient: PrismaClient) {
+  _db = newClient
+  globalForPrisma.prisma = newClient
+}
+
+/**
  * On Vercel serverless, each cold start gets a fresh /tmp filesystem.
- * Strategy: Download the seed database (pre-built with schema + no data)
- * from the app's own static assets, copy to /tmp, then let auto-seeding
- * populate the demo data.
+ * Strategy: Download the seed database (pre-built with schema) from
+ * the app's own static assets, copy to /tmp/hms.db, then reconnect
+ * PrismaClient. Auto-seeding will populate demo data after.
  */
 export async function ensureDbReady() {
   if (globalForPrisma._dbInitialized) return
   if (process.env.TURSO_DATABASE_URL) return // Turso is persistent
   if (!process.env.VERCEL) return // Local dev — file persists
 
-  const dbPath = '/tmp/hms.db'
-
   // Quick check if tables already exist (warm invocation)
   try {
-    await db.property.findFirst()
+    await _db.property.findFirst()
     globalForPrisma._dbInitialized = true
     return
   } catch {
@@ -57,42 +97,28 @@ export async function ensureDbReady() {
 
   try {
     // Download the seed DB from our own static hosting
-    // The build script puts the seed DB at public/hms-seed.db
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'https://my-project-steel-omega.vercel.app'
     
+    console.log('[DB] Downloading seed DB from', `${baseUrl}/hms-seed.db`)
     const response = await fetch(`${baseUrl}/hms-seed.db`)
+    
     if (response.ok) {
       const buffer = Buffer.from(await response.arrayBuffer())
-      fs.writeFileSync(dbPath, buffer)
+      fs.writeFileSync('/tmp/hms.db', buffer)
       console.log('[DB] Downloaded seed DB:', buffer.length, 'bytes')
+      
+      // Reconnect PrismaClient to the now-existing /tmp/hms.db
+      const newClient = new PrismaClient({ log: ['error', 'warn'] })
+      replaceDbClient(newClient)
+      
+      // Verify it works
+      await _db.property.findFirst()
+      console.log('[DB] Database ready after seed download')
     } else {
-      console.error('[DB] Failed to download seed DB:', response.status)
-      // Fallback: try to find it in the bundled files
-      const possiblePaths = [
-        path.join(process.cwd(), 'public', 'hms-seed.db'),
-        path.join(process.cwd(), '.next', 'server', 'public', 'hms-seed.db'),
-      ]
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          fs.copyFileSync(p, dbPath)
-          console.log('[DB] Copied seed DB from', p)
-          break
-        }
-      }
+      console.error('[DB] Failed to download seed DB:', response.status, await response.text().catch(() => ''))
     }
-    
-    // Re-create PrismaClient pointing to the now-existing DB
-    const { PrismaClient } = require('@prisma/client')
-    if (globalForPrisma.prisma) {
-      try { await globalForPrisma.prisma.$disconnect() } catch {}
-    }
-    globalForPrisma.prisma = new PrismaClient({ log: ['error', 'warn'] })
-    
-    // Verify it works
-    await db.property.findFirst()
-    console.log('[DB] Database ready')
   } catch (e: any) {
     console.error('[DB] Setup failed:', e.message?.slice(0, 300))
   }
