@@ -1,22 +1,17 @@
 // Auth — Login
 import { db, ensureDbReady } from "@/lib/db";
-import { ok, fail } from "@/lib/hms";
+import { ok, fail, PROPERTY_ID } from "@/lib/hms";
 import { NextRequest } from "next/server";
-import { createHmac } from "crypto";
 
 // Demo password for all users — in production use bcrypt
 const DEMO_PASSWORD = "aurelian2024";
-const PASSWORD_SALT = "aria_hms_salt";
-
-function hashPassword(password: string): string {
-  return createHmac("sha256", PASSWORD_SALT).update(password).digest("hex");
-}
 
 export async function POST(req: NextRequest) {
   try {
-    // Ensure DB is ready on Vercel serverless
+    // Ensure DB is ready on Vercel serverless and trigger auto-seed if empty
     await ensureDbReady();
-    
+    await PROPERTY_ID(); // triggers ensureProperty → seedDemoData on first run
+
     const body = await req.json();
     const { email, password } = body;
 
@@ -24,7 +19,7 @@ export async function POST(req: NextRequest) {
       return fail("Email and password are required", "VALIDATION", 400);
     }
 
-    // Verify password
+    // Verify password (demo: all users share one password)
     if (password !== DEMO_PASSWORD) {
       return fail("Invalid email or password", "AUTH_INVALID", 401);
     }
@@ -38,7 +33,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (!user || user.status !== "active") {
+    // Schema uses `isActive` (Boolean), not `status` (String)
+    if (!user || !user.isActive) {
       return fail("Invalid email or password", "AUTH_INVALID", 401);
     }
 

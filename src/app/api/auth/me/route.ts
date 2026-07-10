@@ -1,10 +1,12 @@
 // Auth — Get current user
-import { db } from "@/lib/db";
+import { db, ensureDbReady } from "@/lib/db";
 import { ok, fail } from "@/lib/hms";
 import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
+    // Ensure DB is ready on Vercel serverless
+    await ensureDbReady();
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
       return fail("Not authenticated", "AUTH_REQUIRED", 401);

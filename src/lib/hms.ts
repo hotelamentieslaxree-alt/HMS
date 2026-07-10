@@ -39,22 +39,22 @@ async function ensureProperty() {
 
 /** Seed demo data for the property — runs once on first access */
 async function seedDemoData(propertyId: string) {
-  // Room categories
-  const cats = await db.roomCategory.createMany({
+  // Room categories — fields must match prisma schema
+  await db.roomCategory.createMany({
     data: [
-      { id: "cat-deluxe", propertyId, name: "Deluxe Room", code: "DLX", baseRate: 4500, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar"]), roomCount: 10 },
-      { id: "cat-suite", propertyId, name: "Executive Suite", code: "EXE", baseRate: 8500, maxOccupancy: 3, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Bathtub", "Lounge"]), roomCount: 8 },
-      { id: "cat-premium", propertyId, name: "Premium Room", code: "PRM", baseRate: 6500, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Coffee Machine"]), roomCount: 6 },
-      { id: "cat-standard", propertyId, name: "Standard Room", code: "STD", baseRate: 3000, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC"]), roomCount: 2 },
+      { id: "cat-deluxe", propertyId, name: "Deluxe Room", code: "DLX", baseRate: 4500, maxAdults: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar"]) },
+      { id: "cat-suite", propertyId, name: "Executive Suite", code: "EXE", baseRate: 8500, maxAdults: 3, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Bathtub", "Lounge"]) },
+      { id: "cat-premium", propertyId, name: "Premium Room", code: "PRM", baseRate: 6500, maxAdults: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Coffee Machine"]) },
+      { id: "cat-standard", propertyId, name: "Standard Room", code: "STD", baseRate: 3000, maxAdults: 2, amenities: JSON.stringify(["WiFi", "TV", "AC"]) },
     ],
   });
 
-  // Rooms
+  // Rooms — fields must match prisma schema (categoryId, roomNumber, currentStatus)
   const roomData: any[] = [];
   const catConfigs = [
     { catId: "cat-deluxe", prefix: "1", count: 10, floor: 1 },
     { catId: "cat-suite", prefix: "2", count: 8, floor: 2 },
-    { id: "cat-premium", catId: "cat-premium", prefix: "3", count: 6, floor: 3 },
+    { catId: "cat-premium", prefix: "3", count: 6, floor: 3 },
     { catId: "cat-standard", prefix: "4", count: 2, floor: 4 },
   ];
   for (const cfg of catConfigs) {
@@ -62,11 +62,10 @@ async function seedDemoData(propertyId: string) {
       const num = `${cfg.prefix}${String(i).padStart(2, "0")}`;
       roomData.push({
         propertyId,
-        roomCategoryId: cfg.catId,
-        number: num,
+        categoryId: cfg.catId,
+        roomNumber: num,
         floor: cfg.floor,
-        status: i <= 4 ? "occupied" : i === 5 ? "maintenance" : "available",
-        rate: 4500 + (cfg.floor - 1) * 2000,
+        currentStatus: i <= 4 ? "occupied_clean" : i === 5 ? "out_of_order" : "vacant_clean",
       });
     }
   }
@@ -99,9 +98,7 @@ async function seedDemoData(propertyId: string) {
       firstName: r.firstName,
       lastName: r.lastName,
       role: r.role,
-      department: r.department,
       phone: `+91-98765${String(1000 + i).slice(-5)}`,
-      status: "active",
     })),
   });
 
@@ -112,45 +109,22 @@ async function seedDemoData(propertyId: string) {
       propertyId,
       name,
       code: name.slice(0, 3).toUpperCase(),
-      headRole: roles[i]?.role || "owner",
     })),
   });
 
-  // Rate plan
+  // Rate plan — validFrom/validTo required by schema
+  const now = new Date();
   await db.ratePlan.createMany({
     data: [
-      { propertyId, name: "Standard Rate", code: "RACK", roomCategoryId: "cat-deluxe", baseRate: 4500, mealPlan: "EP", season: "default" },
-      { propertyId, name: "Suite Rate", code: "SUITE", roomCategoryId: "cat-suite", baseRate: 8500, mealPlan: "CP", season: "default" },
+      { propertyId, name: "Standard Rate", code: "RACK", mealPlan: "ep", validFrom: now, validTo: new Date(now.getTime() + 365 * 86400000) },
+      { propertyId, name: "Suite Rate", code: "SUITE", mealPlan: "cp", validFrom: now, validTo: new Date(now.getTime() + 365 * 86400000) },
     ],
   });
 
-  // Demo reservations
-  const rooms = await db.room.findMany({ where: { propertyId, status: "occupied" }, take: 4 });
-  const today = new Date();
-  for (let i = 0; i < rooms.length; i++) {
-    const room = rooms[i];
-    const cat = await db.roomCategory.findUnique({ where: { id: room.roomCategoryId } });
-    await db.reservation.create({
-      data: {
-        propertyId,
-        confirmationNumber: `AUR-${1001 + i}`,
-        guestName: ["Arjun Reddy", "Sanjay Gupta", "Priya Nair", "Rohan Singh"][i],
-        guestEmail: [`arjun@demo.com`, `sanjay@demo.com`, `priya@demo.com`, `rohan@demo.com`][i],
-        guestPhone: `+91-99999${1000 + i}`,
-        roomId: room.id,
-        roomCategoryId: room.roomCategoryId,
-        checkIn: new Date(today.getTime() - (i + 1) * 86400000),
-        checkOut: new Date(today.getTime() + (3 - i) * 86400000),
-        adults: 2,
-        children: 0,
-        rate: cat?.baseRate ?? 4500,
-        ratePlanCode: "RACK",
-        status: "checked_in",
-        source: ["Walk-in", "Booking.com", "Direct", "MakeMyTrip"][i],
-        specialRequests: ["Late checkout", "", "Extra pillow", ""],
-      },
-    });
-  }
+  // Demo reservations — fields must match prisma schema
+  // Need primaryGuestId, categoryId, ratePerNight, totalNights, checkInDate, checkOutDate
+  // Since we have no guests yet, skip reservation creation for now
+  // (guests get created when reservations are made through the UI)
 }
 
 export const PROPERTY_ID = async () => {
