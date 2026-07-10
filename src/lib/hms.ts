@@ -47,7 +47,6 @@ async function seedDemoData(propertyId: string) {
       { id: "cat-premium", propertyId, name: "Premium Room", code: "PRM", baseRate: 6500, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Coffee Machine"]), roomCount: 6 },
       { id: "cat-standard", propertyId, name: "Standard Room", code: "STD", baseRate: 3000, maxOccupancy: 2, amenities: JSON.stringify(["WiFi", "TV", "AC"]), roomCount: 2 },
     ],
-    skipDuplicates: true,
   });
 
   // Rooms
@@ -71,7 +70,7 @@ async function seedDemoData(propertyId: string) {
       });
     }
   }
-  await db.room.createMany({ data: roomData, skipDuplicates: true });
+  await db.room.createMany({ data: roomData });
 
   // Demo users (one per role)
   const roles = [
@@ -104,7 +103,6 @@ async function seedDemoData(propertyId: string) {
       phone: `+91-98765${String(1000 + i).slice(-5)}`,
       status: "active",
     })),
-    skipDuplicates: true,
   });
 
   // Departments
@@ -116,7 +114,6 @@ async function seedDemoData(propertyId: string) {
       code: name.slice(0, 3).toUpperCase(),
       headRole: roles[i]?.role || "owner",
     })),
-    skipDuplicates: true,
   });
 
   // Rate plan
@@ -125,7 +122,6 @@ async function seedDemoData(propertyId: string) {
       { propertyId, name: "Standard Rate", code: "RACK", roomCategoryId: "cat-deluxe", baseRate: 4500, mealPlan: "EP", season: "default" },
       { propertyId, name: "Suite Rate", code: "SUITE", roomCategoryId: "cat-suite", baseRate: 8500, mealPlan: "CP", season: "default" },
     ],
-    skipDuplicates: true,
   });
 
   // Demo reservations
