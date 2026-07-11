@@ -52,7 +52,7 @@ export const POST = withHandler(async (req: NextRequest) => {
       email: body.email ?? null,
       department: body.department ?? null,
       consultationFee: body.consultationFee ?? 0,
-      availableDays: body.availableDays ?? "[]",
+      availableDays: body.availableDays ?? [],
       availableFrom: body.availableFrom ?? null,
       availableTo: body.availableTo ?? null,
       status: body.status ?? "active",

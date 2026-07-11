@@ -42,10 +42,10 @@ async function seedDemoData(propertyId: string) {
   // Room categories — fields must match prisma schema
   await db.roomCategory.createMany({
     data: [
-      { id: "cat-deluxe", propertyId, name: "Deluxe Room", code: "DLX", baseRate: 4500, maxAdults: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar"]) },
-      { id: "cat-suite", propertyId, name: "Executive Suite", code: "EXE", baseRate: 8500, maxAdults: 3, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Bathtub", "Lounge"]) },
-      { id: "cat-premium", propertyId, name: "Premium Room", code: "PRM", baseRate: 6500, maxAdults: 2, amenities: JSON.stringify(["WiFi", "TV", "AC", "Mini Bar", "Coffee Machine"]) },
-      { id: "cat-standard", propertyId, name: "Standard Room", code: "STD", baseRate: 3000, maxAdults: 2, amenities: JSON.stringify(["WiFi", "TV", "AC"]) },
+      { id: "cat-deluxe", propertyId, name: "Deluxe Room", code: "DLX", baseRate: 4500, maxAdults: 2, amenities: ["WiFi", "TV", "AC", "Mini Bar"] },
+      { id: "cat-suite", propertyId, name: "Executive Suite", code: "EXE", baseRate: 8500, maxAdults: 3, amenities: ["WiFi", "TV", "AC", "Mini Bar", "Bathtub", "Lounge"] },
+      { id: "cat-premium", propertyId, name: "Premium Room", code: "PRM", baseRate: 6500, maxAdults: 2, amenities: ["WiFi", "TV", "AC", "Mini Bar", "Coffee Machine"] },
+      { id: "cat-standard", propertyId, name: "Standard Room", code: "STD", baseRate: 3000, maxAdults: 2, amenities: ["WiFi", "TV", "AC"] },
     ],
   });
 
@@ -290,8 +290,8 @@ export async function logAudit(opts: {
         action: opts.action,
         entityType: opts.entityType ?? null,
         entityId: opts.entityId ?? null,
-        oldValue: opts.oldValue ? JSON.stringify(opts.oldValue) : null,
-        newValue: opts.newValue ? JSON.stringify(opts.newValue) : null,
+        oldValue: opts.oldValue ?? null,
+        newValue: opts.newValue ?? null,
         ipAddress: opts.ipAddress ?? null,
       },
     });

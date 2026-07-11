@@ -1,6 +1,6 @@
 // GET /api/rooms — list all rooms with category + status
 import { db } from "@/lib/db";
-import { ok, PROPERTY_ID, safeJsonParse, withHandler } from "@/lib/hms";
+import { ok, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export const GET = withHandler(async () => {
       blockedReason: r.blockedReason,
       blockedUntil: r.blockedUntil,
       notes: r.notes,
-      category: { id: r.category.id, name: r.category.name, code: r.category.code, baseRate: r.category.baseRate, maxAdults: r.category.maxAdults, maxChildren: r.category.maxChildren, amenities: safeJsonParse(r.category.amenities, []) },
+      category: { id: r.category.id, name: r.category.name, code: r.category.code, baseRate: r.category.baseRate, maxAdults: r.category.maxAdults, maxChildren: r.category.maxChildren, amenities: r.category.amenities ?? [] },
     })),
   });
 });

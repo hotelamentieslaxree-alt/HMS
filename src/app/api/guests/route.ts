@@ -1,6 +1,6 @@
 // /api/guests — list (search) + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, safeJsonParse, withHandler } from "@/lib/hms";
+import { ok, fail, parseBody, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export const GET = withHandler(async (req: Request) => {
     doNotDisturb: g.doNotDisturb,
     totalStays: g.totalStays,
     totalRevenue: g.totalRevenue,
-    preferences: safeJsonParse(g.preferences, {}),
+    preferences: g.preferences ?? {},
     reservationCount: g.primaryReservations.length,
     blacklisted: g.blacklisted,
   })));
@@ -60,7 +60,7 @@ export const POST = withHandler(async (req: Request) => {
   const guest = await db.guest.create({
     data: {
       title, firstName, lastName, email, phone, nationality, idType, idNumber,
-      preferences: preferences ? JSON.stringify(preferences) : "{}",
+      preferences: preferences ?? {},
       vipStatus,
     },
   });

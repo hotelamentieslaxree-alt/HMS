@@ -1,14 +1,12 @@
 // ARIA HMS — Hospitality Operating System
-// Prisma schema (SQLite). Note: SQLite has no native ENUM / array / JSONB,
-// so enums are stored as String with app-level validation, and arrays/objects
-// are stored as JSON strings.
+// Prisma schema (PostgreSQL)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -138,7 +136,7 @@ model RoomCategory {
   maxAdults           Int      @default(2)
   maxChildren         Int      @default(1)
   baseRate            Float
-  amenities           String   @default("[]") // JSON array
+  amenities           Json     @default([])
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -237,7 +235,7 @@ model Guest {
   country         String   @default("IN")
   loyaltyTier     String   @default("silver") // none | silver | gold | platinum
   loyaltyPoints   Int      @default(0)
-  preferences     String   @default("{}") // JSON
+  preferences     Json     @default({})
   vipStatus       Boolean  @default(false)
   doNotDisturb    Boolean  @default(false)
   totalStays      Int      @default(0)
@@ -400,7 +398,7 @@ model HousekeepingTask {
   inspectedById String?
   inspectedAt   DateTime?
   rejectionReason String?
-  checklist     String   @default("[]") // JSON array of {item, done}
+  checklist     Json     @default([])
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -477,7 +475,7 @@ model MenuCategory {
   name       String
   sortOrder  Int      @default(0)
   isActive   Boolean  @default(true)
-  mealPeriod String   @default("[]") // JSON array
+  mealPeriod Json     @default([])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -495,7 +493,7 @@ model MenuItem {
   price         Float
   itemType      String   @default("food") // food | beverage | package
   dietType      String   @default("veg") // veg | non_veg | vegan | contains_egg | contains_alcohol
-  allergens     String   @default("[]")
+  allergens     Json     @default([])
   preparationTimeMinutes Int @default(15)
   isAvailable   Boolean  @default(true)
   isFeatured    Boolean  @default(false)
@@ -593,8 +591,8 @@ model AuditLog {
   action      String
   entityType  String?
   entityId    String?
-  oldValue    String?  // JSON
-  newValue    String?  // JSON
+  oldValue    Json?
+  newValue    Json?
   ipAddress   String?
   occurredAt  DateTime @default(now())
 
@@ -876,7 +874,7 @@ model ModuleConfig {
   propertyId  String
   moduleKey   String   // e.g. "hospital", "inventory", "finance"
   enabled     Boolean  @default(false)
-  config      String   @default("{}") // JSON: module-specific config
+  config      Json     @default({})
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -989,8 +987,8 @@ model Patient {
   email           String?
   address         String?
   bloodGroup      String?
-  allergies       String   @default("[]") // JSON array
-  medicalHistory  String   @default("{}") // JSON
+  allergies       Json     @default([])
+  medicalHistory  Json     @default({})
   emergencyContact String?
   insuranceProvider String?
   insurancePolicy String?
@@ -1016,7 +1014,7 @@ model Doctor {
   email         String?
   department    String?
   consultationFee Float  @default(0)
-  availableDays String   @default("[]") // JSON array: ["MON","TUE",...]
+  availableDays Json     @default([])
   availableFrom String?  // e.g. "09:00"
   availableTo   String?  // e.g. "17:00"
   status        String   @default("active") // active | on_leave | inactive
@@ -1214,7 +1212,7 @@ model Task {
   dueDate     DateTime?
   completedAt DateTime?
   moduleKey   String?  // which module created this task
-  tags        String   @default("[]") // JSON array
+  tags        Json     @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1236,7 +1234,7 @@ model Document {
   fileUrl      String?
   fileSize     Int      @default(0) // bytes
   uploadedById String?
-  tags         String   @default("[]") // JSON
+  tags         Json     @default([])
   isTemplate   Boolean  @default(false)
   version      Int      @default(1)
   status       String   @default("active") // active | archived | deleted
@@ -1260,8 +1258,8 @@ model IntegrationConfig {
   provider     String   // booking_com | agoda | expedia | razorpay | stripe | whatsapp | gmail | tally | zoho
   category     String   // ota | payment | communication | accounting
   isActive     Boolean  @default(false)
-  credentials  String   @default("{}") // JSON: encrypted credentials
-  settings     String   @default("{}") // JSON: integration settings
+  credentials  Json     @default({})
+  settings     Json     @default({})
   lastSyncAt   DateTime?
   syncStatus   String   @default("never") // never | syncing | success | error
   syncError    String?

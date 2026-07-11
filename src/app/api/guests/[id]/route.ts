@@ -1,6 +1,6 @@
 // /api/guests/[id] — detail with stay history
 import { db } from "@/lib/db";
-import { ok, fail, safeJsonParse, withHandler } from "@/lib/hms";
+import { ok, fail, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export const GET = withHandler(async (req: Request, { params }: { params: Promis
 
   return ok({
     ...guest,
-    preferences: safeJsonParse(guest.preferences, {}),
+    preferences: guest.preferences ?? {},
     stayHistory: guest.primaryReservations.map((r) => {
       const folio = r.folios[0];
       const total = folio ? folio.lines.filter((l) => !l.isVoided && l.transactionType === "charge").reduce((s, l) => s + l.amount + l.taxAmount, 0) : 0;

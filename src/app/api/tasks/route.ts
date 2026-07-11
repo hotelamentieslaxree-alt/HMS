@@ -65,7 +65,7 @@ export const POST = withHandler(async (req: NextRequest) => {
       assignedById: body.assignedById ?? null,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       moduleKey: body.moduleKey ?? null,
-      tags: body.tags ?? "[]",
+      tags: body.tags ?? [],
     },
     include: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },

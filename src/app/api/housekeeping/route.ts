@@ -1,6 +1,6 @@
 // /api/housekeeping — task list + create
 import { db } from "@/lib/db";
-import { ok, fail, parseBody, broadcast, safeJsonParse, PROPERTY_ID, withHandler } from "@/lib/hms";
+import { ok, fail, parseBody, broadcast, PROPERTY_ID, withHandler } from "@/lib/hms";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export const GET = withHandler(async (req: Request) => {
       completedAt: t.completedAt,
       inspectedAt: t.inspectedAt,
       notes: t.notes,
-      checklist: safeJsonParse(t.checklist, []),
+      checklist: t.checklist ?? [],
       rejectionReason: t.rejectionReason,
       room: {
         id: t.room.id,
@@ -62,14 +62,14 @@ export const POST = withHandler(async (req: Request) => {
     data: {
       propertyId, roomId, taskType, priority, assignedToId: assignedToId || null,
       notes: notes || null, scheduledFor: new Date(),
-      checklist: JSON.stringify([
+      checklist: [
         { item: "Bed linen changed", done: false },
         { item: "Bathroom sanitized", done: false },
         { item: "Towels replaced", done: false },
         { item: "Amenities restocked", done: false },
         { item: "Floor vacuumed", done: false },
         { item: "Minibar checked", done: false },
-      ]),
+      ],
     },
     include: { room: { include: { category: true } }, assignee: true },
   });

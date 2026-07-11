@@ -27,7 +27,7 @@ export const GET = withHandler(async () => {
       group: def.group,
       required: def.required ?? false,
       enabled: dbEntry ? dbEntry.enabled : def.enabled,
-      config: dbEntry ? dbEntry.config : "{}",
+      config: dbEntry ? dbEntry.config : {},
       dbId: dbEntry?.id ?? null,
     };
   });

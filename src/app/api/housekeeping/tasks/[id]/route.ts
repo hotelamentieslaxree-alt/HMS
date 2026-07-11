@@ -17,7 +17,7 @@ export const PUT = withHandler(async (req: Request, { params }: { params: Promis
   if (status) updates.status = status;
   if (rejectionReason) updates.rejectionReason = rejectionReason;
   if (notes) updates.notes = notes;
-  if (checklist) updates.checklist = JSON.stringify(checklist);
+  if (checklist) updates.checklist = checklist;
 
   if (status === "in_progress" && !task.startedAt) updates.startedAt = new Date();
   if (status === "completed" && !task.completedAt) updates.completedAt = new Date();
