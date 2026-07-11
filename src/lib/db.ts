@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
+import { execSync } from 'child_process'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -45,7 +46,7 @@ function getOrCreateClient(): PrismaClient {
   return _activeClient
 }
 
-/** Replace the active database client (used after seed DB download on Vercel) */
+/** Replace the active database client (used after schema push on Vercel) */
 function replaceDbClient(newClient: PrismaClient) {
   if (_activeClient) {
     try { _activeClient.$disconnect(); } catch {}
@@ -82,13 +83,13 @@ export async function ensureDbReady() {
     return
   }
 
-  // Vercel: deduplicate
+  // Vercel: deduplicate concurrent calls
   if (_ensureDbPromise) {
     await _ensureDbPromise
     return
   }
 
-  _ensureDbPromise = _downloadSeedDb()
+  _ensureDbPromise = _initVercelDb()
   try {
     await _ensureDbPromise
   } finally {
@@ -96,8 +97,17 @@ export async function ensureDbReady() {
   }
 }
 
-async function _downloadSeedDb() {
-  // If file already exists with valid data, just reconnect and verify
+/**
+ * Vercel cold-start strategy (NO external download):
+ *
+ * 1. Check if /tmp/hms.db already exists with valid data → warm start
+ * 2. If not, run `prisma db push` which creates /tmp/hms.db with all tables
+ * 3. Then ensureProperty() → seedDemoData() in hms.ts fills in demo rows
+ *
+ * This is 100% self-contained — zero dependency on any external URL.
+ */
+async function _initVercelDb() {
+  // ─── Warm start: reuse existing valid DB ──────────────────────────────────
   if (fs.existsSync('/tmp/hms.db')) {
     try {
       const stat = fs.statSync('/tmp/hms.db')
@@ -107,9 +117,10 @@ async function _downloadSeedDb() {
           await client.property.findFirst()
           replaceDbClient(client)
           globalForPrisma._dbInitialized = true
-          console.log('[DB] Warm start — reusing /tmp/hms.db')
+          console.log('[DB] Warm start — reusing /tmp/hms.db (' + stat.size + ' bytes)')
           return
         } catch {
+          // DB file exists but tables missing or corrupt
           try { client.$disconnect(); } catch {}
         }
       }
@@ -118,43 +129,32 @@ async function _downloadSeedDb() {
     try { fs.unlinkSync('/tmp/hms.db'); } catch {}
   }
 
-  // Download seed DB — try multiple URL sources
-  const urls = [
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/hms-seed.db` : null,
-    'https://chandracycle.vercel.app/hms-seed.db',
-  ].filter(Boolean) as string[]
-
-  for (const url of urls) {
-    try {
-      console.log('[DB] Downloading seed DB from', url)
-      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
-      if (!response.ok) {
-        console.warn('[DB] HTTP', response.status, 'from', url)
-        continue
-      }
-      const buffer = Buffer.from(await response.arrayBuffer())
-      if (buffer.length < 10000) {
-        console.warn('[DB] File too small:', buffer.length, 'bytes from', url)
-        continue
-      }
-      fs.writeFileSync('/tmp/hms.db', buffer)
-      console.log('[DB] Downloaded:', buffer.length, 'bytes')
-
-      const client = createPrismaClient()
-      try {
-        await client.property.findFirst()
-        replaceDbClient(client)
-        globalForPrisma._dbInitialized = true
-        console.log('[DB] Ready ✓')
-        return
-      } catch (verifyErr: any) {
-        console.error('[DB] Verify failed:', verifyErr.message?.slice(0, 200))
-        try { client.$disconnect(); } catch {}
-      }
-    } catch (e: any) {
-      console.warn('[DB] Download error from', url, ':', e.message?.slice(0, 150))
-    }
+  // ─── Cold start: create fresh DB with schema ──────────────────────────────
+  console.log('[DB] Cold start — pushing schema to /tmp/hms.db')
+  try {
+    // prisma db push creates the SQLite file + all tables
+    execSync('npx prisma db push --skip-generate', {
+      stdio: 'pipe',
+      timeout: 30_000,
+      env: { ...process.env, DATABASE_URL: 'file:/tmp/hms.db' },
+    })
+    console.log('[DB] Schema push complete')
+  } catch (e: any) {
+    console.error('[DB] Schema push failed:', e.message?.slice(0, 300))
+    // Fallback: try creating client anyway — might work if schema already exists
   }
 
-  console.error('[DB] All download attempts failed')
+  // Create PrismaClient and verify
+  const client = createPrismaClient()
+  try {
+    await client.property.findFirst()
+    replaceDbClient(client)
+    globalForPrisma._dbInitialized = true
+    console.log('[DB] Ready ✓')
+  } catch (verifyErr: any) {
+    console.error('[DB] Verify failed after schema push:', verifyErr.message?.slice(0, 300))
+    // Last resort: still set client so app doesn't completely crash
+    replaceDbClient(client)
+    globalForPrisma._dbInitialized = true
+  }
 }
