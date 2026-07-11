@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { useApi } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { KpiCard, fmtINR, fmtDate } from "../shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ChefHat, Clock, CheckCircle2, AlertTriangle, Flame,
-  UtensilsCrossed, Timer, ArrowRight, Plus, Bell,
-  Flame as FireIcon, Utensils, Coffee, Sandwich, Salad, IceCream,
+  Timer, Plus, Bell,
+  Utensils, Coffee, Sandwich,
 } from "lucide-react";
 
 // ─── TYPES ───────────────────────────────────────────────────────────

@@ -308,6 +308,7 @@ model Reservation {
   room         Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
   ratePlan     RatePlan?    @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
   folios       Folio[]
+  posOrders    PosOrder[]
 
   @@index([propertyId, status])
   @@index([propertyId, checkInDate])
@@ -514,6 +515,7 @@ model PosOrder {
   outletId      String
   tableId       String?
   reservationId String?
+  reservation   Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   orderType     String   @default("dine_in") // dine_in | room_service | takeaway | delivery | banquet
   status        String   @default("draft") // draft | sent_to_kitchen | in_preparation | ready | served | billed | paid | void
   waiterId      String?
