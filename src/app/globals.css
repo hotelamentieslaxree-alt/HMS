@@ -161,10 +161,14 @@
   .text-gold { color: var(--hms-gold); }
   .text-navy { color: var(--hms-navy); }
   .bg-navy { background-color: var(--hms-navy); }
+  .bg-navy-light { background-color: var(--hms-navy-light); }
   .bg-gold { background-color: var(--hms-gold); }
+  .bg-gold-light { background-color: var(--hms-gold-light); }
   .bg-surface { background-color: var(--hms-surface); }
   .border-gold { border-color: var(--hms-gold); }
   .ring-gold { --tw-ring-color: var(--hms-gold); }
+  .hover\:bg-navy-light:hover { background-color: var(--hms-navy-light); }
+  .hover\:bg-gold-light:hover { background-color: var(--hms-gold-light); }
   .font-display { font-family: var(--font-display), Georgia, serif; }
   .font-mono-num { font-family: var(--font-mono), monospace; font-variant-numeric: tabular-nums; }
   .shadow-glow-gold { box-shadow: 0 0 24px rgba(201, 149, 42, 0.25); }
@@ -175,6 +179,7 @@
   .role-bar-gm { border-left: 3px solid var(--role-gm); }
   .role-bar-manager { border-left: 3px solid var(--role-manager); }
   .role-bar-staff { border-left: 3px solid var(--role-staff); }
+  .role-bar-gold { border-left: 3px solid var(--hms-gold); }
 
   /* Room status colors */
   .room-vc { background-color: #DCFCE7; border-color: #16A34A; color: #14532D; } /* vacant_clean */
