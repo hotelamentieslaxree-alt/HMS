@@ -15,7 +15,7 @@ import {
   Wrench, UtensilsCrossed, AlertCircle, Activity, ArrowRight, Users,
   Shield, DollarSign, BarChart3, Clock, CheckCircle2, AlertTriangle,
   ClipboardList, ChefHat, CreditCard, Wallet, FileText, UserCog, Building2,
-  MoonStar, Calendar,
+  MoonStar, Calendar, ShoppingCart, Package, AlertOctagon, Warehouse, Star,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
@@ -39,6 +39,7 @@ export function DashboardModule() {
     role === "hr_mgr" ? "hr" :
     role === "sales_mgr" || role === "sales_exec" ? "sales" :
     role === "mkt_mgr" || role === "mkt_exec" ? "marketing" :
+    role === "purchase_mgr" ? "purchasing" :
     "gm"; // fallback
 
   switch (roleLevel) {
@@ -52,6 +53,7 @@ export function DashboardModule() {
     case "revenue": return <RevenueDashboard />;
     case "hr": return <HRDashboard />;
     case "sales": return <SalesDashboard />;
+    case "purchasing": return <PurchaseDashboard />;
     case "marketing": return <MarketingDashboard />;
     default: return <GMDashboard />;
   }
@@ -1096,6 +1098,144 @@ function SalesDashboard() {
           { icon: BarChart3, label: "Sales Reports", desc: "Performance analytics" },
         ].map((a, i) => (
           <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── PURCHASE MANAGER DASHBOARD ──────────────────────────────────
+function PurchaseDashboard() {
+  const { data, loading } = useDashboardData();
+  const { setActiveModule } = useAppStore();
+  if (loading || !data) return <DashboardSkeleton />;
+
+  const k = data.kpis;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-2xl font-bold">Purchase Manager Dashboard</h2>
+          <p className="text-sm text-muted-foreground">Procurement, inventory & vendor management</p>
+        </div>
+        <Badge className="bg-[#10B981] text-white border-0">Procurement Department</Badge>
+      </div>
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Active POs" value="12" icon={ShoppingCart} accent="success" delta={8.3} deltaLabel="vs last month" />
+        <KpiCard label="Pending Approvals" value="4" icon={AlertTriangle} accent="warning" delta={-16.7} deltaLabel="vs last week" />
+        <KpiCard label="Low Stock Alerts" value="7" icon={AlertOctagon} accent="danger" delta={40} deltaLabel="items below par" />
+        <KpiCard label="Vendor Rating" value="4.2" icon={Star} accent="gold" delta={2.4} deltaLabel="avg score /5" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Purchase Spend by Category</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { category: "Linen", spend: 185000, fill: "#1B3A6B" },
+                { category: "Amenities", spend: 92000, fill: "#C9952A" },
+                { category: "Minibar", spend: 68000, fill: "#16A34A" },
+                { category: "Kitchen", spend: 45000, fill: "#0369A1" },
+                { category: "Electronics", spend: 32000, fill: "#D97706" },
+                { category: "Safety", spend: 28000, fill: "#7C3AED" },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="category" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip formatter={(v: number) => fmtINR(v)} />
+                <Bar dataKey="spend" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Stock Level vs Par Level</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { item: "Bed Sheets", stock: 60, par: 40 },
+                { item: "Bath Towels", stock: 80, par: 52 },
+                { item: "Soap Bars", stock: 200, par: 200 },
+                { item: "Shampoo", stock: 120, par: 156 },
+                { item: "Mineral Water", stock: 90, par: 78 },
+                { item: "Kettles", stock: 28, par: 26 },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="item" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="stock" fill="#10B981" name="Current Stock" radius={[4,4,0,0]} />
+                <Bar dataKey="par" fill="#e5e7eb" name="Par Level" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* PO Status & Quick Actions */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Purchase Order Pipeline</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[
+                { status: "Draft", count: 3, color: "bg-gray-200 text-gray-700" },
+                { status: "Submitted", count: 4, color: "bg-blue-100 text-blue-700" },
+                { status: "Approved", count: 2, color: "bg-green-100 text-green-700" },
+                { status: "Partially Received", count: 1, color: "bg-amber-100 text-amber-700" },
+                { status: "Cancelled", count: 2, color: "bg-red-100 text-red-700" },
+              ].map(po => (
+                <div key={po.status} className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">{po.status}</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${po.color}`}>{po.count}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Critical Stock Alerts</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[
+                { item: "Shampoo Bottle 30ml", qty: 120, par: 156, status: "Below Par" },
+                { item: "Conditioner 30ml", qty: 110, par: 156, status: "Below Par" },
+                { item: "Body Lotion 30ml", qty: 90, par: 156, status: "Critical" },
+                { item: "Beer Can", qty: 45, par: 26, status: "OK" },
+                { item: "Fire Extinguisher", qty: 30, par: 30, status: "At Par" },
+              ].map(alert => (
+                <div key={alert.item} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{alert.item}</p>
+                    <p className="text-xs text-muted-foreground">Stock: {alert.qty} / Par: {alert.par}</p>
+                  </div>
+                  <Badge variant={alert.status === "Critical" ? "destructive" : alert.status === "Below Par" ? "secondary" : "outline"} className="text-[10px]">
+                    {alert.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { icon: ShoppingCart, label: "Create PO", module: "purchasing" as const },
+          { icon: Package, label: "Inventory", module: "inventory" as const },
+          { icon: Users, label: "Vendors", module: "vendors" as const },
+          { icon: BarChart3, label: "Reports", module: "reports" as const },
+        ].map((a, i) => (
+          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => setActiveModule(a.module)} />
         ))}
       </div>
     </div>

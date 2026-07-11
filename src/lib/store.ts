@@ -144,9 +144,9 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
   { key: "folios", label: "Folios & Billing", group: "commerce", enabled: true },
   // Hospital
   { key: "hospital", label: "Hospital", group: "hospitality", enabled: false },
-  { key: "inventory", label: "Inventory", group: "inventory", enabled: false },
-  { key: "purchasing", label: "Purchasing", group: "inventory", enabled: false },
-  { key: "vendors", label: "Vendors", group: "inventory", enabled: false },
+  { key: "inventory", label: "Inventory", group: "inventory", enabled: true },
+  { key: "purchasing", label: "Purchasing", group: "inventory", enabled: true },
+  { key: "vendors", label: "Vendors", group: "inventory", enabled: true },
   // Finance
   { key: "finance", label: "Finance", group: "finance", enabled: true },
   { key: "accounting", label: "Accounting", group: "finance", enabled: false },
@@ -159,7 +159,7 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
   { key: "marketing", label: "Marketing Hub", group: "crm", enabled: true },
   { key: "crm", label: "CRM", group: "crm", enabled: false },
   // Productivity
-  { key: "tasks", label: "Tasks", group: "productivity", enabled: false },
+  { key: "tasks", label: "Tasks", group: "productivity", enabled: true },
   { key: "documents", label: "Documents", group: "productivity", enabled: false },
   // Intelligence
   { key: "reports", label: "Reports", group: "intelligence", enabled: true },

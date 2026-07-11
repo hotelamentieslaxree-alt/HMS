@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { useAppStore, AuthUser, ROLE_META } from "@/lib/store";
-import { Hotel, Shield, Eye, EyeOff, LogIn, ArrowRight, Star, Users, Sparkles, UtensilsCrossed, Wrench, DollarSign, BarChart3, UserCog, ChevronRight, TrendingUp, Megaphone } from "lucide-react";
+import { useAppStore, AuthUser, ROLE_META, ModuleKey } from "@/lib/store";
+import { Hotel, Shield, Eye, EyeOff, LogIn, ArrowRight, Star, Users, Sparkles, UtensilsCrossed, Wrench, DollarSign, BarChart3, UserCog, ChevronRight, TrendingUp, Megaphone, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
 // Quick login cards for demo
@@ -26,10 +26,11 @@ const QUICK_LOGINS = [
   { email: "technician@aurelian.com", role: "technician", icon: Wrench, color: "#6B7280", label: "Technician", desc: "Repairs & maintenance" },
   { email: "sales_exec@aurelian.com", role: "sales_exec", icon: TrendingUp, color: "#F97316", label: "Sales Executive", desc: "Lead generation" },
   { email: "mkt_exec@aurelian.com", role: "mkt_exec", icon: Megaphone, color: "#8B5CF6", label: "Marketing Exec", desc: "Social & content" },
+  { email: "purchase_mgr@aurelian.com", role: "purchase_mgr", icon: ShoppingCart, color: "#10B981", label: "Purchase Manager", desc: "Procurement & inventory" },
 ];
 
 export function LoginPage() {
-  const { setUser } = useAppStore();
+  const { setUser, navigateTo } = useAppStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -49,6 +50,29 @@ export function LoginPage() {
     }
   }, [setUser]);
 
+  // Role-based default module after login
+  const getDefaultModule = (role: string): ModuleKey => {
+    const roleModuleMap: Record<string, ModuleKey> = {
+      purchase_mgr: "purchasing",
+      hk_mgr: "housekeeping",
+      hk_attendant: "housekeeping",
+      fb_mgr: "pos",
+      waiter: "pos",
+      fin_mgr: "finance",
+      eng_mgr: "maintenance",
+      technician: "maintenance",
+      rev_mgr: "reports",
+      hr_mgr: "hr",
+      sales_mgr: "sales",
+      sales_exec: "sales",
+      mkt_mgr: "marketing",
+      mkt_exec: "marketing",
+      fom: "rooms",
+      receptionist: "reservations",
+    };
+    return roleModuleMap[role] || "dashboard";
+  };
+
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
     setLoading(true);
     try {
@@ -58,6 +82,9 @@ export function LoginPage() {
       });
       localStorage.setItem("aria_auth", JSON.stringify(userData));
       setUser(userData);
+      // Navigate to role-specific default module
+      const defaultModule = getDefaultModule(userData.role);
+      navigateTo(defaultModule);
       toast.success(`Welcome, ${userData.firstName}!`);
     } catch (e: any) {
       toast.error(e.message || "Login failed");
