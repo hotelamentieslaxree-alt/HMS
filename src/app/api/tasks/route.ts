@@ -65,7 +65,7 @@ export const POST = withHandler(async (req: NextRequest) => {
       assignedById: body.assignedById ?? null,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       moduleKey: body.moduleKey ?? null,
-      tags: body.tags ?? [],
+      tags: body.tags ?? "[]",
     },
     include: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -118,7 +118,7 @@ export const PUT = withHandler(async (req: NextRequest) => {
   if (rest.priority !== undefined) updateData.priority = rest.priority;
   if (rest.assignedToId !== undefined) updateData.assignedToId = rest.assignedToId;
   if (rest.dueDate !== undefined) updateData.dueDate = rest.dueDate ? new Date(rest.dueDate) : null;
-  if (rest.tags !== undefined) updateData.tags = rest.tags;
+  if (rest.tags !== undefined) updateData.tags = rest.tags ? JSON.stringify(rest.tags) : null;
 
   const task = await db.task.update({
     where: { id },

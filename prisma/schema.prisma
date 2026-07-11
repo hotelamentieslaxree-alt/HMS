@@ -136,7 +136,7 @@ model RoomCategory {
   maxAdults           Int      @default(2)
   maxChildren         Int      @default(1)
   baseRate            Float
-  amenities           Json     @default([])
+  amenities           String   @default("[]")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -235,7 +235,7 @@ model Guest {
   country         String   @default("IN")
   loyaltyTier     String   @default("silver") // none | silver | gold | platinum
   loyaltyPoints   Int      @default(0)
-  preferences     Json     @default({})
+  preferences     String   @default("{}")
   vipStatus       Boolean  @default(false)
   doNotDisturb    Boolean  @default(false)
   totalStays      Int      @default(0)
@@ -398,7 +398,7 @@ model HousekeepingTask {
   inspectedById String?
   inspectedAt   DateTime?
   rejectionReason String?
-  checklist     Json     @default([])
+  checklist     String   @default("[]")
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -475,7 +475,7 @@ model MenuCategory {
   name       String
   sortOrder  Int      @default(0)
   isActive   Boolean  @default(true)
-  mealPeriod Json     @default([])
+  mealPeriod String     @default("[]")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -493,7 +493,7 @@ model MenuItem {
   price         Float
   itemType      String   @default("food") // food | beverage | package
   dietType      String   @default("veg") // veg | non_veg | vegan | contains_egg | contains_alcohol
-  allergens     Json     @default([])
+  allergens     String   @default("[]")
   preparationTimeMinutes Int @default(15)
   isAvailable   Boolean  @default(true)
   isFeatured    Boolean  @default(false)
@@ -591,8 +591,8 @@ model AuditLog {
   action      String
   entityType  String?
   entityId    String?
-  oldValue    Json?
-  newValue    Json?
+  oldValue    String?
+  newValue    String?
   ipAddress   String?
   occurredAt  DateTime @default(now())
 
@@ -874,7 +874,7 @@ model ModuleConfig {
   propertyId  String
   moduleKey   String   // e.g. "hospital", "inventory", "finance"
   enabled     Boolean  @default(false)
-  config      Json     @default({})
+  config      String   @default("{}")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -987,8 +987,8 @@ model Patient {
   email           String?
   address         String?
   bloodGroup      String?
-  allergies       Json     @default([])
-  medicalHistory  Json     @default({})
+  allergies       String   @default("[]")
+  medicalHistory  String   @default("{}")
   emergencyContact String?
   insuranceProvider String?
   insurancePolicy String?
@@ -1014,7 +1014,7 @@ model Doctor {
   email         String?
   department    String?
   consultationFee Float  @default(0)
-  availableDays Json     @default([])
+  availableDays String   @default("[]")
   availableFrom String?  // e.g. "09:00"
   availableTo   String?  // e.g. "17:00"
   status        String   @default("active") // active | on_leave | inactive
@@ -1212,7 +1212,7 @@ model Task {
   dueDate     DateTime?
   completedAt DateTime?
   moduleKey   String?  // which module created this task
-  tags        Json     @default([])
+  tags        String   @default("[]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1234,7 +1234,7 @@ model Document {
   fileUrl      String?
   fileSize     Int      @default(0) // bytes
   uploadedById String?
-  tags         Json     @default([])
+  tags         String   @default("[]")
   isTemplate   Boolean  @default(false)
   version      Int      @default(1)
   status       String   @default("active") // active | archived | deleted
@@ -1258,8 +1258,8 @@ model IntegrationConfig {
   provider     String   // booking_com | agoda | expedia | razorpay | stripe | whatsapp | gmail | tally | zoho
   category     String   // ota | payment | communication | accounting
   isActive     Boolean  @default(false)
-  credentials  Json     @default({})
-  settings     Json     @default({})
+  credentials  String   @default("{}")
+  settings     String   @default("{}")
   lastSyncAt   DateTime?
   syncStatus   String   @default("never") // never | syncing | success | error
   syncError    String?
