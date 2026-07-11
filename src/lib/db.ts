@@ -121,7 +121,7 @@ async function _downloadSeedDb() {
   // Download seed DB — try multiple URL sources
   const urls = [
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/hms-seed.db` : null,
-    'https://my-project-steel-omega.vercel.app/hms-seed.db',
+    'https://chandracycle.vercel.app/hms-seed.db',
   ].filter(Boolean) as string[]
 
   for (const url of urls) {
