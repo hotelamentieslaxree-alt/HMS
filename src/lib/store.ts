@@ -32,7 +32,10 @@ export type ModuleKey =
   | "integrations"
   | "settings"
   | "properties"
-  | "kitchen";
+  | "kitchen"
+  | "accounting"
+  | "purchasing"
+  | "vendors";
 
 export type RoleKey =
   | "owner"
@@ -51,7 +54,8 @@ export type RoleKey =
   | "sales_mgr"
   | "sales_exec"
   | "mkt_mgr"
-  | "mkt_exec";
+  | "mkt_exec"
+  | "purchase_mgr";
 
 export interface AuthUser {
   id: string;
@@ -95,11 +99,11 @@ export const MODULE_GROUPS: Record<string, { label: string; modules: ModuleKey[]
   },
   inventory: {
     label: "Inventory & Procurement",
-    modules: ["inventory"],
+    modules: ["inventory", "purchasing", "vendors"],
   },
   finance: {
     label: "Finance & Accounting",
-    modules: ["finance"],
+    modules: ["finance", "accounting"],
   },
   hrms: {
     label: "HRMS",
@@ -140,10 +144,12 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
   { key: "folios", label: "Folios & Billing", group: "commerce", enabled: true },
   // Hospital
   { key: "hospital", label: "Hospital", group: "hospitality", enabled: false },
-  // Inventory
   { key: "inventory", label: "Inventory", group: "inventory", enabled: false },
+  { key: "purchasing", label: "Purchasing", group: "inventory", enabled: false },
+  { key: "vendors", label: "Vendors", group: "inventory", enabled: false },
   // Finance
   { key: "finance", label: "Finance", group: "finance", enabled: true },
+  { key: "accounting", label: "Accounting", group: "finance", enabled: false },
   // HRMS
   { key: "hr", label: "HR Hub", group: "hrms", enabled: true },
   { key: "attendance", label: "Attendance", group: "hrms", enabled: true },
@@ -172,11 +178,11 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
 
 // Which modules each role can access (among enabled modules)
 export const ROLE_MODULES: Record<string, ModuleKey[]> = {
-  owner: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
-  gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
+  owner: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
+  gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
   fom: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "folios", "reports", "night-audit", "staff", "scorecard", "tasks"],
   receptionist: ["dashboard", "reservations", "rooms", "guests", "folios", "staff", "tasks"],
-  hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard", "tasks", "laundry"],
+  hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard", "tasks", "laundry", "inventory", "purchasing"],
   hk_attendant: ["dashboard", "housekeeping", "tasks"],
   fb_mgr: ["dashboard", "pos", "kitchen", "reports", "staff", "scorecard", "inventory", "tasks"],
   waiter: ["dashboard", "pos", "kitchen", "tasks"],
@@ -189,6 +195,7 @@ export const ROLE_MODULES: Record<string, ModuleKey[]> = {
   sales_exec: ["dashboard", "sales", "crm", "staff", "tasks"],
   mkt_mgr: ["dashboard", "marketing", "crm", "scorecard", "staff", "reports", "tasks"],
   mkt_exec: ["dashboard", "marketing", "crm", "staff", "tasks"],
+  purchase_mgr: ["dashboard", "inventory", "finance", "reports", "audit", "tasks", "vendors", "purchasing"],
 };
 
 export const ROLE_META: Record<string, { label: string; level: number; accent: string; barClass: string; deptCode?: string }> = {
@@ -209,6 +216,7 @@ export const ROLE_META: Record<string, { label: string; level: number; accent: s
   sales_exec: { label: "Sales Executive", level: 4, accent: "#F97316", barClass: "role-bar-staff", deptCode: "SALES" },
   mkt_mgr: { label: "Marketing Manager", level: 3, accent: "#7C3AED", barClass: "role-bar-manager", deptCode: "MKT" },
   mkt_exec: { label: "Marketing Executive", level: 4, accent: "#8B5CF6", barClass: "role-bar-staff", deptCode: "MKT" },
+  purchase_mgr: { label: "Purchase Manager", level: 3, accent: "#10B981", barClass: "role-bar-manager", deptCode: "PROC" },
 };
 
 interface AppState {

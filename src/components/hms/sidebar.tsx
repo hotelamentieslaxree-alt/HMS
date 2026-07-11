@@ -11,6 +11,7 @@ import {
   Building2, PieChart, Calendar, FileText, ClipboardList, BarChart3,
   Heart, Package, Landmark, Handshake, CheckSquare, Brain, Zap,
   Plug, Settings, ChefHat, Globe, Cpu,
+  ShoppingCart, Calculator, BookOpen, Scale,
 } from "lucide-react";
 
 interface SubItem {
@@ -78,6 +79,16 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         { key: "procurement", label: "Procurement", icon: ClipboardList },
         { key: "vendors", label: "Vendors", icon: Briefcase },
       ]},
+      { key: "purchasing", label: "Purchase Orders", icon: ShoppingCart, children: [
+        { key: "purchase-orders", label: "All Orders", icon: ShoppingCart },
+        { key: "rfq", label: "Request for Quotation", icon: FileText },
+        { key: "approvals", label: "Approvals", icon: CheckSquare },
+      ]},
+      { key: "vendors", label: "Vendors", icon: Briefcase, children: [
+        { key: "directory", label: "Vendor Directory", icon: Briefcase },
+        { key: "contracts", label: "Contracts", icon: FileText },
+        { key: "performance", label: "Performance", icon: BarChart3 },
+      ]},
     ],
   },
   {
@@ -89,6 +100,13 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         { key: "gst", label: "GST", icon: FileText },
         { key: "cashbook", label: "Cashbook", icon: IndianRupee },
         { key: "pnl", label: "Profit & Loss", icon: TrendingUp },
+      ]},
+      { key: "accounting", label: "Accounting", icon: Calculator, children: [
+        { key: "chart-of-accounts", label: "Chart of Accounts", icon: Calculator },
+        { key: "journal-entries", label: "Journal Entries", icon: BookOpen },
+        { key: "billing-verification", label: "Billing Verification", icon: CheckSquare },
+        { key: "budget", label: "Budget", icon: PieChart },
+        { key: "trial-balance", label: "Trial Balance", icon: Scale },
       ]},
     ],
   },

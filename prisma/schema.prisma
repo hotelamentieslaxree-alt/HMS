@@ -15,58 +15,68 @@ datasource db {
 // ════════════════════════════════════════════════════════════════
 
 model Property {
-  id            String   @id @default(cuid())
-  name          String
-  code          String
-  city          String
-  state         String?
-  country       String
-  timezone      String   @default("Asia/Calcutta")
-  currency      String   @default("INR")
-  starRating    Int      @default(5)
-  totalRooms    Int      @default(0)
-  checkInTime   String   @default("14:00")
-  checkOutTime  String   @default("12:00")
-  gstNumber     String?
-  taxId         String?
-  logoUrl       String?
-  status        String   @default("active") // active | suspended
-  businessDate  DateTime @default(now())    // current business date
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  code         String
+  city         String
+  state        String?
+  country      String
+  timezone     String   @default("Asia/Calcutta")
+  currency     String   @default("INR")
+  starRating   Int      @default(5)
+  totalRooms   Int      @default(0)
+  checkInTime  String   @default("14:00")
+  checkOutTime String   @default("12:00")
+  gstNumber    String?
+  taxId        String?
+  logoUrl      String?
+  status       String   @default("active") // active | suspended
+  businessDate DateTime @default(now()) // current business date
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  roomCategories    RoomCategory[]
-  rooms             Room[]
-  reservations      Reservation[]
-  housekeepingTasks HousekeepingTask[]
-  outlets           Outlet[]
-  ratePlans         RatePlan[]
-  auditLogs         AuditLog[]
-  users             User[]
-  departments       Department[]
-  shiftHandovers    ShiftHandover[]
-  attendance        Attendance[]
-  payrollRecords    PayrollRecord[]
-  companyEvents     CompanyEvent[]
-  scorecards        Scorecard[]
-  leads             Lead[]
-  deals             Deal[]
-  campaigns         Campaign[]
-  socialAccounts    SocialAccount[]
+  roomCategories           RoomCategory[]
+  rooms                    Room[]
+  reservations             Reservation[]
+  housekeepingTasks        HousekeepingTask[]
+  outlets                  Outlet[]
+  ratePlans                RatePlan[]
+  auditLogs                AuditLog[]
+  users                    User[]
+  departments              Department[]
+  shiftHandovers           ShiftHandover[]
+  attendance               Attendance[]
+  payrollRecords           PayrollRecord[]
+  companyEvents            CompanyEvent[]
+  scorecards               Scorecard[]
+  leads                    Lead[]
+  deals                    Deal[]
+  campaigns                Campaign[]
+  socialAccounts           SocialAccount[]
   // Enterprise v2 relations
-  moduleConfigs     ModuleConfig[]
-  patients          Patient[]
-  doctors           Doctor[]
-  appointments      Appointment[]
-  stockItems        StockItem[]
-  vendors           Vendor[]
-  purchaseOrders    PurchaseOrder[]
-  invoices          Invoice[]
-  expenses          Expense[]
-  cashbookEntries   CashbookEntry[]
-  tasks             Task[]
-  documents         Document[]
-  integrationConfigs IntegrationConfig[]
+  moduleConfigs            ModuleConfig[]
+  patients                 Patient[]
+  doctors                  Doctor[]
+  appointments             Appointment[]
+  stockItems               StockItem[]
+  vendors                  Vendor[]
+  purchaseOrders           PurchaseOrder[]
+  invoices                 Invoice[]
+  expenses                 Expense[]
+  cashbookEntries          CashbookEntry[]
+  tasks                    Task[]
+  documents                Document[]
+  integrationConfigs       IntegrationConfig[]
+  // Inventory & Accounting relations
+  amenityItems             AmenityItem[]
+  amenityStockTransactions AmenityStockTransaction[]
+  amenityInspections       AmenityInspection[]
+  vendorRatings            VendorRating[]
+  seasonConfigs            SeasonConfig[]
+  accounts                 Account[]
+  journalEntries           JournalEntry[]
+  billingVerifications     BillingVerification[]
+  budgetEntries            BudgetEntry[]
 }
 
 model Department {
@@ -85,40 +95,40 @@ model Department {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  propertyId    String?
-  email         String   @unique
-  firstName     String
-  lastName      String
-  role          String   // owner | gm | fom | hk_mgr | fb_mgr | rev_mgr | fin_mgr | eng_mgr | hr_mgr | receptionist | hk_attendant | waiter | technician
-  roleLevel     Int      @default(4) // 1 owner, 2 gm, 3 manager, 4 staff
-  departmentId  String?
-  employeeCode  String?
-  phone         String?
-  isActive      Boolean  @default(true)
-  avatarUrl     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  propertyId   String?
+  email        String   @unique
+  firstName    String
+  lastName     String
+  role         String // owner | gm | fom | hk_mgr | fb_mgr | rev_mgr | fin_mgr | eng_mgr | hr_mgr | receptionist | hk_attendant | waiter | technician
+  roleLevel    Int      @default(4) // 1 owner, 2 gm, 3 manager, 4 staff
+  departmentId String?
+  employeeCode String?
+  phone        String?
+  isActive     Boolean  @default(true)
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  property    Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  department  Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  hkTasks     HousekeepingTask[] @relation("HkTaskAssignee")
-  hkInspected HousekeepingTask[] @relation("HkTaskInspector")
-  posOrders     PosOrder[]       @relation("PosOrderWaiter")
-  auditLogs     AuditLog[]
-  attendance    Attendance[]
-  payrollRecords PayrollRecord[]
-  scorecards    Scorecard[]
-  organizedEvents CompanyEvent[]  @relation("EventOrganizer")
-  assignedLeads   Lead[]          @relation("LeadAssignee")
-  assignedDeals   Deal[]          @relation("DealAssignee")
+  property        Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  department      Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  hkTasks         HousekeepingTask[] @relation("HkTaskAssignee")
+  hkInspected     HousekeepingTask[] @relation("HkTaskInspector")
+  posOrders       PosOrder[]         @relation("PosOrderWaiter")
+  auditLogs       AuditLog[]
+  attendance      Attendance[]
+  payrollRecords  PayrollRecord[]
+  scorecards      Scorecard[]
+  organizedEvents CompanyEvent[]     @relation("EventOrganizer")
+  assignedLeads   Lead[]             @relation("LeadAssignee")
+  assignedDeals   Deal[]             @relation("DealAssignee")
   // Enterprise v2 relations
   sessions        Session[]
   loginHistory    LoginHistory[]
   userPermissions UserPermission[]
-  assignedTasks   Task[]           @relation("TaskAssignee")
-  createdTasks    Task[]           @relation("TaskAssigner")
-  uploadedDocs    Document[]       @relation("DocumentUploader")
+  assignedTasks   Task[]             @relation("TaskAssignee")
+  createdTasks    Task[]             @relation("TaskAssigner")
+  uploadedDocs    Document[]         @relation("DocumentUploader")
 
   @@index([propertyId])
 }
@@ -128,48 +138,49 @@ model User {
 // ════════════════════════════════════════════════════════════════
 
 model RoomCategory {
-  id                  String   @id @default(cuid())
-  propertyId          String
-  name                String
-  code                String
-  description         String?
-  maxAdults           Int      @default(2)
-  maxChildren         Int      @default(1)
-  baseRate            Float
-  amenities           String   @default("[]")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id          String   @id @default(cuid())
+  propertyId  String
+  name        String
+  code        String
+  description String?
+  maxAdults   Int      @default(2)
+  maxChildren Int      @default(1)
+  baseRate    Float
+  amenities   String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   rooms        Room[]
-  ratePlans    RatePlan[]   @relation("RatePlanCategories")
+  ratePlans    RatePlan[]    @relation("RatePlanCategories")
   reservations Reservation[]
+  amenityItems AmenityItem[]
 
   @@index([propertyId])
 }
 
 model Room {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   propertyId    String
   categoryId    String
   roomNumber    String
   floor         Int
   wing          String?
-  currentStatus String   @default("vacant_clean")
+  currentStatus String    @default("vacant_clean")
   // vacant_clean | vacant_dirty | occupied_clean | occupied_dirty | out_of_order | out_of_service
-  isSmoking     Boolean  @default(false)
-  isAccessible  Boolean  @default(false)
+  isSmoking     Boolean   @default(false)
+  isAccessible  Boolean   @default(false)
   notes         String?
   blockedReason String?
   blockedUntil  DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  category         RoomCategory      @relation(fields: [categoryId], references: [id])
-  statusLogs       RoomStatusLog[]
-  hkTasks          HousekeepingTask[]
-  reservationRooms Reservation[]
+  property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  category           RoomCategory        @relation(fields: [categoryId], references: [id])
+  statusLogs         RoomStatusLog[]
+  hkTasks            HousekeepingTask[]
+  reservationRooms   Reservation[]
   maintenanceTickets MaintenanceTicket[]
 
   @@unique([propertyId, roomNumber])
@@ -177,13 +188,13 @@ model Room {
 }
 
 model RoomStatusLog {
-  id         String   @id @default(cuid())
-  roomId     String
-  oldStatus  String?
-  newStatus  String
-  changedBy  String?
-  reason     String?
-  changedAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  roomId    String
+  oldStatus String?
+  newStatus String
+  changedBy String?
+  reason    String?
+  changedAt DateTime @default(now())
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
@@ -191,24 +202,24 @@ model RoomStatusLog {
 }
 
 model RatePlan {
-  id                 String   @id @default(cuid())
-  propertyId         String
-  name               String
-  code               String
-  description        String?
-  mealPlan           String   @default("ep") // ep | cp | map | ap
-  isRefundable       Boolean  @default(true)
-  advancePurchaseDays Int     @default(0)
-  minStayNights      Int      @default(1)
-  maxStayNights      Int      @default(30)
-  validFrom          DateTime
-  validTo            DateTime
-  markupPercent      Float    @default(0) // over base rate
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  propertyId          String
+  name                String
+  code                String
+  description         String?
+  mealPlan            String   @default("ep") // ep | cp | map | ap
+  isRefundable        Boolean  @default(true)
+  advancePurchaseDays Int      @default(0)
+  minStayNights       Int      @default(1)
+  maxStayNights       Int      @default(30)
+  validFrom           DateTime
+  validTo             DateTime
+  markupPercent       Float    @default(0) // over base rate
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  categories  RoomCategory[] @relation("RatePlanCategories")
+  property     Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  categories   RoomCategory[] @relation("RatePlanCategories")
   reservations Reservation[]
 
   @@index([propertyId])
@@ -219,31 +230,31 @@ model RatePlan {
 // ════════════════════════════════════════════════════════════════
 
 model Guest {
-  id              String   @id @default(cuid())
-  title           String   @default("Mr")
+  id              String    @id @default(cuid())
+  title           String    @default("Mr")
   firstName       String
   lastName        String
   email           String?
   phone           String?
-  nationality     String   @default("IN")
-  idType          String?  // passport | aadhaar | driving_license | voter
+  nationality     String    @default("IN")
+  idType          String? // passport | aadhaar | driving_license | voter
   idNumber        String?
   dateOfBirth     DateTime?
   address         String?
   city            String?
   state           String?
-  country         String   @default("IN")
-  loyaltyTier     String   @default("silver") // none | silver | gold | platinum
-  loyaltyPoints   Int      @default(0)
-  preferences     String   @default("{}")
-  vipStatus       Boolean  @default(false)
-  doNotDisturb    Boolean  @default(false)
-  totalStays      Int      @default(0)
-  totalRevenue    Float    @default(0)
-  blacklisted     Boolean  @default(false)
+  country         String    @default("IN")
+  loyaltyTier     String    @default("silver") // none | silver | gold | platinum
+  loyaltyPoints   Int       @default(0)
+  preferences     String    @default("{}")
+  vipStatus       Boolean   @default(false)
+  doNotDisturb    Boolean   @default(false)
+  totalStays      Int       @default(0)
+  totalRevenue    Float     @default(0)
+  blacklisted     Boolean   @default(false)
   blacklistReason String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   primaryReservations Reservation[] @relation("PrimaryGuestReservations")
 
@@ -252,52 +263,52 @@ model Guest {
 }
 
 model Company {
-  id            String   @id @default(cuid())
-  name          String
-  gstNumber     String?
-  address       String?
-  creditLimit   Float    @default(0)
-  paymentTerms  String?
-  contactName   String?
-  contactEmail  String?
+  id             String   @id @default(cuid())
+  name           String
+  gstNumber      String?
+  address        String?
+  creditLimit    Float    @default(0)
+  paymentTerms   String?
+  contactName    String?
+  contactEmail   String?
   negotiatedRate Float?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   reservations Reservation[]
 }
 
 model Reservation {
-  id              String   @id @default(cuid())
-  propertyId      String
-  confirmationNumber String @unique
-  bookingSource   String   @default("direct") // direct | booking_com | expedia | airbnb | makemytrip | goibibo | agoda | corporate | walk_in | phone
-  status          String   @default("confirmed") // confirmed | tentative | waitlisted | checked_in | checked_out | cancelled | no_show
-  primaryGuestId  String
-  companyId       String?
-  categoryId      String
-  roomId          String?
-  ratePlanId      String?
-  ratePerNight    Float
-  totalNights     Int
-  checkInDate     DateTime
-  checkOutDate    DateTime
-  actualCheckIn   DateTime?
-  actualCheckOut  DateTime?
-  adults          Int      @default(2)
-  children        Int      @default(0)
-  infants         Int      @default(0)
-  specialRequests String?
-  internalNotes   String?
-  otaCommissionPercent Float @default(0)
-  otaCommissionAmount   Float @default(0)
-  netRevenue      Float    @default(0)
-  depositAmount   Float    @default(0)
-  cancellationReason String?
-  cancelledAt     DateTime?
-  cancelledBy     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  propertyId           String
+  confirmationNumber   String    @unique
+  bookingSource        String    @default("direct") // direct | booking_com | expedia | airbnb | makemytrip | goibibo | agoda | corporate | walk_in | phone
+  status               String    @default("confirmed") // confirmed | tentative | waitlisted | checked_in | checked_out | cancelled | no_show
+  primaryGuestId       String
+  companyId            String?
+  categoryId           String
+  roomId               String?
+  ratePlanId           String?
+  ratePerNight         Float
+  totalNights          Int
+  checkInDate          DateTime
+  checkOutDate         DateTime
+  actualCheckIn        DateTime?
+  actualCheckOut       DateTime?
+  adults               Int       @default(2)
+  children             Int       @default(0)
+  infants              Int       @default(0)
+  specialRequests      String?
+  internalNotes        String?
+  otaCommissionPercent Float     @default(0)
+  otaCommissionAmount  Float     @default(0)
+  netRevenue           Float     @default(0)
+  depositAmount        Float     @default(0)
+  cancellationReason   String?
+  cancelledAt          DateTime?
+  cancelledBy          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   primaryGuest Guest        @relation("PrimaryGuestReservations", fields: [primaryGuestId], references: [id])
@@ -318,21 +329,21 @@ model Reservation {
 // ════════════════════════════════════════════════════════════════
 
 model Folio {
-  id           String   @id @default(cuid())
+  id            String    @id @default(cuid())
   reservationId String
-  folioNumber  String   @unique
-  folioType    String   @default("room") // room | extra | advance | city_ledger
-  status       String   @default("open") // open | closed | transferred
-  subtotal     Float    @default(0)
-  taxAmount    Float    @default(0)
-  totalAmount  Float    @default(0)
-  paidAmount   Float    @default(0)
-  balance      Float    @default(0)
-  createdAt    DateTime @default(now())
-  closedAt     DateTime?
-  closedBy     String?
+  folioNumber   String    @unique
+  folioType     String    @default("room") // room | extra | advance | city_ledger
+  status        String    @default("open") // open | closed | transferred
+  subtotal      Float     @default(0)
+  taxAmount     Float     @default(0)
+  totalAmount   Float     @default(0)
+  paidAmount    Float     @default(0)
+  balance       Float     @default(0)
+  createdAt     DateTime  @default(now())
+  closedAt      DateTime?
+  closedBy      String?
 
-  reservation Reservation  @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   lines       FolioLine[]
   payments    Payment[]
 
@@ -340,20 +351,20 @@ model Folio {
 }
 
 model FolioLine {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   folioId         String
-  transactionType String   @default("charge") // charge | payment | adjustment | void
+  transactionType String    @default("charge") // charge | payment | adjustment | void
   description     String
-  amount          Float    @default(0)
+  amount          Float     @default(0)
   taxCode         String?
-  taxAmount       Float    @default(0)
-  departmentCode  String?  // ROOM | FB | MINIBAR | LAUNDRY | SPA | MISC
+  taxAmount       Float     @default(0)
+  departmentCode  String? // ROOM | FB | MINIBAR | LAUNDRY | SPA | MISC
   outletCode      String?
-  postedAt        DateTime @default(now())
+  postedAt        DateTime  @default(now())
   postedBy        String?
-  referenceType   String?  // pos_order | minibar | room_rate | manual
+  referenceType   String? // pos_order | minibar | room_rate | manual
   referenceId     String?
-  isVoided        Boolean  @default(false)
+  isVoided        Boolean   @default(false)
   voidedAt        DateTime?
   voidedById      String?
   voidReason      String?
@@ -364,16 +375,16 @@ model FolioLine {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  folioId       String
-  amount        Float
-  paymentMethod String   // cash | credit_card | debit_card | upi | bank_transfer | city_ledger
+  id               String   @id @default(cuid())
+  folioId          String
+  amount           Float
+  paymentMethod    String // cash | credit_card | debit_card | upi | bank_transfer | city_ledger
   paymentReference String?
-  cardLast4     String?
-  cardType      String?
-  status        String   @default("completed") // pending | completed | failed | refunded
-  processedAt   DateTime @default(now())
-  processedBy   String?
+  cardLast4        String?
+  cardType         String?
+  status           String   @default("completed") // pending | completed | failed | refunded
+  processedAt      DateTime @default(now())
+  processedBy      String?
 
   folio Folio @relation(fields: [folioId], references: [id], onDelete: Cascade)
 
@@ -385,47 +396,47 @@ model Payment {
 // ════════════════════════════════════════════════════════════════
 
 model HousekeepingTask {
-  id            String   @id @default(cuid())
-  propertyId    String
-  roomId        String
-  taskType      String   @default("checkout_cleaning") // checkout_cleaning | stayover | turndown | deep_clean | inspection | maintenance_prep
-  assignedToId  String?
-  priority      String   @default("normal") // urgent | high | normal | low
-  status        String   @default("pending") // pending | in_progress | completed | inspected | rejected
-  scheduledFor  DateTime @default(now())
-  startedAt     DateTime?
-  completedAt   DateTime?
-  inspectedById String?
-  inspectedAt   DateTime?
+  id              String    @id @default(cuid())
+  propertyId      String
+  roomId          String
+  taskType        String    @default("checkout_cleaning") // checkout_cleaning | stayover | turndown | deep_clean | inspection | maintenance_prep
+  assignedToId    String?
+  priority        String    @default("normal") // urgent | high | normal | low
+  status          String    @default("pending") // pending | in_progress | completed | inspected | rejected
+  scheduledFor    DateTime  @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  inspectedById   String?
+  inspectedAt     DateTime?
   rejectionReason String?
-  checklist     String   @default("[]")
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  checklist       String    @default("[]")
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  assignee    User?    @relation("HkTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  inspector   User?    @relation("HkTaskInspector", fields: [inspectedById], references: [id], onDelete: SetNull)
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  assignee  User?    @relation("HkTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  inspector User?    @relation("HkTaskInspector", fields: [inspectedById], references: [id], onDelete: SetNull)
 
   @@index([propertyId, status])
   @@index([assignedToId])
 }
 
 model LostFound {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   propertyId      String
   itemDescription String
   itemCategory    String?
   foundLocation   String?
-  foundDate       DateTime @default(now())
+  foundDate       DateTime  @default(now())
   foundBy         String?
   storageLocation String?
-  status          String   @default("in_custody") // in_custody | claimed | disposed | donated
+  status          String    @default("in_custody") // in_custody | claimed | disposed | donated
   claimedBy       String?
   claimedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([propertyId, status])
 }
@@ -445,25 +456,25 @@ model Outlet {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  tables     RestaurantTable[]
+  property       Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tables         RestaurantTable[]
   menuCategories MenuCategory[]
-  orders     PosOrder[]
+  orders         PosOrder[]
 
   @@index([propertyId])
 }
 
 model RestaurantTable {
-  id         String   @id @default(cuid())
-  outletId   String
+  id          String   @id @default(cuid())
+  outletId    String
   tableNumber String
-  capacity   Int      @default(4)
-  status     String   @default("available") // available | occupied | reserved | cleaning
-  section    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  capacity    Int      @default(4)
+  status      String   @default("available") // available | occupied | reserved | cleaning
+  section     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  outlet Outlet    @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  outlet Outlet     @relation(fields: [outletId], references: [id], onDelete: Cascade)
   orders PosOrder[]
 
   @@unique([outletId, tableNumber])
@@ -475,7 +486,7 @@ model MenuCategory {
   name       String
   sortOrder  Int      @default(0)
   isActive   Boolean  @default(true)
-  mealPeriod String     @default("[]")
+  mealPeriod String   @default("[]")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -486,21 +497,21 @@ model MenuCategory {
 }
 
 model MenuItem {
-  id            String   @id @default(cuid())
-  categoryId    String
-  name          String
-  description   String?
-  price         Float
-  itemType      String   @default("food") // food | beverage | package
-  dietType      String   @default("veg") // veg | non_veg | vegan | contains_egg | contains_alcohol
-  allergens     String   @default("[]")
-  preparationTimeMinutes Int @default(15)
-  isAvailable   Boolean  @default(true)
-  isFeatured    Boolean  @default(false)
-  photoUrl      String?
-  recipeCost    Float    @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  categoryId             String
+  name                   String
+  description            String?
+  price                  Float
+  itemType               String   @default("food") // food | beverage | package
+  dietType               String   @default("veg") // veg | non_veg | vegan | contains_egg | contains_alcohol
+  allergens              String   @default("[]")
+  preparationTimeMinutes Int      @default(15)
+  isAvailable            Boolean  @default(true)
+  isFeatured             Boolean  @default(false)
+  photoUrl               String?
+  recipeCost             Float    @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   category   MenuCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   orderLines PosOrderLine[]
@@ -509,24 +520,24 @@ model MenuItem {
 }
 
 model PosOrder {
-  id            String   @id @default(cuid())
-  outletId      String
-  tableId       String?
-  reservationId String?
-  reservation   Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  orderType     String   @default("dine_in") // dine_in | room_service | takeaway | delivery | banquet
-  status        String   @default("draft") // draft | sent_to_kitchen | in_preparation | ready | served | billed | paid | void
-  waiterId      String?
-  subtotal      Float    @default(0)
-  discountAmount Float   @default(0)
-  taxAmount     Float    @default(0)
-  totalAmount   Float    @default(0)
-  guestsCount   Int      @default(1)
-  notes         String?
-  kotNumber     Int?
-  createdAt     DateTime @default(now())
-  billedAt      DateTime?
-  paidAt        DateTime?
+  id             String       @id @default(cuid())
+  outletId       String
+  tableId        String?
+  reservationId  String?
+  reservation    Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  orderType      String       @default("dine_in") // dine_in | room_service | takeaway | delivery | banquet
+  status         String       @default("draft") // draft | sent_to_kitchen | in_preparation | ready | served | billed | paid | void
+  waiterId       String?
+  subtotal       Float        @default(0)
+  discountAmount Float        @default(0)
+  taxAmount      Float        @default(0)
+  totalAmount    Float        @default(0)
+  guestsCount    Int          @default(1)
+  notes          String?
+  kotNumber      Int?
+  createdAt      DateTime     @default(now())
+  billedAt       DateTime?
+  paidAt         DateTime?
 
   outlet Outlet           @relation(fields: [outletId], references: [id], onDelete: Cascade)
   table  RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
@@ -537,18 +548,18 @@ model PosOrder {
 }
 
 model PosOrderLine {
-  id                String   @id @default(cuid())
-  orderId           String
-  itemId            String
-  quantity          Int      @default(1)
-  unitPrice         Float
+  id                  String   @id @default(cuid())
+  orderId             String
+  itemId              String
+  quantity            Int      @default(1)
+  unitPrice           Float
   specialInstructions String?
-  status            String   @default("pending") // pending | in_progress | ready | served | void
-  voidReason        String?
-  createdAt         DateTime @default(now())
+  status              String   @default("pending") // pending | in_progress | ready | served | void
+  voidReason          String?
+  createdAt           DateTime @default(now())
 
   order PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  item  MenuItem  @relation(fields: [itemId], references: [id])
+  item  MenuItem @relation(fields: [itemId], references: [id])
 
   @@index([orderId])
 }
@@ -558,18 +569,18 @@ model PosOrderLine {
 // ════════════════════════════════════════════════════════════════
 
 model MaintenanceTicket {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   propertyId  String
   roomId      String?
   title       String
   description String?
-  priority    String   @default("normal") // urgent | high | normal | low
-  status      String   @default("open") // open | in_progress | completed | cancelled
-  category    String?  // electrical | plumbing | hvac | carpentry | civil | av | it
+  priority    String    @default("normal") // urgent | high | normal | low
+  status      String    @default("open") // open | in_progress | completed | cancelled
+  category    String? // electrical | plumbing | hvac | carpentry | civil | av | it
   raisedBy    String?
   assignedTo  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
   room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
@@ -583,18 +594,18 @@ model MaintenanceTicket {
 // ════════════════════════════════════════════════════════════════
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  propertyId  String?
-  userId      String?
-  userRole    String?
-  user_email  String?
-  action      String
-  entityType  String?
-  entityId    String?
-  oldValue    String?
-  newValue    String?
-  ipAddress   String?
-  occurredAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  propertyId String?
+  userId     String?
+  userRole   String?
+  user_email String?
+  action     String
+  entityType String?
+  entityId   String?
+  oldValue   String?
+  newValue   String?
+  ipAddress  String?
+  occurredAt DateTime @default(now())
 
   property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -607,7 +618,7 @@ model Notification {
   id         String   @id @default(cuid())
   propertyId String?
   userId     String?
-  type       String   // info | success | warning | error | approval | alert
+  type       String // info | success | warning | error | approval | alert
   title      String
   message    String
   isRead     Boolean  @default(false)
@@ -618,29 +629,29 @@ model Notification {
 }
 
 model ShiftHandover {
-  id          String   @id @default(cuid())
-  propertyId  String
-  fromUser    String
-  toUser      String?
-  shift       String   // morning | evening | night
-  notes       String
-  openIssues  String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  propertyId String
+  fromUser   String
+  toUser     String?
+  shift      String // morning | evening | night
+  notes      String
+  openIssues String?
+  createdAt  DateTime @default(now())
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
 model NightAuditLog {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   propertyId    String
   businessDate  DateTime
-  status        String   @default("running") // running | completed | failed
-  startedAt     DateTime @default(now())
+  status        String    @default("running") // running | completed | failed
+  startedAt     DateTime  @default(now())
   completedAt   DateTime?
   startedBy     String
-  postingsCount Int      @default(0)
-  revenuePosted Float    @default(0)
-  noShowsCount  Int      @default(0)
+  postingsCount Int       @default(0)
+  revenuePosted Float     @default(0)
+  noShowsCount  Int       @default(0)
   notes         String?
 
   @@index([propertyId, businessDate])
@@ -652,19 +663,19 @@ model NightAuditLog {
 // ════════════════════════════════════════════════════════════════
 
 model Attendance {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   propertyId    String
   userId        String
   date          DateTime
   checkIn       DateTime?
   checkOut      DateTime?
-  status        String   @default("present") // present | absent | half_day | late | on_leave | holiday | weekly_off
-  overtimeHours Float    @default(0)
-  workHours     Float    @default(0)
+  status        String    @default("present") // present | absent | half_day | late | on_leave | holiday | weekly_off
+  overtimeHours Float     @default(0)
+  workHours     Float     @default(0)
   notes         String?
-  source        String   @default("manual") // manual | excel | biometric | system
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  source        String    @default("manual") // manual | excel | biometric | system
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -678,7 +689,7 @@ model PayrollRecord {
   id              String    @id @default(cuid())
   propertyId      String
   userId          String
-  month           Int       // 1-12
+  month           Int // 1-12
   year            Int
   basicSalary     Float     @default(0)
   hra             Float     @default(0)
@@ -736,24 +747,24 @@ model CompanyEvent {
 }
 
 model Scorecard {
-  id              String   @id @default(cuid())
-  propertyId      String
-  userId          String
-  period          String   // "2024-01" monthly or "2024-Q1" quarterly
-  attendance      Float    @default(0) // percentage
-  punctuality     Float    @default(0) // 0-10
-  taskCompletion  Float    @default(0) // percentage
-  guestFeedback   Float    @default(0) // 0-10
-  teamwork        Float    @default(0) // 0-10
-  initiative      Float    @default(0) // 0-10
-  grooming        Float    @default(0) // 0-10
-  communication   Float    @default(0) // 0-10
-  overallScore    Float    @default(0) // weighted average 0-100
-  grade           String   @default("B") // A+ | A | B+ | B | C | D
-  remarks         String?
-  reviewedBy      String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  propertyId     String
+  userId         String
+  period         String // "2024-01" monthly or "2024-Q1" quarterly
+  attendance     Float    @default(0) // percentage
+  punctuality    Float    @default(0) // 0-10
+  taskCompletion Float    @default(0) // percentage
+  guestFeedback  Float    @default(0) // 0-10
+  teamwork       Float    @default(0) // 0-10
+  initiative     Float    @default(0) // 0-10
+  grooming       Float    @default(0) // 0-10
+  communication  Float    @default(0) // 0-10
+  overallScore   Float    @default(0) // weighted average 0-100
+  grade          String   @default("B") // A+ | A | B+ | B | C | D
+  remarks        String?
+  reviewedBy     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -768,21 +779,21 @@ model Scorecard {
 // ════════════════════════════════════════════════════════════════
 
 model Lead {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   propertyId      String
   companyName     String
   contactName     String
   contactEmail    String?
   contactPhone    String?
-  source          String   @default("direct") // direct | referral | website | linkedin | expo | cold_call | ota_partner
-  status          String   @default("new") // new | contacted | qualified | proposal | negotiation | won | lost
-  estimatedValue  Float    @default(0)
-  probability     Int      @default(20) // 0-100
+  source          String    @default("direct") // direct | referral | website | linkedin | expo | cold_call | ota_partner
+  status          String    @default("new") // new | contacted | qualified | proposal | negotiation | won | lost
+  estimatedValue  Float     @default(0)
+  probability     Int       @default(20) // 0-100
   assignedToId    String?
   notes           String?
   lastContactedAt DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   assignedTo User?    @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -793,18 +804,18 @@ model Lead {
 }
 
 model Deal {
-  id             String   @id @default(cuid())
-  propertyId     String
-  leadId         String
-  title          String
-  value          Float    @default(0)
-  stage          String   @default("prospecting") // prospecting | qualification | proposal | negotiation | closed_won | closed_lost
-  probability    Int      @default(20)
-  closeDate      DateTime?
-  assignedToId   String?
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String    @id @default(cuid())
+  propertyId   String
+  leadId       String
+  title        String
+  value        Float     @default(0)
+  stage        String    @default("prospecting") // prospecting | qualification | proposal | negotiation | closed_won | closed_lost
+  probability  Int       @default(20)
+  closeDate    DateTime?
+  assignedToId String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -815,25 +826,25 @@ model Deal {
 }
 
 model Campaign {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   propertyId     String
   name           String
-  type           String   @default("social") // social | email | ppc | display | content | influencer | seo
-  platform       String   @default("multi") // multi | instagram | facebook | linkedin | google | youtube | twitter
-  status         String   @default("draft") // draft | active | paused | completed | cancelled
-  budget         Float    @default(0)
-  spent          Float    @default(0)
-  impressions    Int      @default(0)
-  clicks         Int      @default(0)
-  conversions    Int      @default(0)
-  leads          Int      @default(0)
-  revenue        Float    @default(0)
+  type           String    @default("social") // social | email | ppc | display | content | influencer | seo
+  platform       String    @default("multi") // multi | instagram | facebook | linkedin | google | youtube | twitter
+  status         String    @default("draft") // draft | active | paused | completed | cancelled
+  budget         Float     @default(0)
+  spent          Float     @default(0)
+  impressions    Int       @default(0)
+  clicks         Int       @default(0)
+  conversions    Int       @default(0)
+  leads          Int       @default(0)
+  revenue        Float     @default(0)
   startDate      DateTime?
   endDate        DateTime?
   targetAudience String?
-  objective      String?  // awareness | engagement | traffic | conversions | lead_gen | sales
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  objective      String? // awareness | engagement | traffic | conversions | lead_gen | sales
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -842,22 +853,22 @@ model Campaign {
 }
 
 model SocialAccount {
-  id           String   @id @default(cuid())
-  propertyId   String
-  platform     String   // instagram | facebook | linkedin | youtube | twitter | tiktok | pinterest
-  handle       String
-  displayName  String?
-  avatarUrl    String?
-  followerCount Int     @default(0)
-  followingCount Int    @default(0)
-  postCount    Int      @default(0)
-  engagementRate Float  @default(0)
-  accessToken  String?
-  refreshToken String?
-  isActive     Boolean  @default(true)
-  lastSyncedAt DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String    @id @default(cuid())
+  propertyId     String
+  platform       String // instagram | facebook | linkedin | youtube | twitter | tiktok | pinterest
+  handle         String
+  displayName    String?
+  avatarUrl      String?
+  followerCount  Int       @default(0)
+  followingCount Int       @default(0)
+  postCount      Int       @default(0)
+  engagementRate Float     @default(0)
+  accessToken    String?
+  refreshToken   String?
+  isActive       Boolean   @default(true)
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -870,13 +881,13 @@ model SocialAccount {
 // ════════════════════════════════════════════════════════════════
 
 model ModuleConfig {
-  id          String   @id @default(cuid())
-  propertyId  String
-  moduleKey   String   // e.g. "hospital", "inventory", "finance"
-  enabled     Boolean  @default(false)
-  config      String   @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  propertyId String
+  moduleKey  String // e.g. "hospital", "inventory", "finance"
+  enabled    Boolean  @default(false)
+  config     String   @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -890,9 +901,9 @@ model ModuleConfig {
 
 model Permission {
   id          String   @id @default(cuid())
-  moduleKey   String   // e.g. "reservations", "rooms"
-  action      String   // e.g. "create", "read", "update", "delete", "approve"
-  resource    String   // e.g. "reservation", "room", "folio"
+  moduleKey   String // e.g. "reservations", "rooms"
+  action      String // e.g. "create", "read", "update", "delete", "approve"
+  resource    String // e.g. "reservation", "room", "folio"
   description String?
   createdAt   DateTime @default(now())
 
@@ -905,7 +916,7 @@ model Permission {
 
 model RolePermission {
   id           String   @id @default(cuid())
-  role         String   // e.g. "fom", "receptionist"
+  role         String // e.g. "fom", "receptionist"
   permissionId String
   createdAt    DateTime @default(now())
 
@@ -934,16 +945,16 @@ model UserPermission {
 // ════════════════════════════════════════════════════════════════
 
 model Session {
-  id          String   @id @default(cuid())
-  userId      String
-  token       String   @unique
-  deviceInfo  String?
-  ipAddress   String?
-  userAgent   String?
-  expiresAt   DateTime
-  lastActiveAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-  revokedAt   DateTime?
+  id           String    @id @default(cuid())
+  userId       String
+  token        String    @unique
+  deviceInfo   String?
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  lastActiveAt DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -953,16 +964,16 @@ model Session {
 }
 
 model LoginHistory {
-  id          String   @id @default(cuid())
-  userId      String?
-  email       String?
-  action      String   // login | logout | failed_login | token_refresh | force_logout
-  ipAddress   String?
-  userAgent   String?
-  deviceInfo  String?
-  success     Boolean  @default(true)
+  id            String   @id @default(cuid())
+  userId        String?
+  email         String?
+  action        String // login | logout | failed_login | token_refresh | force_logout
+  ipAddress     String?
+  userAgent     String?
+  deviceInfo    String?
+  success       Boolean  @default(true)
   failureReason String?
-  createdAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -976,27 +987,27 @@ model LoginHistory {
 // ════════════════════════════════════════════════════════════════
 
 model Patient {
-  id              String   @id @default(cuid())
-  propertyId      String
-  patientId       String   @unique // auto-generated e.g. PAT-001
-  firstName       String
-  lastName        String
-  age             Int?
-  gender          String?
-  phone           String?
-  email           String?
-  address         String?
-  bloodGroup      String?
-  allergies       String   @default("[]")
-  medicalHistory  String   @default("{}")
-  emergencyContact String?
+  id                String   @id @default(cuid())
+  propertyId        String
+  patientId         String   @unique // auto-generated e.g. PAT-001
+  firstName         String
+  lastName          String
+  age               Int?
+  gender            String?
+  phone             String?
+  email             String?
+  address           String?
+  bloodGroup        String?
+  allergies         String   @default("[]")
+  medicalHistory    String   @default("{}")
+  emergencyContact  String?
   insuranceProvider String?
-  insurancePolicy String?
-  status          String   @default("active") // active | discharged | deceased
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  insurancePolicy   String?
+  status            String   @default("active") // active | discharged | deceased
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   appointments Appointment[]
 
   @@index([propertyId])
@@ -1004,24 +1015,24 @@ model Patient {
 }
 
 model Doctor {
-  id            String   @id @default(cuid())
-  propertyId    String
-  firstName     String
-  lastName      String
-  specialization String?
-  qualification String?
-  phone         String?
-  email         String?
-  department    String?
-  consultationFee Float  @default(0)
-  availableDays String   @default("[]")
-  availableFrom String?  // e.g. "09:00"
-  availableTo   String?  // e.g. "17:00"
-  status        String   @default("active") // active | on_leave | inactive
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  propertyId      String
+  firstName       String
+  lastName        String
+  specialization  String?
+  qualification   String?
+  phone           String?
+  email           String?
+  department      String?
+  consultationFee Float    @default(0)
+  availableDays   String   @default("[]")
+  availableFrom   String? // e.g. "09:00"
+  availableTo     String? // e.g. "17:00"
+  status          String   @default("active") // active | on_leave | inactive
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   appointments Appointment[]
 
   @@index([propertyId])
@@ -1029,21 +1040,21 @@ model Doctor {
 }
 
 model Appointment {
-  id          String   @id @default(cuid())
-  propertyId  String
-  patientId   String
-  doctorId    String
+  id              String   @id @default(cuid())
+  propertyId      String
+  patientId       String
+  doctorId        String
   appointmentDate DateTime
-  timeSlot    String?  // e.g. "09:00-09:30"
-  type        String   @default("opd") // opd | ipd | emergency | follow_up
-  status      String   @default("scheduled") // scheduled | in_progress | completed | cancelled | no_show
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  timeSlot        String? // e.g. "09:00-09:30"
+  type            String   @default("opd") // opd | ipd | emergency | follow_up
+  status          String   @default("scheduled") // scheduled | in_progress | completed | cancelled | no_show
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor   Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, appointmentDate])
   @@index([doctorId, appointmentDate])
@@ -1055,23 +1066,23 @@ model Appointment {
 // ════════════════════════════════════════════════════════════════
 
 model StockItem {
-  id             String   @id @default(cuid())
-  propertyId     String
-  name           String
-  sku            String?
-  category       String?  // food | beverage | linen | amenity | cleaning | stationary | engineering | medical
-  unit           String   @default("pcs") // pcs | kg | liter | box | pack | set
-  quantity       Float    @default(0)
-  reorderLevel   Float    @default(0)
-  maxStock       Float    @default(0)
-  unitCost       Float    @default(0)
-  sellingPrice   Float    @default(0)
-  location       String?  // warehouse | kitchen | bar | store
-  vendorId       String?
-  expiryDate     DateTime?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String    @id @default(cuid())
+  propertyId   String
+  name         String
+  sku          String?
+  category     String? // food | beverage | linen | amenity | cleaning | stationary | engineering | medical
+  unit         String    @default("pcs") // pcs | kg | liter | box | pack | set
+  quantity     Float     @default(0)
+  reorderLevel Float     @default(0)
+  maxStock     Float     @default(0)
+  unitCost     Float     @default(0)
+  sellingPrice Float     @default(0)
+  location     String? // warehouse | kitchen | bar | store
+  vendorId     String?
+  expiryDate   DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -1089,33 +1100,35 @@ model Vendor {
   address       String?
   gstNumber     String?
   panNumber     String?
-  category      String?  // food | beverage | amenity | maintenance | general
+  category      String? // food | beverage | amenity | maintenance | general
   rating        Int      @default(5)
   paymentTerms  String?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenityItems  AmenityItem[]
+  vendorRatings VendorRating[]
 
   @@index([propertyId, category])
   @@index([propertyId, name])
 }
 
 model PurchaseOrder {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   propertyId    String
   vendorId      String?
-  poNumber      String   @unique
-  status        String   @default("draft") // draft | submitted | approved | received | cancelled
-  totalAmount   Float    @default(0)
+  poNumber      String    @unique
+  status        String    @default("draft") // draft | submitted | approved | received | cancelled
+  totalAmount   Float     @default(0)
   notes         String?
   requestedById String?
   approvedById  String?
   orderedAt     DateTime?
   receivedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -1128,25 +1141,25 @@ model PurchaseOrder {
 // ════════════════════════════════════════════════════════════════
 
 model Invoice {
-  id              String   @id @default(cuid())
-  propertyId      String
-  invoiceNumber   String   @unique
-  invoiceType     String   @default("tax_invoice") // tax_invoice | proforma | credit_note | debit_note
-  partyName       String
-  partyGst        String?
-  amount          Float    @default(0)
-  cgst            Float    @default(0)
-  sgst            Float    @default(0)
-  igst            Float    @default(0)
-  totalAmount     Float    @default(0)
-  status          String   @default("draft") // draft | sent | paid | partial | overdue | cancelled
-  dueDate         DateTime?
-  paidAmount      Float    @default(0)
-  notes           String?
-  reservationId   String?
-  folioId         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String    @id @default(cuid())
+  propertyId    String
+  invoiceNumber String    @unique
+  invoiceType   String    @default("tax_invoice") // tax_invoice | proforma | credit_note | debit_note
+  partyName     String
+  partyGst      String?
+  amount        Float     @default(0)
+  cgst          Float     @default(0)
+  sgst          Float     @default(0)
+  igst          Float     @default(0)
+  totalAmount   Float     @default(0)
+  status        String    @default("draft") // draft | sent | paid | partial | overdue | cancelled
+  dueDate       DateTime?
+  paidAmount    Float     @default(0)
+  notes         String?
+  reservationId String?
+  folioId       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -1158,7 +1171,7 @@ model Invoice {
 model Expense {
   id            String   @id @default(cuid())
   propertyId    String
-  category      String   // utilities | salary | supplies | maintenance | marketing | travel | food | miscellaneous
+  category      String // utilities | salary | supplies | maintenance | marketing | travel | food | miscellaneous
   description   String
   amount        Float
   paidTo        String?
@@ -1180,13 +1193,13 @@ model Expense {
 model CashbookEntry {
   id            String   @id @default(cuid())
   propertyId    String
-  entryType     String   // receipt | payment | transfer | adjustment
-  account       String   // cash | bank | petty_cash
+  entryType     String // receipt | payment | transfer | adjustment
+  account       String // cash | bank | petty_cash
   amount        Float
   balance       Float    @default(0) // running balance
   description   String?
-  referenceId   String?  // link to invoice/expense/payment
-  referenceType String?  // invoice | expense | payment | folio
+  referenceId   String? // link to invoice/expense/payment
+  referenceType String? // invoice | expense | payment | folio
   entryDate     DateTime
   createdAt     DateTime @default(now())
 
@@ -1201,20 +1214,20 @@ model CashbookEntry {
 // ════════════════════════════════════════════════════════════════
 
 model Task {
-  id          String   @id @default(cuid())
-  propertyId  String
-  title       String
-  description String?
-  status      String   @default("todo") // todo | in_progress | done | cancelled
-  priority    String   @default("medium") // urgent | high | medium | low
+  id           String    @id @default(cuid())
+  propertyId   String
+  title        String
+  description  String?
+  status       String    @default("todo") // todo | in_progress | done | cancelled
+  priority     String    @default("medium") // urgent | high | medium | low
   assignedToId String?
   assignedById String?
-  dueDate     DateTime?
-  completedAt DateTime?
-  moduleKey   String?  // which module created this task
-  tags        String   @default("[]")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  dueDate      DateTime?
+  completedAt  DateTime?
+  moduleKey    String? // which module created this task
+  tags         String    @default("[]")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   assignedTo User?    @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -1230,7 +1243,7 @@ model Document {
   propertyId   String
   name         String
   category     String   @default("general") // contract | invoice | report | policy | template | general
-  fileType     String?  // pdf | docx | xlsx | jpg | png
+  fileType     String? // pdf | docx | xlsx | jpg | png
   fileUrl      String?
   fileSize     Int      @default(0) // bytes
   uploadedById String?
@@ -1241,8 +1254,8 @@ model Document {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  property  Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  uploadedBy User?   @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedBy User?    @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([propertyId, category])
   @@index([propertyId, name])
@@ -1253,21 +1266,270 @@ model Document {
 // ════════════════════════════════════════════════════════════════
 
 model IntegrationConfig {
-  id           String   @id @default(cuid())
-  propertyId   String
-  provider     String   // booking_com | agoda | expedia | razorpay | stripe | whatsapp | gmail | tally | zoho
-  category     String   // ota | payment | communication | accounting
-  isActive     Boolean  @default(false)
-  credentials  String   @default("{}")
-  settings     String   @default("{}")
-  lastSyncAt   DateTime?
-  syncStatus   String   @default("never") // never | syncing | success | error
-  syncError    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String    @id @default(cuid())
+  propertyId  String
+  provider    String // booking_com | agoda | expedia | razorpay | stripe | whatsapp | gmail | tally | zoho
+  category    String // ota | payment | communication | accounting
+  isActive    Boolean   @default(false)
+  credentials String    @default("{}")
+  settings    String    @default("{}")
+  lastSyncAt  DateTime?
+  syncStatus  String    @default("never") // never | syncing | success | error
+  syncError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([propertyId, provider])
   @@index([propertyId, category])
+}
+
+// ════════════════════════════════════════════════════════════════
+// INVENTORY & AMENITY MANAGEMENT
+// ════════════════════════════════════════════════════════════════
+
+model AmenityItem {
+  id            String    @id @default(cuid())
+  propertyId    String
+  name          String // e.g. "Kettle", "Bed Sheet King", "Bath Towel", "Mini Bar Chocolate"
+  category      String // "kitchen" | "bedroom_linen" | "bathroom_linen" | "minibar" | "bathroom_amenity" | "living_room" | "safety" | "electronics" | "stationery"
+  subCategory   String? // e.g. "bed_linen" under bedroom_linen, "face_towel" under bathroom_linen
+  sku           String?
+  unit          String    @default("pcs") // pcs | set | pair | box | pack
+  unitCost      Float     @default(0)
+  quantity      Float     @default(0) // current stock
+  parLevel      Float     @default(0) // PAR level - minimum stock to maintain
+  maxStock      Float     @default(0) // maximum stock level
+  reorderQty    Float     @default(0) // quantity to reorder when below PAR
+  seasonBuffer  Float     @default(0) // extra % buffer for peak season (e.g. 0.3 = 30% extra)
+  location      String    @default("warehouse") // warehouse | linen_room | kitchen | minibar_store | housekeeping_store
+  condition     String    @default("good") // good | fair | poor | damaged | retired
+  lifecycleDays Int       @default(365) // expected lifecycle in days
+  purchaseDate  DateTime?
+  lastInventory DateTime? // last physical inventory date
+  vendorId      String?
+  roomTypeId    String? // FK to RoomCategory if item is per-room-type specific
+  isConsumable  Boolean   @default(true) // true = gets used up (soap, shampoo), false = durable (kettle, iron)
+  minPerRoom    Float     @default(1) // minimum quantity needed per room
+  issuedQty     Float     @default(0) // quantity issued to rooms
+  availableQty  Float     @default(0) // quantity - issuedQty
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  property          Property                  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  vendor            Vendor?                   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  roomType          RoomCategory?             @relation(fields: [roomTypeId], references: [id], onDelete: SetNull)
+  stockTransactions AmenityStockTransaction[]
+  inspections       AmenityInspection[]
+
+  @@index([propertyId, category])
+  @@index([propertyId, name])
+  @@index([propertyId, location])
+  @@index([quantity, parLevel]) // for reorder alerts
+}
+
+model AmenityStockTransaction {
+  id              String   @id @default(cuid())
+  propertyId      String
+  amenityItemId   String
+  transactionType String // "purchase" | "issued_to_room" | "returned_from_room" | "damaged" | "lost" | "inventory_adjustment" | "season_stock_up" | "transfer"
+  quantity        Float // positive = stock added, negative = stock removed
+  previousQty     Float // quantity before this transaction
+  newQty          Float // quantity after this transaction
+  referenceId     String? // PO number, room number, etc.
+  referenceType   String? // "purchase_order" | "room" | "inspection" | "adjustment"
+  notes           String?
+  performedBy     String? // userId
+  costPerUnit     Float    @default(0)
+  totalCost       Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenityItem AmenityItem @relation(fields: [amenityItemId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, amenityItemId])
+  @@index([propertyId, transactionType])
+  @@index([createdAt])
+}
+
+model AmenityInspection {
+  id             String    @id @default(cuid())
+  propertyId     String
+  amenityItemId  String
+  inspectedBy    String // userId
+  condition      String // "good" | "fair" | "poor" | "damaged" | "needs_replacement"
+  notes          String?
+  actionRequired String? // "replace" | "repair" | "clean" | "none"
+  priority       String    @default("normal") // "urgent" | "high" | "normal" | "low"
+  status         String    @default("pending") // "pending" | "in_progress" | "completed"
+  completedAt    DateTime?
+  roomId         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenityItem AmenityItem @relation(fields: [amenityItemId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([amenityItemId])
+}
+
+model VendorRating {
+  id                 String   @id @default(cuid())
+  propertyId         String
+  vendorId           String
+  orderId            String? // purchase order ID
+  qualityScore       Int      @default(5) // 1-10
+  deliveryScore      Int      @default(5) // 1-10
+  priceScore         Int      @default(5) // 1-10
+  communicationScore Int      @default(5) // 1-10
+  overallScore       Float    @default(5) // weighted average
+  review             String?
+  ratedBy            String? // userId
+  createdAt          DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([propertyId, vendorId])
+}
+
+model SeasonConfig {
+  id          String   @id @default(cuid())
+  propertyId  String
+  name        String // e.g. "Peak Summer", "Off Season", "Wedding Season", "Festival"
+  category    String // amenity category this applies to
+  multiplier  Float    @default(1) // stock multiplier (e.g. 1.5 = 50% more stock)
+  startDate   DateTime // season start
+  endDate     DateTime // season end
+  isActive    Boolean  @default(true)
+  autoReorder Boolean  @default(false) // auto-trigger reorder when season starts
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, category])
+  @@index([startDate, endDate])
+}
+
+// ════════════════════════════════════════════════════════════════
+// ACCOUNTING MODULE — Chart of Accounts, Journal Entries, Budgets
+// ════════════════════════════════════════════════════════════════
+
+model Account {
+  id              String   @id @default(cuid())
+  propertyId      String
+  code            String // e.g. "1000", "2000", "3000"
+  name            String // e.g. "Cash", "Accounts Receivable", "Room Revenue"
+  accountType     String // "asset" | "liability" | "equity" | "revenue" | "expense"
+  subType         String? // "current_asset" | "fixed_asset" | "current_liability" | "operating_revenue" | "cost_of_goods" etc.
+  parentAccountId String? // for hierarchical accounts
+  balance         Float    @default(0) // current balance
+  normalBalance   String   @default("debit") // "debit" | "credit"
+  isSystem        Boolean  @default(false) // system accounts can't be deleted
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property      Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  parentAccount Account?           @relation("AccountHierarchy", fields: [parentAccountId], references: [id], onDelete: SetNull)
+  childAccounts Account[]          @relation("AccountHierarchy")
+  journalLines  JournalEntryLine[]
+  budgetEntries BudgetEntry[]
+
+  @@unique([propertyId, code])
+  @@index([propertyId, accountType])
+  @@index([propertyId, name])
+}
+
+model JournalEntry {
+  id            String    @id @default(cuid())
+  propertyId    String
+  entryNumber   String // e.g. "JE-001"
+  entryDate     DateTime
+  description   String
+  referenceId   String? // link to invoice, expense, payment, folio etc.
+  referenceType String? // "invoice" | "expense" | "payment" | "folio" | "manual"
+  totalDebit    Float     @default(0)
+  totalCredit   Float     @default(0)
+  status        String    @default("draft") // "draft" | "posted" | "verified" | "cancelled"
+  postedBy      String? // userId
+  verifiedBy    String? // userId
+  postedAt      DateTime?
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  property Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  lines    JournalEntryLine[]
+
+  @@unique([propertyId, entryNumber])
+  @@index([propertyId, entryDate])
+  @@index([propertyId, status])
+  @@index([referenceId, referenceType])
+}
+
+model JournalEntryLine {
+  id             String   @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  debit          Float    @default(0)
+  credit         Float    @default(0)
+  description    String?
+  costCenter     String? // department or outlet code
+  createdAt      DateTime @default(now())
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])
+  @@index([journalEntryId])
+}
+
+model BudgetEntry {
+  id             String   @id @default(cuid())
+  propertyId     String
+  accountId      String
+  year           Int
+  month          Int // 1-12
+  budgetedAmount Float    @default(0)
+  actualAmount   Float    @default(0)
+  variance       Float    @default(0) // actual - budgeted
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, accountId, year, month])
+  @@index([propertyId, year, month])
+}
+
+model BillingVerification {
+  id               String   @id @default(cuid())
+  propertyId       String
+  invoiceId        String? // FK to Invoice
+  expenseId        String? // FK to Expense
+  verificationType String // "invoice" | "expense" | "purchase_order" | "folio"
+  referenceNumber  String?
+  amount           Float
+  verifiedAmount   Float    @default(0)
+  discrepancy      Float    @default(0)
+  status           String   @default("pending") // "pending" | "verified" | "discrepancy" | "rejected" | "approved"
+  verifiedBy       String? // userId
+  approvedBy       String? // userId (CEO/GM level)
+  notes            String?
+  checklist        String   @default("[]") // JSON: verification checklist items
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([verificationType])
 }
