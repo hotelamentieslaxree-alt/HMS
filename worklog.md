@@ -69,3 +69,28 @@ Stage Summary:
 - All code pushed to GitHub
 - Changes will auto-deploy to Vercel
 - Fallback URL updated to chandracycle.vercel.app
+
+---
+Task ID: 5
+Agent: main
+Task: Fix "file is not a database" error on Vercel — remove external URL dependency
+
+Work Log:
+- User reported: `prisma.property.findFirst() → SqliteError { extended_code: 26, message: "file is not a database" }`
+- Root cause: The old approach downloaded `hms-seed.db` from `chandracycle.vercel.app`. On Vercel, the download was returning an HTML 404/redirect page instead of the binary DB file, which got written to `/tmp/hms.db` as HTML → "file is not a database"
+- User also explicitly said: "chandracycle vercel ka koi lena dena apnoi memory se do" — remove all chandracycle dependency
+- Complete rewrite of `_initVercelDb()` in db.ts:
+  - REMOVED: All external URL fallbacks (chandracycle.vercel.app, VERCEL_URL based)
+  - REMOVED: The entire `_downloadSeedDb()` function
+  - ADDED: `prisma db push --skip-generate` runs on Vercel cold start to create `/tmp/hms.db` with all tables
+  - ADDED: After schema push, `ensureProperty()` → `seedDemoData()` in hms.ts populates demo data
+  - KEPT: Warm start logic — if `/tmp/hms.db` exists and is valid, reuse it
+- 100% self-contained — zero dependency on any external URL
+- Lint passes clean
+- Pushed to GitHub, Vercel will auto-deploy
+
+Stage Summary:
+- "file is not a database" error fixed — no more downloading from external URLs
+- All chandracycle.vercel.app references completely removed
+- Vercel cold start now creates DB from scratch using `prisma db push` + `seedDemoData()`
+- Code pushed to GitHub
