@@ -31,6 +31,8 @@ import {
 
 // ─── TYPES ──────────────────────────────────────────────────────────
 
+const CHART_COLORS = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
+
 type POStatus = "draft" | "submitted" | "approved" | "received" | "cancelled";
 type AmenityCategory =
   | "bedroom_linen"
@@ -155,15 +157,15 @@ interface Vendor {
 // ─── CATEGORY META ──────────────────────────────────────────────────
 
 const CATEGORY_META: Record<AmenityCategory, { label: string; icon: any; color: string }> = {
-  bedroom_linen: { label: "Bedroom Linen", icon: Bed, color: "#7C3AED" },
-  bathroom_linen: { label: "Bathroom Linen", icon: Bath, color: "#0284C7" },
+  bedroom_linen: { label: "Bedroom Linen", icon: Bed, color: "#1B3A6B" },
+  bathroom_linen: { label: "Bathroom Linen", icon: Bath, color: "#C9952A" },
   minibar: { label: "Mini Bar Items", icon: Coffee, color: "#D97706" },
-  kitchen: { label: "Kitchen Equipment", icon: Thermometer, color: "#DC2626" },
-  bathroom_amenity: { label: "Bathroom Amenities", icon: Palette, color: "#16A34A" },
-  electronics: { label: "Electronics", icon: Tv, color: "#0369A1" },
+  kitchen: { label: "Kitchen Equipment", icon: Thermometer, color: "#16A34A" },
+  bathroom_amenity: { label: "Bathroom Amenities", icon: Palette, color: "#0369A1" },
+  electronics: { label: "Electronics", icon: Tv, color: "#7C3AED" },
   safety: { label: "Safety Items", icon: Shield, color: "#B45309" },
   stationery: { label: "Stationery", icon: PenTool, color: "#6B7280" },
-  living_room: { label: "Living Room", icon: Sofa, color: "#9333EA" },
+  living_room: { label: "Living Room", icon: Sofa, color: "#1B3A6B" },
 };
 
 const CATEGORY_DESCRIPTIONS: Record<AmenityCategory, string> = {
@@ -183,14 +185,14 @@ const PO_STATUS_META: Record<POStatus, { label: string; cls: string; icon: any }
   submitted: { label: "Submitted", cls: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]", icon: Send },
   approved: { label: "Approved", cls: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]", icon: ThumbsUp },
   received: { label: "Received", cls: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]", icon: Inbox },
-  cancelled: { label: "Cancelled", cls: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]", icon: XCircle },
+  cancelled: { label: "Cancelled", cls: "bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]", icon: XCircle },
 };
 
 const CONDITION_META: Record<string, { label: string; cls: string }> = {
   new: { label: "New", cls: "bg-[#DCFCE7] text-[#14532D] border-[#16A34A]" },
   good: { label: "Good", cls: "bg-[#DBEAFE] text-[#1B3A6B] border-[#0369A1]" },
   fair: { label: "Fair", cls: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]" },
-  poor: { label: "Poor", cls: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]" },
+  poor: { label: "Poor", cls: "bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]" },
   damaged: { label: "Damaged", cls: "bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]" },
   needs_replacement: { label: "Needs Replacement", cls: "bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]" },
 };
@@ -203,13 +205,13 @@ const TRANSACTION_TYPE_META: Record<TransactionType, { label: string; cls: strin
   lost: { label: "Lost", cls: "text-[#991B1B]", icon: XCircle, direction: "out" },
   inventory_adjustment: { label: "Adjustment", cls: "text-[#D97706]", icon: ArrowRightLeft, direction: "neutral" },
   season_stock_up: { label: "Season Stock Up", cls: "text-[#7C3AED]", icon: TrendingUp, direction: "in" },
-  transfer: { label: "Transfer", cls: "text-[#0284C7]", icon: ArrowRightLeft, direction: "neutral" },
+  transfer: { label: "Transfer", cls: "text-[#0369A1]", icon: ArrowRightLeft, direction: "neutral" },
 };
 
 const PRIORITY_META: Record<string, { label: string; cls: string }> = {
   low: { label: "Low", cls: "bg-[#E5E7EB] text-[#374151] border-[#6B7280]" },
   normal: { label: "Normal", cls: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]" },
-  high: { label: "High", cls: "bg-[#FFE4E6] text-[#881337] border-[#DC2626]" },
+  high: { label: "High", cls: "bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]" },
   urgent: { label: "Urgent", cls: "bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]" },
 };
 
@@ -733,7 +735,7 @@ export function PurchasingModule() {
                         </div>
                         <Badge variant="secondary" className="text-[10px] ml-2">{items.length} items</Badge>
                         {belowParCount > 0 && (
-                          <Badge className="text-[10px] bg-[#FFE4E6] text-[#881337] border-[#DC2626]">
+                          <Badge className="text-[10px] bg-[#FEE2E2] text-[#7F1D1D] border-[#991B1B]">
                             <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> {belowParCount} below PAR
                           </Badge>
                         )}
@@ -773,8 +775,8 @@ export function PurchasingModule() {
                                   key={item.id}
                                   className={cn(
                                     "hover:bg-muted/50",
-                                    below && "bg-[#FFF5F5] dark:bg-[#FFE4E6]/10",
-                                    stStatus === "critical" && "bg-[#FFE4E6]/50 dark:bg-[#FFE4E6]/10"
+                                    below && "bg-[#FEE2E2]/60 dark:bg-[#7F1D1D]/10",
+                                    stStatus === "critical" && "bg-[#FEE2E2]/80 dark:bg-[#7F1D1D]/10"
                                   )}
                                 >
                                   <TableCell className="text-xs font-medium">{item.name}</TableCell>
@@ -1044,7 +1046,7 @@ export function PurchasingModule() {
                           <TableRow key={season.id} className={cn("hover:bg-muted/50", !season.isActive && "opacity-60")}>
                             <TableCell className="text-xs font-semibold flex items-center gap-1.5">
                               {season.name.includes("Summer") && <Sun className="h-3 w-3 text-[#D97706]" />}
-                              {season.name.includes("Monsoon") && <CloudRain className="h-3 w-3 text-[#0284C7]" />}
+                              {season.name.includes("Monsoon") && <CloudRain className="h-3 w-3 text-[#0369A1]" />}
                               {season.name.includes("Winter") && <Snowflake className="h-3 w-3 text-[#0369A1]" />}
                               {season.name.includes("Conference") && <FileText className="h-3 w-3 text-[#7C3AED]" />}
                               {season.name}
@@ -1112,10 +1114,10 @@ export function PurchasingModule() {
 
           {/* Critical inspections alert */}
           {!inspectionLoading && inspections.filter((i) => (i.priority === "urgent" || i.priority === "high") && i.status !== "completed").length > 0 && (
-            <div className="rounded-lg border border-[#DC2626]/30 bg-[#FFE4E6]/50 p-3 mb-4 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-[#DC2626] mt-0.5 shrink-0" />
+            <div className="rounded-lg border border-[#991B1B]/30 bg-[#FEE2E2]/60 dark:bg-[#7F1D1D]/10 p-3 mb-4 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-[#991B1B] mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-[#DC2626]">Critical Inspections Require Attention</p>
+                <p className="text-xs font-semibold text-[#7F1D1D] dark:text-[#FCA5A5]">Critical Inspections Require Attention</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
                   {inspections.filter((i) => (i.priority === "urgent" || i.priority === "high") && i.status !== "completed").length} items have high/urgent priority and need immediate action.
                 </p>
@@ -1170,7 +1172,7 @@ export function PurchasingModule() {
                             key={insp.id}
                             className={cn(
                               "hover:bg-muted/50 cursor-pointer",
-                              (insp.priority === "urgent" || insp.priority === "high") && insp.status === "pending" && "bg-[#FFE4E6]/30 dark:bg-[#FFE4E6]/10"
+                              (insp.priority === "urgent" || insp.priority === "high") && insp.status === "pending" && "bg-[#FEE2E2]/40 dark:bg-[#7F1D1D]/10"
                             )}
                             onClick={() => setShowInspectionDetail(insp)}
                           >

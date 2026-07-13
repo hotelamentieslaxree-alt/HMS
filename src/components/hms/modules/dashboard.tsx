@@ -1119,7 +1119,7 @@ function PurchaseDashboard() {
           <h2 className="font-display text-2xl font-bold">Purchase Manager Dashboard</h2>
           <p className="text-sm text-muted-foreground">Procurement, inventory & vendor management</p>
         </div>
-        <Badge className="bg-[#10B981] text-white border-0">Procurement Department</Badge>
+        <Badge className="bg-[#1B3A6B] text-white border-0">Procurement Department</Badge>
       </div>
 
       {/* KPI Row */}
@@ -1171,7 +1171,7 @@ function PurchaseDashboard() {
                 <YAxis fontSize={11} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="stock" fill="#10B981" name="Current Stock" radius={[4,4,0,0]} />
+                <Bar dataKey="stock" fill="#1B3A6B" name="Current Stock" radius={[4,4,0,0]} />
                 <Bar dataKey="par" fill="#e5e7eb" name="Par Level" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
