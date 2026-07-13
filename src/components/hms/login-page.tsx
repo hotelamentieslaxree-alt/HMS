@@ -108,12 +108,12 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0A0F1C] text-white overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#FFC0CB] via-[#FFB3C6] to-[#FF69B4] text-white overflow-hidden">
       {/* Background effects */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#1B3A6B]/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#C9952A]/10 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#1B3A6B]/5 rounded-full blur-[150px]" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#D6336C]/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#FF69B4]/15 rounded-full blur-[100px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#FF69B4]/10 rounded-full blur-[150px]" />
       </div>
 
       {/* Content */}
@@ -121,12 +121,12 @@ export function LoginPage() {
         {/* Header */}
         <header className="flex items-center justify-between px-6 py-4 lg:px-12">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#C9952A] to-[#F0C96A] text-[#1B3A6B] font-display font-bold text-lg shadow-glow-gold">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF69B4] to-[#FF8EC7] text-white font-display font-bold text-lg shadow-glow-gold">
               A
             </div>
             <div>
               <h1 className="font-display text-lg font-bold tracking-tight">ARIA HMS</h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#C9952A]/80">Hospitality Operating System</p>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[#FFE0EE]">Hospitality Operating System</p>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-4 text-xs text-white/40">
@@ -143,12 +143,12 @@ export function LoginPage() {
           <div className="w-full max-w-6xl">
             {/* Welcome text */}
             <div className="text-center mb-10 animate-[fadeInUp_0.6s_ease-out]">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#C9952A]/30 bg-[#C9952A]/10 px-4 py-1.5 mb-4">
-                <Star className="h-3.5 w-3.5 text-[#C9952A]" />
-                <span className="text-xs font-medium text-[#F0C96A]">The Aurelian Grand · Mumbai</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#FF69B4]/30 bg-[#FF69B4]/10 px-4 py-1.5 mb-4">
+                <Star className="h-3.5 w-3.5 text-[#FF69B4]" />
+                <span className="text-xs font-medium text-[#FFE0EE]">The Aurelian Grand · Mumbai</span>
               </div>
               <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
-                Welcome to <span className="text-[#C9952A]">ARIA</span>
+                Welcome to <span className="text-[#FF69B4]">ARIA</span>
               </h2>
               <p className="mt-3 text-base text-white/50 max-w-lg mx-auto">
                 Select your role to access your workspace, or sign in with your credentials
@@ -159,13 +159,13 @@ export function LoginPage() {
             <div className="flex items-center justify-center gap-3 mb-8">
               <button
                 onClick={() => setMode("cards")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${mode === "cards" ? "bg-[#C9952A] text-[#0A0F1C]" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${mode === "cards" ? "bg-[#D6336C] text-white" : "bg-white/20 text-white/80 hover:bg-white/30"}`}
               >
                 Quick Access
               </button>
               <button
                 onClick={() => setMode("manual")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${mode === "manual" ? "bg-[#C9952A] text-[#0A0F1C]" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${mode === "manual" ? "bg-[#D6336C] text-white" : "bg-white/20 text-white/80 hover:bg-white/30"}`}
               >
                 Sign In
               </button>
@@ -183,18 +183,18 @@ export function LoginPage() {
                         key={q.email}
                         onClick={() => quickLogin(q.email)}
                         disabled={loading}
-                        className="group relative flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 text-center hover:border-[#C9952A]/40 hover:bg-white/10 transition-all duration-300 disabled:opacity-50"
+                        className="group relative flex flex-col items-center gap-2 rounded-xl border border-white/20 bg-white/15 p-4 text-center hover:border-[#FF69B4]/50 hover:bg-white/25 transition-all duration-300 disabled:opacity-50"
                       >
                         {/* Role badge */}
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: `${q.color}20` }}>
                           <Icon className="h-5 w-5" style={{ color: q.color }} />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-white group-hover:text-[#F0C96A] transition-colors">{q.label}</p>
+                          <p className="text-sm font-semibold text-white group-hover:text-[#FF8EC7] transition-colors">{q.label}</p>
                           <p className="text-[10px] text-white/40 mt-0.5">{q.desc}</p>
                         </div>
                         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ChevronRight className="h-3.5 w-3.5 text-[#C9952A]" />
+                          <ChevronRight className="h-3.5 w-3.5 text-[#FF69B4]" />
                         </div>
                         {/* Level badge */}
                         <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wider text-white/30">L{meta?.level ?? 4}</span>
@@ -203,15 +203,15 @@ export function LoginPage() {
                   })}
                 </div>
                 <p className="text-center text-xs text-white/30 mt-6">
-                  Click a role card to instantly log in · Demo password: <code className="px-1.5 py-0.5 rounded bg-white/10 text-[#F0C96A]">aurelian2024</code>
+                  Click a role card to instantly log in · Demo password: <code className="px-1.5 py-0.5 rounded bg-white/20 text-[#FF8EC7]">aurelian2024</code>
                 </p>
               </div>
             ) : (
               <div className="animate-[fadeIn_0.3s_ease-out]">
                 <form onSubmit={submitManual} className="max-w-md mx-auto space-y-4">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5">
+                  <div className="rounded-2xl border border-white/20 bg-white/10 p-8 space-y-5">
                     <div className="text-center mb-2">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#C9952A] to-[#F0C96A] text-[#0A0F1C] mx-auto mb-3">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF8EC7] text-white mx-auto mb-3">
                         <LogIn className="h-6 w-6" />
                       </div>
                       <h3 className="font-display text-xl font-bold">Sign In</h3>
@@ -225,7 +225,7 @@ export function LoginPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="your.name@aurelian.com"
-                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[#C9952A]/50 focus:outline-none focus:ring-1 focus:ring-[#C9952A]/30 transition-colors"
+                        className="w-full rounded-lg border border-white/20 bg-white/15 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#FF69B4]/50 focus:outline-none focus:ring-1 focus:ring-[#FF69B4]/30 transition-colors"
                       />
                     </div>
 
@@ -252,10 +252,10 @@ export function LoginPage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#C9952A] to-[#F0C96A] px-4 py-3 text-sm font-bold text-[#0A0F1C] hover:shadow-glow-gold transition-all disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#D6336C] to-[#FF69B4] px-4 py-3 text-sm font-bold text-white hover:shadow-glow-gold transition-all disabled:opacity-50"
                     >
                       {loading ? (
-                        <div className="h-4 w-4 border-2 border-[#0A0F1C]/30 border-t-[#0A0F1C] rounded-full animate-spin" />
+                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       ) : (
                         <>
                           <ArrowRight className="h-4 w-4" />
@@ -265,7 +265,7 @@ export function LoginPage() {
                     </button>
                   </div>
                   <p className="text-center text-xs text-white/30">
-                    All demo accounts use password: <code className="px-1.5 py-0.5 rounded bg-white/10 text-[#F0C96A]">aurelian2024</code>
+                    All demo accounts use password: <code className="px-1.5 py-0.5 rounded bg-white/20 text-[#FF8EC7]">aurelian2024</code>
                   </p>
                 </form>
               </div>
