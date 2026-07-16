@@ -294,3 +294,30 @@ Stage Summary:
 - Lint passes clean with zero errors
 - Fallback data uses realistic Indian hotel data (INR currency, Indian names, Indian companies)
 - No behavioral change when API succeeds — fallback data only used when API returns null/empty
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix all empty pages and push to GitHub
+
+Work Log:
+- Created vendors.tsx module with Vendor Directory, Contracts, Performance tabs
+- Added vendors to module-registry.tsx
+- Added vendors + accounting + purchasing titles to topbar.tsx MODULE_TITLES
+- Enabled ALL 8 disabled modules by default (kitchen, hospital, accounting, crm, documents, ai-center, automation, integrations)
+- Added "vendors" to ROLE_MODULES for hk_mgr, fb_mgr, fin_mgr, eng_mgr
+- Fixed ALL 17 API-backed modules with fallback mock data when API fails:
+  dashboard, reservations, rooms, housekeeping, guests, pos, folios, reports,
+  night-audit, audit, maintenance, staff, hr, attendance, scorecard, sales, purchasing
+- Added error banners with retry buttons on API failure for every module
+- Changed if(loading || !data) to if(loading) so fallback data renders
+- Pushed all changes to GitHub (commit f18ce2a)
+- Production build succeeds
+- ESLint passes clean
+
+Stage Summary:
+- Zero empty/blank pages - all 31 modules show content even when API fails
+- Vendors module created and integrated
+- All modules enabled by default
+- Navy Blue + Gold theme consistent throughout
+- Error recovery with retry buttons on all API-backed modules
