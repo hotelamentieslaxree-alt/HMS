@@ -23,10 +23,21 @@ import {
   MapPin, Filter, ChevronRight, ChevronDown, UserCircle,
   Briefcase, GitBranch, PhoneCall, MailOpen,
   PieChart as PieChartIcon,
+  AlertTriangle,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
 } from "recharts";
+
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_EMPLOYEES = [
+  { id: "e1", firstName: "Vikram", lastName: "Singh", email: "vikram.singh@ariahotel.in", phone: "+91-98100-12345", employeeCode: "EMP-001", role: "gm", isActive: true, isOnLeave: false, department: { name: "Management" }, departmentCode: "Management" },
+  { id: "e2", firstName: "Deepa", lastName: "Nair", email: "deepa.nair@ariahotel.in", phone: "+91-98200-23456", employeeCode: "EMP-002", role: "fom", isActive: true, isOnLeave: false, department: { name: "Front Office" }, departmentCode: "Front Office" },
+  { id: "e3", firstName: "Ramesh", lastName: "Patel", email: "ramesh.patel@ariahotel.in", phone: "+91-98300-34567", employeeCode: "EMP-003", role: "receptionist", isActive: true, isOnLeave: false, department: { name: "Front Office" }, departmentCode: "Front Office" },
+  { id: "e4", firstName: "Sunita", lastName: "Devi", email: "sunita.devi@ariahotel.in", phone: "+91-98400-45678", employeeCode: "EMP-004", role: "hk_mgr", isActive: true, isOnLeave: false, department: { name: "Housekeeping" }, departmentCode: "Housekeeping" },
+  { id: "e5", firstName: "Arjun", lastName: "Reddy", email: "arjun.reddy@ariahotel.in", phone: "+91-98500-56789", employeeCode: "EMP-005", role: "fb_mgr", isActive: false, isOnLeave: false, department: { name: "Food & Beverage" }, departmentCode: "Food & Beverage" },
+  { id: "e6", firstName: "Kavita", lastName: "Sharma", email: "kavita.sharma@ariahotel.in", phone: "+91-98600-67890", employeeCode: "EMP-006", role: "hr_mgr", isActive: true, isOnLeave: true, department: { name: "Human Resources" }, departmentCode: "Human Resources" },
+];
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────
 const NAVY = "#1B3A6B";
@@ -247,7 +258,7 @@ export function StaffModule() {
 
 // ─── TAB 1: DIRECTORY ──────────────────────────────────────────────
 function DirectoryTab() {
-  const { data: empData, loading, error } = useApi<any>("/api/hr/employees?isActive=all", []);
+  const { data: empData, loading, error, reload } = useApi<any>("/api/hr/employees?isActive=all", []);
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -255,8 +266,8 @@ function DirectoryTab() {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const employees: any[] = useMemo(() => {
-    if (!empData) return [];
-    return Array.isArray(empData) ? empData : [];
+    const raw = empData ?? FALLBACK_EMPLOYEES;
+    return Array.isArray(raw) ? raw : [];
   }, [empData]);
 
   // Derive department list from data
@@ -317,6 +328,14 @@ function DirectoryTab() {
 
   return (
     <div className="space-y-5">
+      {/* API error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Total Staff" value={totalStaff} icon={Users} accent="navy" />
@@ -470,11 +489,11 @@ function DirectoryTab() {
 
 // ─── TAB 2: DEPARTMENTS ────────────────────────────────────────────
 function DepartmentsTab() {
-  const { data: empData, loading } = useApi<any>("/api/hr/employees?isActive=all", []);
+  const { data: empData, loading, error, reload } = useApi<any>("/api/hr/employees?isActive=all", []);
 
   const employees: any[] = useMemo(() => {
-    if (!empData) return [];
-    return Array.isArray(empData) ? empData : [];
+    const raw = empData ?? FALLBACK_EMPLOYEES;
+    return Array.isArray(raw) ? raw : [];
   }, [empData]);
 
   // Group by department
@@ -510,6 +529,13 @@ function DepartmentsTab() {
 
   return (
     <div className="space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Department Distribution Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
@@ -670,11 +696,11 @@ function DepartmentsTab() {
 
 // ─── TAB 3: ORG CHART ──────────────────────────────────────────────
 function OrgChartTab() {
-  const { data: empData, loading } = useApi<any>("/api/hr/employees?isActive=all", []);
+  const { data: empData, loading, error, reload } = useApi<any>("/api/hr/employees?isActive=all", []);
 
   const employees: any[] = useMemo(() => {
-    if (!empData) return [];
-    return Array.isArray(empData) ? empData : [];
+    const raw = empData ?? FALLBACK_EMPLOYEES;
+    return Array.isArray(raw) ? raw : [];
   }, [empData]);
 
   // Build hierarchy: group by role level, then by department
@@ -730,6 +756,13 @@ function OrgChartTab() {
 
   return (
     <div className="space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Org Overview KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard

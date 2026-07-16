@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Receipt, CreditCard, Banknote, Plus, Printer } from "lucide-react";
+import { Receipt, CreditCard, Banknote, Plus, Printer, AlertTriangle } from "lucide-react";
 import { fmtINR, fmtDateTime, ResStatusBadge } from "../shared";
 import { cn } from "@/lib/utils";
 
@@ -26,15 +26,56 @@ const PAYMENT_METHODS = [
   { value: "bank_transfer", label: "Bank Transfer", icon: Banknote },
 ];
 
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_FOLIOS = [
+  {
+    id: "f1", folioNumber: "FOL-2025-0042", status: "open",
+    totalAmount: 28500, subtotal: 25000, taxAmount: 3500, paidAmount: 15000, balance: 13500,
+    reservation: { guest: { name: "Rajesh Kumar" }, confirmationNumber: "ARI-2025-0142", room: { number: "301" } },
+    lines: [
+      { id: "fl1", description: "Room Charge — Deluxe King", departmentCode: "ROOM", postedAt: new Date().toISOString(), transactionType: "charge", amount: 6500, isVoided: false },
+      { id: "fl2", description: "Room Service — Dinner", departmentCode: "FB", postedAt: new Date().toISOString(), transactionType: "charge", amount: 1850, isVoided: false },
+      { id: "fl3", description: "Cash Payment", departmentCode: "MISC", postedAt: new Date().toISOString(), transactionType: "payment", amount: -15000, isVoided: false },
+    ],
+  },
+  {
+    id: "f2", folioNumber: "FOL-2025-0039", status: "open",
+    totalAmount: 58000, subtotal: 52000, taxAmount: 6000, paidAmount: 0, balance: 58000,
+    reservation: { guest: { name: "Anil Mehta" }, confirmationNumber: "ARI-2025-0139", room: { number: "801" } },
+    lines: [
+      { id: "fl4", description: "Room Charge — Royal Suite", departmentCode: "ROOM", postedAt: new Date().toISOString(), transactionType: "charge", amount: 12000, isVoided: false },
+      { id: "fl5", description: "Spa — Aromatherapy 90min", departmentCode: "SPA", postedAt: new Date().toISOString(), transactionType: "charge", amount: 4000, isVoided: false },
+    ],
+  },
+  {
+    id: "f3", folioNumber: "FOL-2025-0045", status: "closed",
+    totalAmount: 14200, subtotal: 12600, taxAmount: 1600, paidAmount: 14200, balance: 0,
+    reservation: { guest: { name: "Priya Sharma" }, confirmationNumber: "ARI-2025-0143", room: null },
+    lines: [
+      { id: "fl6", description: "Room Charge — Superior Twin", departmentCode: "ROOM", postedAt: new Date().toISOString(), transactionType: "charge", amount: 4800, isVoided: false },
+      { id: "fl7", description: "Minibar", departmentCode: "MINIBAR", postedAt: new Date().toISOString(), transactionType: "charge", amount: 1200, isVoided: false },
+      { id: "fl8", description: "UPI Payment", departmentCode: "MISC", postedAt: new Date().toISOString(), transactionType: "payment", amount: -14200, isVoided: false },
+    ],
+  },
+];
+
 export function FoliosModule() {
   const { refreshTick } = useAppStore();
   const [tab, setTab] = useState("open");
   const [payFolio, setPayFolio] = useState<any>(null);
   const [chargeFolio, setChargeFolio] = useState<any>(null);
-  const { data, loading, reload } = useApi<any[]>(`/api/folios?status=${tab === "all" ? "" : tab}`, [tab, refreshTick]);
+  const { data, loading, error, reload } = useApi<any[]>(`/api/folios?status=${tab === "all" ? "" : tab}`, [tab, refreshTick]);
+  const folios = data?.length ? data : FALLBACK_FOLIOS;
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="open">Open Folios</TabsTrigger>
@@ -45,11 +86,11 @@ export function FoliosModule() {
 
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48" />)}</div>
-      ) : !data?.length ? (
+      ) : !folios.length ? (
         <p className="text-center text-sm text-muted-foreground py-12">No folios found</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {data.map((f: any) => (
+          {folios.map((f: any) => (
             <Card key={f.id} className={cn(f.status === "open" && "role-bar-gold")}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">

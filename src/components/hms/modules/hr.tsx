@@ -24,11 +24,52 @@ import {
   UserCircle, Search, Building2, Cake, Gift, PartyPopper,
   ChevronRight, TrendingUp, Activity, ClipboardCheck, Sparkles,
   Heart, UsersRound, Wallet, Receipt,
+  AlertTriangle,
 } from "lucide-react";
 import {
   BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
+
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_EMP_DATA = [
+  { id: "e1", firstName: "Vikram", lastName: "Singh", email: "vikram.singh@ariahotel.in", phone: "+91-98100-12345", employeeCode: "EMP-001", role: "gm", isActive: true, isOnLeave: false, department: "Management", departmentCode: "Management" },
+  { id: "e2", firstName: "Deepa", lastName: "Nair", email: "deepa.nair@ariahotel.in", phone: "+91-98200-23456", employeeCode: "EMP-002", role: "fom", isActive: true, isOnLeave: false, department: "Front Office", departmentCode: "Front Office" },
+  { id: "e3", firstName: "Ramesh", lastName: "Patel", email: "ramesh.patel@ariahotel.in", phone: "+91-98300-34567", employeeCode: "EMP-003", role: "receptionist", isActive: true, isOnLeave: false, department: "Front Office", departmentCode: "Front Office" },
+  { id: "e4", firstName: "Sunita", lastName: "Devi", email: "sunita.devi@ariahotel.in", phone: "+91-98400-45678", employeeCode: "EMP-004", role: "hk_mgr", isActive: true, isOnLeave: false, department: "Housekeeping", departmentCode: "Housekeeping" },
+  { id: "e5", firstName: "Arjun", lastName: "Reddy", email: "arjun.reddy@ariahotel.in", phone: "+91-98500-56789", employeeCode: "EMP-005", role: "fb_mgr", isActive: false, isOnLeave: false, department: "Food & Beverage", departmentCode: "Food & Beverage" },
+  { id: "e6", firstName: "Kavita", lastName: "Sharma", email: "kavita.sharma@ariahotel.in", phone: "+91-98600-67890", employeeCode: "EMP-006", role: "hr_mgr", isActive: true, isOnLeave: true, department: "Human Resources", departmentCode: "Human Resources" },
+];
+
+const FALLBACK_ATT_DATA = {
+  summary: { attendanceRate: 92, totalPresent: 38, totalAbsent: 3, totalLate: 2 },
+  todayAttendance: [
+    { id: "att1", employeeId: "e1", status: "present", checkIn: "09:00", checkOut: null, date: new Date().toISOString() },
+    { id: "att2", employeeId: "e2", status: "present", checkIn: "08:45", checkOut: null, date: new Date().toISOString() },
+    { id: "att3", employeeId: "e3", status: "late", checkIn: "10:15", checkOut: null, date: new Date().toISOString() },
+  ],
+  attendance: [],
+};
+
+const FALLBACK_PAYROLL_DATA = {
+  summary: { totalGrossPay: 840000, totalDeductions: 126000, totalNetPay: 714000, employeeCount: 6, byDepartment: { Management: 1, "Front Office": 2, Housekeeping: 1, "Food & Beverage": 1, "Human Resources": 1 } },
+  records: [
+    { id: "pr1", employeeId: "e1", employeeName: "Vikram Singh", department: "Management", grossPay: 150000, deductions: 22500, netPay: 127500, status: "paid" },
+    { id: "pr2", employeeId: "e2", employeeName: "Deepa Nair", department: "Front Office", grossPay: 95000, deductions: 14250, netPay: 80750, status: "paid" },
+    { id: "pr3", employeeId: "e3", employeeName: "Ramesh Patel", department: "Front Office", grossPay: 55000, deductions: 8250, netPay: 46750, status: "processed" },
+    { id: "pr4", employeeId: "e4", employeeName: "Sunita Devi", department: "Housekeeping", grossPay: 75000, deductions: 11250, netPay: 63750, status: "processed" },
+    { id: "pr5", employeeId: "e5", employeeName: "Arjun Reddy", department: "Food & Beverage", grossPay: 85000, deductions: 12750, netPay: 72250, status: "draft" },
+    { id: "pr6", employeeId: "e6", employeeName: "Kavita Sharma", department: "Human Resources", grossPay: 80000, deductions: 12000, netPay: 68000, status: "draft" },
+  ],
+};
+
+const FALLBACK_EVENT_DATA = {
+  events: [
+    { id: "ev1", title: "Quarterly Review Meeting", type: "meeting", eventDate: new Date().toISOString(), endDate: null, venue: "Conference Room A", description: "Q1 performance review" },
+    { id: "ev2", title: "Fire Safety Training", type: "training", eventDate: new Date(Date.now() + 86400000).toISOString(), endDate: null, venue: "Basement Hall", description: "Annual fire safety drill" },
+    { id: "ev3", title: "Holi Celebration", type: "festival", eventDate: new Date(Date.now() + 172800000).toISOString(), endDate: new Date(Date.now() + 172800000).toISOString(), venue: "Poolside", description: "Festival of colours celebration" },
+  ],
+};
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────
 const CC = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
@@ -147,16 +188,19 @@ export function HRModule() {
 
 // ─── TAB 1: OVERVIEW ─────────────────────────────────────────────────
 function OverviewTab() {
-  const { data: empData, loading: l1 } = useApi<any>("/api/hr/employees?isActive=all", []);
+  const { data: empData, loading: l1, error: e1 } = useApi<any>("/api/hr/employees?isActive=all", []);
   const { data: attData, loading: l2 } = useApi<any>(`/api/hr/attendance?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
   const { data: payrollData, loading: l3 } = useApi<any>(`/api/hr/payroll?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
   const { data: eventData, loading: l4 } = useApi<any>(`/api/hr/events?month=${now.getMonth()+1}&year=${now.getFullYear()}`, []);
 
   const loading = l1 || l2 || l3 || l4;
+  const apiError = e1;
 
-  if (loading || !empData) return <SkeletonGrid />;
+  const safeEmpData = empData ?? FALLBACK_EMP_DATA;
 
-  const emps: any[] = Array.isArray(empData) ? empData : [];
+  if (loading) return <SkeletonGrid />;
+
+  const emps: any[] = Array.isArray(safeEmpData) ? safeEmpData : [];
   const totalEmployees = emps.length;
   const activeCount = emps.filter((e: any) => e.isActive).length;
   const byDepartment: Record<string, number> = {};
@@ -165,9 +209,9 @@ function OverviewTab() {
     byDepartment[d] = (byDepartment[d] || 0) + 1;
   }
 
-  const attSummary = (attData as any)?.summary || {};
-  const payrollSummary = (payrollData as any)?.summary || {};
-  const events: any[] = (eventData as any)?.events || [];
+  const attSummary = (attData as any)?.summary || FALLBACK_ATT_DATA.summary;
+  const payrollSummary = (payrollData as any)?.summary || FALLBACK_PAYROLL_DATA.summary;
+  const events: any[] = (eventData as any)?.events || FALLBACK_EVENT_DATA.events;
 
   // Upcoming birthdays this/next month
   const thisMonth = now.getMonth() + 1;
@@ -200,6 +244,12 @@ function OverviewTab() {
 
   return (
     <div className="space-y-5">
+      {apiError && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+        </div>
+      )}
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard label="Total Employees" value={totalEmployees} icon={Users} accent="navy" />
@@ -359,11 +409,11 @@ function EmployeesTab() {
   if (deptFilter !== "all") queryParams.set("department", deptFilter);
   if (roleFilter !== "all") queryParams.set("role", roleFilter);
 
-  const { data, loading, reload } = useApi<any>(`/api/hr/employees?${queryParams.toString()}`, [search, deptFilter, roleFilter, statusFilter]);
+  const { data, loading, error, reload } = useApi<any>(`/api/hr/employees?${queryParams.toString()}`, [search, deptFilter, roleFilter, statusFilter]);
   const { triggerRefresh } = useAppStore();
 
-  const employees: any[] = Array.isArray(data) ? data : [];
-  const summary = (data as any)?.summary || {};
+  const employees: any[] = Array.isArray(data) ? data : Array.isArray(FALLBACK_EMP_DATA) ? FALLBACK_EMP_DATA : [];
+  const summary = (data as any)?.summary || FALLBACK_PAYROLL_DATA.summary;
   const departments: string[] = Object.keys(summary.byDepartment || {});
 
   const resetForm = () => setForm({ firstName: "", lastName: "", email: "", role: "", department: "", phone: "" });
@@ -389,10 +439,17 @@ function EmployeesTab() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  if (loading || !data) return <SkeletonGrid />;
+  if (loading) return <SkeletonGrid />;
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
@@ -541,14 +598,14 @@ function PayrollTab() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [slipItem, setSlipItem] = useState<any>(null);
 
-  const { data, loading, reload } = useApi<any>(
+  const { data, loading, error, reload } = useApi<any>(
     `/api/hr/payroll?month=${month}&year=${year}${statusFilter !== "all" ? `&status=${statusFilter}` : ""}`,
     [month, year, statusFilter]
   );
   const { triggerRefresh } = useAppStore();
 
-  const summary = data?.summary || {};
-  const records: any[] = data?.records || [];
+  const summary = data?.summary || FALLBACK_PAYROLL_DATA.summary;
+  const records: any[] = data?.records || FALLBACK_PAYROLL_DATA.records;
 
   const handleAction = async (action: string) => {
     try {
@@ -557,10 +614,17 @@ function PayrollTab() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  if (loading || !data) return <SkeletonGrid />;
+  if (loading) return <SkeletonGrid />;
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={month} onValueChange={setMonth}>
@@ -763,10 +827,10 @@ function EventsTab() {
   const [birthdayEventOpen, setBirthdayEventOpen] = useState(false);
   const [birthdayForm, setBirthdayForm] = useState({ personName: "", birthDay: "", birthMonth: "" });
 
-  const { data, loading, reload } = useApi<any>(`/api/hr/events?month=${month}&year=${year}`, [month, year]);
+  const { data, loading, error, reload } = useApi<any>(`/api/hr/events?month=${month}&year=${year}`, [month, year]);
   const { triggerRefresh } = useAppStore();
 
-  const events: any[] = data?.events || [];
+  const events: any[] = data?.events || FALLBACK_EVENT_DATA.events;
 
   // Upcoming birthdays
   const thisMonth = now.getMonth() + 1;
@@ -836,10 +900,17 @@ function EventsTab() {
 
   const resetForm = () => setForm({ title: "", type: "meeting", eventDate: "", endDate: "", venue: "", description: "" });
 
-  if (loading || !data) return <SkeletonGrid />;
+  if (loading) return <SkeletonGrid />;
 
   return (
     <div className="space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Events Controls */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={month} onValueChange={setMonth}>

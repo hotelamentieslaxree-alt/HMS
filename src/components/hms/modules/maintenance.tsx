@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Wrench, Plus, Zap, Droplets, Wind, Hammer, Building, Tv, Cpu } from "lucide-react";
+import { Wrench, Plus, Zap, Droplets, Wind, Hammer, Building, Tv, Cpu, AlertTriangle } from "lucide-react";
 import { timeAgo } from "../shared";
 import { cn } from "@/lib/utils";
 
@@ -34,17 +34,37 @@ const CATEGORY_META: Record<string, { icon: any; color: string }> = {
   it: { icon: Cpu, color: "#1B3A6B" },
 };
 
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_MAINTENANCE = {
+  summary: { open: 5, in_progress: 3, completed: 12 },
+  tickets: [
+    { id: "mt1", title: "AC not cooling in Room 305", description: "Guest reported warm air from AC unit", category: "hvac", priority: "urgent", status: "open", room: { number: "305" }, createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "mt2", title: "Leaking faucet — Room 412", description: "Bathroom tap dripping continuously", category: "plumbing", priority: "high", status: "in_progress", room: { number: "412" }, createdAt: new Date(Date.now() - 14400000).toISOString() },
+    { id: "mt3", title: "Replace lobby chandelier bulb", description: "One of the LED panels is flickering", category: "electrical", priority: "normal", status: "open", room: null, createdAt: new Date(Date.now() - 28800000).toISOString() },
+    { id: "mt4", title: "Wi-Fi router reset — Floor 3", description: "Intermittent connectivity on 3rd floor", category: "it", priority: "normal", status: "in_progress", room: null, createdAt: new Date(Date.now() - 43200000).toISOString() },
+    { id: "mt5", title: "Room 201 wardrobe hinge broken", category: "carpentry", priority: "low", status: "open", room: { number: "201" }, createdAt: new Date(Date.now() - 86400000).toISOString() },
+  ],
+};
+
 export function MaintenanceModule() {
   const { refreshTick, triggerRefresh } = useAppStore();
   const [showNew, setShowNew] = useState(false);
-  const { data, loading, reload } = useApi<any>("/api/maintenance", [refreshTick]);
+  const { data, loading, error, reload } = useApi<any>("/api/maintenance", [refreshTick]);
+  const maintenanceData = data ?? FALLBACK_MAINTENANCE;
 
-  if (loading || !data) return <Skeleton className="h-96" />;
+  if (loading) return <Skeleton className="h-96" />;
 
-  const s = data.summary;
+  const s = maintenanceData.summary;
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="grid grid-cols-3 gap-3 flex-1">
           <Card><CardContent className="p-4 flex items-center justify-between"><div><p className="text-[10px] uppercase text-muted-foreground">Open</p><p className="font-display text-2xl font-bold text-[#DC2626]">{s.open}</p></div><Wrench className="h-5 w-5 text-[#DC2626]" /></CardContent></Card>
@@ -55,7 +75,7 @@ export function MaintenanceModule() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {data.tickets.map((t: any) => {
+        {maintenanceData.tickets.map((t: any) => {
           const cat = CATEGORY_META[t.category || "civil"] || CATEGORY_META.civil;
           const pri = PRIORITY_META[t.priority] || PRIORITY_META.normal;
           const CatIcon = cat.icon;

@@ -295,11 +295,11 @@ export function PurchasingModule() {
   const [updatingInspection, setUpdatingInspection] = useState<string | null>(null);
 
   // ─── API Data Fetching ───
-  const { data: purchaseOrders = [], loading: poLoading, reload: reloadPOs } = useApi<PurchaseOrder[]>("/api/purchasing/orders?limit=100", [refreshTick]);
-  const { data: amenities = [], loading: amenityLoading, reload: reloadAmenities } = useApi<AmenityItem[]>("/api/purchasing/amenities?limit=100", [refreshTick]);
-  const { data: transactions = [], loading: txLoading, reload: reloadTx } = useApi<StockTransaction[]>("/api/purchasing/stock-transactions?limit=100", [refreshTick]);
-  const { data: seasons = [], loading: seasonLoading, reload: reloadSeasons } = useApi<SeasonConfig[]>("/api/purchasing/season-config", [refreshTick]);
-  const { data: inspections = [], loading: inspectionLoading, reload: reloadInspections } = useApi<InspectionRecord[]>("/api/purchasing/inspections?limit=100", [refreshTick]);
+  const { data: purchaseOrders = [], loading: poLoading, error: poError, reload: reloadPOs } = useApi<PurchaseOrder[]>("/api/purchasing/orders?limit=100", [refreshTick]);
+  const { data: amenities = [], loading: amenityLoading, error: amenityError, reload: reloadAmenities } = useApi<AmenityItem[]>("/api/purchasing/amenities?limit=100", [refreshTick]);
+  const { data: transactions = [], loading: txLoading, error: txError, reload: reloadTx } = useApi<StockTransaction[]>("/api/purchasing/stock-transactions?limit=100", [refreshTick]);
+  const { data: seasons = [], loading: seasonLoading, error: seasonError, reload: reloadSeasons } = useApi<SeasonConfig[]>("/api/purchasing/season-config", [refreshTick]);
+  const { data: inspections = [], loading: inspectionLoading, error: inspectionError, reload: reloadInspections } = useApi<InspectionRecord[]>("/api/purchasing/inspections?limit=100", [refreshTick]);
   const { data: vendors = [] } = useApi<Vendor[]>("/api/inventory/vendors");
 
   // ─── New PO Form State ───
@@ -497,6 +497,14 @@ export function PurchasingModule() {
 
   return (
     <div className="space-y-4">
+      {/* API error banner */}
+      {(poError || amenityError || txError || seasonError || inspectionError) && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={() => { reloadPOs(); reloadAmenities(); reloadTx(); reloadSeasons(); reloadInspections(); }} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

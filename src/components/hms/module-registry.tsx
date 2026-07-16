@@ -40,6 +40,7 @@ const registry: Record<string, () => Promise<ModuleComponent>> = {
   settings: () => import("./modules/settings").then(m => m.SettingsModule),
   accounting: () => import("./modules/accounting").then(m => m.AccountingModule),
   purchasing: () => import("./modules/purchasing").then(m => m.PurchasingModule),
+  vendors: () => import("./modules/vendors").then(m => m.VendorsModule),
 };
 
 export function loadModule(key: ModuleKey): Promise<ModuleComponent> {

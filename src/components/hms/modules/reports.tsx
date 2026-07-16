@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, FileText, TrendingUp, Percent, Receipt, Users, Download } from "lucide-react";
+import { BarChart3, FileText, TrendingUp, Percent, Receipt, Users, Download, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 import { fmtINR } from "../shared";
 import { cn } from "@/lib/utils";
@@ -21,12 +21,63 @@ const REPORTS = [
   { key: "payment_methods", label: "Payment Methods", icon: FileText, desc: "Cash / card / UPI split" },
 ];
 
+// ─── Fallback data when API fails ────────────────────────────────
+const today = new Date().toISOString().slice(0, 10);
+const FALLBACK_REPORTS: Record<string, any> = {
+  daily_revenue: [
+    { day: "2025-03-01", room: 78000, fb: 22000, minibar: 4500, laundry: 3200, other: 1800, tax: 10950, total: 120450 },
+    { day: "2025-03-02", room: 82000, fb: 24500, minibar: 5100, laundry: 2800, other: 2100, tax: 11650, total: 128150 },
+    { day: "2025-03-03", room: 71000, fb: 19800, minibar: 3800, laundry: 3100, other: 1500, tax: 9920, total: 109120 },
+    { day: "2025-03-04", room: 93000, fb: 28000, minibar: 6200, laundry: 4100, other: 2400, tax: 13370, total: 147070 },
+    { day: "2025-03-05", room: 88000, fb: 25600, minibar: 5500, laundry: 3600, other: 2000, tax: 12470, total: 137170 },
+  ],
+  occupancy: [
+    { day: "2025-03-01", occupancyRate: 68 },
+    { day: "2025-03-02", occupancyRate: 72 },
+    { day: "2025-03-03", occupancyRate: 65 },
+    { day: "2025-03-04", occupancyRate: 82 },
+    { day: "2025-03-05", occupancyRate: 78 },
+  ],
+  channel_production: [
+    { source: "direct", reservations: 45, roomNights: 92, grossRevenue: 520000, commission: 0, netRevenue: 520000, cancellations: 3 },
+    { source: "booking_com", reservations: 32, roomNights: 58, grossRevenue: 380000, commission: 57000, netRevenue: 323000, cancellations: 5 },
+    { source: "make_my_trip", reservations: 28, roomNights: 48, grossRevenue: 310000, commission: 46500, netRevenue: 263500, cancellations: 4 },
+    { source: "corporate", reservations: 18, roomNights: 42, grossRevenue: 290000, commission: 0, netRevenue: 290000, cancellations: 1 },
+  ],
+  gst: {
+    period: { from: "2025-03-01", to: "2025-03-05" },
+    grandTaxable: 890000, grandTax: 133500, grandTotal: 1023500,
+    byTaxCode: {
+      "GST-5": { taxable: 120000, cgst: 3000, sgst: 3000, igst: 0, total: 6000 },
+      "GST-12": { taxable: 280000, cgst: 16800, sgst: 16800, igst: 0, total: 33600 },
+      "GST-18": { taxable: 490000, cgst: 44100, sgst: 44100, igst: 0, total: 88200 },
+      "IGST-18": { taxable: 10000, cgst: 0, sgst: 0, igst: 1800, total: 1800 },
+    },
+  },
+  folio_audit: { day: today, count: 42, open: 18, closed: 24, totalCharges: 485000, totalTax: 72800, totalPayments: 392000, voids: 2 },
+  payment_methods: [
+    { method: "cash", total: 185000, count: 34 },
+    { method: "credit_card", total: 245000, count: 28 },
+    { method: "debit_card", total: 92000, count: 15 },
+    { method: "upi", total: 138000, count: 42 },
+    { method: "bank_transfer", total: 67000, count: 3 },
+  ],
+};
+
 export function ReportsModule() {
   const [active, setActive] = useState("daily_revenue");
-  const { data, loading } = useApi<any>(`/api/reports?type=${active}`, [active]);
+  const { data, loading, error, reload } = useApi<any>(`/api/reports?type=${active}`, [active]);
+  const reportData = data ?? FALLBACK_REPORTS[active];
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Report selector */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {REPORTS.map((r) => {
@@ -45,20 +96,20 @@ export function ReportsModule() {
       </div>
 
       {/* Report content */}
-      {loading || !data ? (
+      {loading ? (
         <Skeleton className="h-96" />
       ) : active === "daily_revenue" ? (
-        <DailyRevenueReport data={data} />
+        <DailyRevenueReport data={reportData} />
       ) : active === "occupancy" ? (
-        <OccupancyReport data={data} />
+        <OccupancyReport data={reportData} />
       ) : active === "channel_production" ? (
-        <ChannelReport data={data} />
+        <ChannelReport data={reportData} />
       ) : active === "gst" ? (
-        <GstReport data={data} />
+        <GstReport data={reportData} />
       ) : active === "folio_audit" ? (
-        <FolioAuditReport data={data} />
+        <FolioAuditReport data={reportData} />
       ) : (
-        <PaymentMethodsReport data={data} />
+        <PaymentMethodsReport data={reportData} />
       )}
     </div>
   );

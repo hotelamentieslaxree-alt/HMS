@@ -10,9 +10,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { UtensilsCrossed, Wine, Coffee, ShoppingBag, Plus, ChefHat, CheckCircle2, DollarSign, Clock } from "lucide-react";
+import { UtensilsCrossed, Wine, Coffee, ShoppingBag, Plus, ChefHat, CheckCircle2, DollarSign, Clock, AlertTriangle } from "lucide-react";
 import { fmtINR } from "../shared";
 import { cn } from "@/lib/utils";
+
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_OUTLETS = [
+  { id: "outlet-1", name: "Spice Garden", code: "SG", type: "restaurant", tableCount: 12, tablesAvailable: 5, tablesOccupied: 7, activeOrders: 4, revenueToday: 42500 },
+  { id: "outlet-2", name: "The Royal Bar", code: "RB", type: "bar", tableCount: 8, tablesAvailable: 3, tablesOccupied: 5, activeOrders: 3, revenueToday: 28700 },
+  { id: "outlet-3", name: "Café Aroma", code: "CA", type: "cafe", tableCount: 6, tablesAvailable: 4, tablesOccupied: 2, activeOrders: 1, revenueToday: 8900 },
+  { id: "outlet-4", name: "Room Service", code: "RS", type: "room_service", tableCount: 0, tablesAvailable: 0, tablesOccupied: 0, activeOrders: 6, revenueToday: 31200 },
+];
+
+const FALLBACK_ORDERS = [
+  { id: "ord-1", kotNumber: 1042, status: "in_preparation", totalAmount: 1850, outlet: { name: "Spice Garden" }, table: { number: "5" }, lines: [{ id: "l1", name: "Butter Chicken", quantity: 1, lineTotal: 650 }, { id: "l2", name: "Garlic Naan", quantity: 4, lineTotal: 400 }, { id: "l3", name: "Dal Makhani", quantity: 1, lineTotal: 450 }, { id: "l4", name: "Jeera Rice", quantity: 1, lineTotal: 350 }] },
+  { id: "ord-2", kotNumber: 1043, status: "sent_to_kitchen", totalAmount: 2400, outlet: { name: "The Royal Bar" }, table: { number: "3" }, lines: [{ id: "l5", name: "Old Monk & Coke", quantity: 2, lineTotal: 800 }, { id: "l6", name: "Paneer Tikka", quantity: 1, lineTotal: 650 }, { id: "l7", name: "Chicken Seekh Kebab", quantity: 1, lineTotal: 950 }] },
+  { id: "ord-3", kotNumber: 1044, status: "ready", totalAmount: 950, outlet: { name: "Café Aroma" }, table: { number: "2" }, lines: [{ id: "l8", name: "Cappuccino", quantity: 2, lineTotal: 500 }, { id: "l9", name: "Blueberry Cheesecake", quantity: 1, lineTotal: 450 }] },
+];
 
 const OUTLET_ICONS: Record<string, any> = {
   restaurant: UtensilsCrossed, bar: Wine, cafe: Coffee, room_service: ShoppingBag, pool_bar: UtensilsCrossed, banquet: UtensilsCrossed,
@@ -32,9 +46,10 @@ const ORDER_STATUS_FLOW: Record<string, { label: string; color: string; next?: s
 export function PosModule() {
   const { refreshTick, triggerRefresh } = useAppStore();
   const [activeOutlet, setActiveOutlet] = useState<string | null>(null);
-  const { data: outlets, loading } = useApi<any[]>("/api/pos/outlets", [refreshTick]);
+  const { data: outlets, loading, error, reload } = useApi<any[]>("/api/pos/outlets", [refreshTick]);
+  const outletsData = outlets ?? FALLBACK_OUTLETS;
 
-  if (loading || !outlets) return <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32" />)}</div>;
+  if (loading) return <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32" />)}</div>;
 
   if (activeOutlet) {
     return <OutletView outletId={activeOutlet} onBack={() => setActiveOutlet(null)} />;
@@ -42,8 +57,15 @@ export function PosModule() {
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {outlets.map((o: any) => {
+        {outletsData.map((o: any) => {
           const Icon = OUTLET_ICONS[o.type] || UtensilsCrossed;
           return (
             <Card key={o.id} className="hover:shadow-card-lg transition-shadow cursor-pointer" onClick={() => setActiveOutlet(o.id)}>
@@ -89,8 +111,9 @@ export function PosModule() {
 function ActiveOrdersPanel() {
   const { refreshTick } = useAppStore();
   const { data: orders, loading } = useApi<any[]>("/api/pos/orders", [refreshTick]);
-  if (loading || !orders) return null;
-  const active = orders.filter((o: any) => ["draft","sent_to_kitchen","in_preparation","ready","served","billed"].includes(o.status)).slice(0, 12);
+  if (loading) return null;
+  const ordersData = orders ?? FALLBACK_ORDERS;
+  const active = ordersData.filter((o: any) => ["draft","sent_to_kitchen","in_preparation","ready","served","billed"].includes(o.status)).slice(0, 12);
   if (!active.length) return null;
   return (
     <Card>

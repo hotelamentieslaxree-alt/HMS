@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Sparkles, Clock, CheckCircle2, Eye, Play, AlertCircle } from "lucide-react";
+import { Sparkles, Clock, CheckCircle2, Eye, Play, AlertCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIORITY_META: Record<string, string> = {
@@ -30,14 +30,32 @@ const TASK_TYPE_LABEL: Record<string, string> = {
   maintenance_prep: "Maintenance Prep",
 };
 
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_HK_DATA = {
+  summary: { pending: 4, in_progress: 3, completed: 8, inspected: 5, total: 20 },
+  tasks: [
+    { id: "hk1", room: { number: "101", category: "Standard Double", floor: 1 }, taskType: "checkout_cleaning", priority: "urgent", status: "pending", assignee: { name: "Ramesh K." }, notes: "Guest checked out early", checklist: [{ item: "Change linens", done: false }, { item: "Restock amenities", done: false }] },
+    { id: "hk2", room: { number: "204", category: "Deluxe King", floor: 2 }, taskType: "stayover", priority: "normal", status: "pending", assignee: { name: "Sunita M." }, notes: null, checklist: [{ item: "Make bed", done: false }, { item: "Replace towels", done: false }] },
+    { id: "hk3", room: { number: "305", category: "Superior Twin", floor: 3 }, taskType: "turndown", priority: "low", status: "pending", assignee: null, notes: "VIP turndown service", checklist: [] },
+    { id: "hk4", room: { number: "102", category: "Standard Double", floor: 1 }, taskType: "deep_clean", priority: "high", status: "in_progress", assignee: { name: "Gita P." }, notes: null, checklist: [{ item: "Scrub bathroom", done: true }, { item: "Polish furniture", done: false }] },
+    { id: "hk5", room: { number: "201", category: "Deluxe King", floor: 2 }, taskType: "stayover", priority: "normal", status: "in_progress", assignee: { name: "Ramesh K." }, notes: null, checklist: [{ item: "Vacuum carpet", done: true }, { item: "Clean bathroom", done: true }] },
+    { id: "hk6", room: { number: "103", category: "Deluxe King", floor: 1 }, taskType: "checkout_cleaning", priority: "high", status: "in_progress", assignee: { name: "Sunita M." }, notes: null, checklist: [{ item: "Strip bed", done: true }, { item: "Wipe surfaces", done: false }] },
+    { id: "hk7", room: { number: "301", category: "Royal Suite", floor: 3 }, taskType: "inspection", priority: "normal", status: "completed", assignee: { name: "Gita P." }, notes: null, checklist: [{ item: "Check amenities", done: true }, { item: "Verify cleanliness", done: true }] },
+    { id: "hk8", room: { number: "202", category: "Deluxe King", floor: 2 }, taskType: "stayover", priority: "low", status: "completed", assignee: { name: "Ramesh K." }, notes: null, checklist: [{ item: "Refresh towels", done: true }, { item: "Empty trash", done: true }] },
+    { id: "hk9", room: { number: "302", category: "Superior Twin", floor: 3 }, taskType: "checkout_cleaning", priority: "normal", status: "inspected", assignee: { name: "Sunita M." }, notes: "Passed QC", checklist: [{ item: "Full cleaning", done: true }, { item: "Amenities restocked", done: true }] },
+  ],
+};
+
 export function HousekeepingModule() {
   const { refreshTick, triggerRefresh } = useAppStore();
   const [tab, setTab] = useState("all");
-  const { data, loading, reload } = useApi<any>(`/api/housekeeping${tab !== "all" ? `?status=${tab}` : ""}`, [tab, refreshTick]);
+  const { data: rawData, loading, error, reload } = useApi<any>(`/api/housekeeping${tab !== "all" ? `?status=${tab}` : ""}`, [tab, refreshTick]);
 
-  if (loading || !data) {
+  if (loading) {
     return <div className="grid grid-cols-1 md:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32" />)}</div>;
   }
+
+  const data = rawData ?? FALLBACK_HK_DATA;
 
   const s = data.summary;
   const advance = async (id: string, status: string) => {
@@ -51,6 +69,14 @@ export function HousekeepingModule() {
 
   return (
     <div className="space-y-4">
+      {/* API error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline hover:no-underline">Retry</button>
+        </div>
+      )}
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="Pending" value={s.pending} color="#D97706" icon={Clock} />

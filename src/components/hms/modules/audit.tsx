@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShieldCheck, Search } from "lucide-react";
+import { ShieldCheck, Search, AlertTriangle } from "lucide-react";
 import { fmtDateTime, timeAgo } from "../shared";
 
 const ACTION_CATEGORIES: Record<string, { label: string; color: string }> = {
@@ -31,9 +31,21 @@ const ACTION_CATEGORIES: Record<string, { label: string; color: string }> = {
 export function AuditModule() {
   const [actionFilter, setActionFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const { data, loading } = useApi<any[]>(`/api/audit-log?limit=80${actionFilter !== "all" ? `&action=${actionFilter}` : ""}`, [actionFilter]);
+  const { data, loading, error, reload } = useApi<any[]>(`/api/audit-log?limit=80${actionFilter !== "all" ? `&action=${actionFilter}` : ""}`, [actionFilter]);
 
-  const filtered = (data || []).filter((l: any) =>
+  // Fallback audit log entries when API fails
+  const FALLBACK_AUDIT_LOG = [
+    { id: "al1", action: "CHECKIN", entityType: "Reservation", user_email: "reception@ariahotel.in", userRole: "receptionist", ipAddress: "192.168.1.45", occurredAt: new Date(Date.now() - 1800000).toISOString(), newValue: { guest: "Rajesh Kumar", room: "301" } },
+    { id: "al2", action: "PAYMENT_PROCESSED", entityType: "Folio", user_email: "frontdesk@ariahotel.in", userRole: "front_desk", ipAddress: "192.168.1.42", occurredAt: new Date(Date.now() - 3600000).toISOString(), newValue: { amount: 15000, method: "UPI" } },
+    { id: "al3", action: "RESERVATION_CREATED", entityType: "Reservation", user_email: "reservations@ariahotel.in", userRole: "reservation_agent", ipAddress: "192.168.1.38", occurredAt: new Date(Date.now() - 7200000).toISOString(), newValue: { guest: "Priya Sharma", confirmation: "ARI-2025-0143" } },
+    { id: "al4", action: "ROOM_STATUS_CHANGED", entityType: "Room", user_email: "housekeeping@ariahotel.in", userRole: "hk_supervisor", ipAddress: "192.168.1.50", occurredAt: new Date(Date.now() - 10800000).toISOString(), newValue: { room: "801", from: "occupied", to: "dirty" } },
+    { id: "al5", action: "NIGHT_AUDIT_COMPLETED", entityType: "System", user_email: "nightaudit@ariahotel.in", userRole: "night_auditor", ipAddress: "192.168.1.10", occurredAt: new Date(Date.now() - 28800000).toISOString(), newValue: { postingsCount: 24, revenuePosted: 148500 } },
+    { id: "al6", action: "RATE_OVERRIDE", entityType: "Reservation", user_email: "gm@ariahotel.in", userRole: "gm", ipAddress: "192.168.1.5", occurredAt: new Date(Date.now() - 43200000).toISOString(), newValue: { from: 6500, to: 5200, reason: "Corporate rate" } },
+  ];
+
+  const rawData = data ?? FALLBACK_AUDIT_LOG;
+
+  const filtered = (rawData || []).filter((l: any) =>
     !search ||
     l.action.toLowerCase().includes(search.toLowerCase()) ||
     (l.user_email || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -42,6 +54,13 @@ export function AuditModule() {
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       <Card className="border-gold/30 bg-gradient-to-r from-navy to-[#2E5FA3] text-white">
         <CardContent className="p-4 flex items-center gap-3">
           <ShieldCheck className="h-8 w-8 text-gold" />

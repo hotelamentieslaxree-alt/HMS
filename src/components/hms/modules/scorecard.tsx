@@ -52,6 +52,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   PieChart as PieChartIcon,
+  AlertTriangle,
 } from "lucide-react";
 import {
   BarChart,
@@ -127,6 +128,31 @@ function last12Periods(): string[] {
   }
   return periods;
 }
+
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_SCORECARD_DATA: ScorecardData = {
+  overallStats: { averageScore: 78.5, totalEmployees: 6, byGrade: { "A+": 1, A: 2, "B+": 2, B: 1 } },
+  departmentAverages: {
+    Management: { average: 88, count: 1 },
+    "Front Office": { average: 82, count: 2 },
+    Housekeeping: { average: 75, count: 1 },
+    "Food & Beverage": { average: 72, count: 1 },
+    "Human Resources": { average: 80, count: 1 },
+  },
+  scorecards: [
+    { id: "sc1", period: currentPeriod(), userId: "e1", userName: "Vikram Singh", department: "Management", departmentCode: "MGT", attendance: 98, punctuality: 9, taskCompletion: 95, guestFeedback: 9, teamwork: 9, initiative: 8, grooming: 10, communication: 9, overallScore: 92, grade: "A+", remarks: "Excellent leader", reviewedBy: "GM", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "sc2", period: currentPeriod(), userId: "e2", userName: "Deepa Nair", department: "Front Office", departmentCode: "FO", attendance: 95, punctuality: 8, taskCompletion: 88, guestFeedback: 9, teamwork: 9, initiative: 7, grooming: 9, communication: 9, overallScore: 87, grade: "A", remarks: "Great with guests", reviewedBy: "FOM", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "sc3", period: currentPeriod(), userId: "e3", userName: "Ramesh Patel", department: "Front Office", departmentCode: "FO", attendance: 90, punctuality: 7, taskCompletion: 82, guestFeedback: 8, teamwork: 8, initiative: 7, grooming: 8, communication: 8, overallScore: 79, grade: "B+", remarks: "Needs initiative", reviewedBy: "FOM", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "sc4", period: currentPeriod(), userId: "e4", userName: "Sunita Devi", department: "Housekeeping", departmentCode: "HK", attendance: 92, punctuality: 8, taskCompletion: 85, guestFeedback: 7, teamwork: 8, initiative: 6, grooming: 9, communication: 7, overallScore: 76, grade: "B+", remarks: "Solid performer", reviewedBy: "HK Mgr", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  ],
+};
+
+const FALLBACK_EMPLOYEES: Employee[] = [
+  { id: "e1", fullName: "Vikram Singh", department: "Management", departmentCode: "MGT", role: "gm", isActive: true },
+  { id: "e2", fullName: "Deepa Nair", department: "Front Office", departmentCode: "FO", role: "fom", isActive: true },
+  { id: "e3", fullName: "Ramesh Patel", department: "Front Office", departmentCode: "FO", role: "receptionist", isActive: true },
+  { id: "e4", fullName: "Sunita Devi", department: "Housekeeping", departmentCode: "HK", role: "hk_mgr", isActive: true },
+];
 
 // ─── Types ────────────────────────────────────────────────────────
 interface ScorecardRow {
@@ -264,23 +290,18 @@ function OverviewTab({
   onViewEmployee: (userId: string, userName: string) => void;
 }) {
   const [period, setPeriod] = useState(currentPeriod());
-  const { data, loading, error } = useApi<ScorecardData>(
+  const { data, loading, error, reload } = useApi<ScorecardData>(
     `/api/hr/scorecards?period=${period}`,
     [period]
   );
 
-  if (loading || !data) return <SkeletonOverview />;
-  if (error)
-    return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
-        Failed to load scorecard data: {error}
-      </div>
-    );
+  const scorecardData = data ?? FALLBACK_SCORECARD_DATA;
 
-  const { overallStats, departmentAverages, scorecards } = data;
+  if (loading) return <SkeletonOverview />;
+
+  const { overallStats, departmentAverages, scorecards } = scorecardData;
   const byGrade = overallStats.byGrade || {};
-  const topPerformer =
-    scorecards.length > 0 ? scorecards[0] : null;
+  const topPerformer = scorecards.length > 0 ? scorecards[0] : null;
 
   // Grade distribution for chart
   const gradeOrder = ["A+", "A", "B+", "B", "C", "D"];
@@ -288,7 +309,6 @@ function OverviewTab({
     .filter((g) => (byGrade[g] || 0) > 0)
     .map((g) => ({ grade: g, count: byGrade[g] || 0 }));
 
-  // Department averages chart
   const deptChartData = Object.entries(departmentAverages).map(
     ([dept, d]) => ({
       department: dept,
@@ -299,6 +319,13 @@ function OverviewTab({
 
   return (
     <div className="space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Period Selector */}
       <div className="flex items-center gap-2">
         <Label className="text-xs text-muted-foreground">Period</Label>
@@ -541,7 +568,7 @@ function ScorecardsTab({
   const [addOpen, setAddOpen] = useState(false);
   const [editSc, setEditSc] = useState<ScorecardRow | null>(null);
 
-  const { data, loading, reload } = useApi<ScorecardData>(
+  const { data, loading, reload, error } = useApi<ScorecardData>(
     `/api/hr/scorecards?period=${period}`,
     [period]
   );
@@ -551,8 +578,8 @@ function ScorecardsTab({
   );
   const { triggerRefresh } = useAppStore();
 
-  const employees: Employee[] = Array.isArray(empData) ? empData : [];
-  const scorecards: ScorecardRow[] = data?.scorecards || [];
+  const employees: Employee[] = Array.isArray(empData) ? empData : FALLBACK_EMPLOYEES;
+  const scorecards: ScorecardRow[] = (data ?? FALLBACK_SCORECARD_DATA)?.scorecards || [];
   const departments = useMemo(() => {
     const deptSet = new Set<string>();
     scorecards.forEach((sc) => {
@@ -599,10 +626,17 @@ function ScorecardsTab({
     }
   };
 
-  if (loading || !data) return <SkeletonOverview />;
+  if (loading) return <SkeletonOverview />;
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={period} onValueChange={setPeriod}>
@@ -805,12 +839,14 @@ function LeaderboardTab({
   onViewEmployee: (userId: string, userName: string) => void;
 }) {
   const [period, setPeriod] = useState(currentPeriod());
-  const { data, loading } = useApi<ScorecardData>(
+  const { data, loading, error, reload } = useApi<ScorecardData>(
     `/api/hr/scorecards?period=${period}`,
     [period]
   );
 
-  if (loading || !data)
+  const scorecardData = data ?? FALLBACK_SCORECARD_DATA;
+
+  if (loading)
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -819,10 +855,17 @@ function LeaderboardTab({
       </div>
     );
 
-  const scorecards = data.scorecards || [];
+  const scorecards = scorecardData.scorecards || [];
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Label className="text-xs text-muted-foreground">Period</Label>
         <Select value={period} onValueChange={setPeriod}>

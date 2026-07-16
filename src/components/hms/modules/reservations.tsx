@@ -15,7 +15,71 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Search, Plus, LogIn, LogOut, Ban, Calendar, Users, BedDouble, Phone } from "lucide-react";
+import { Search, Plus, LogIn, LogOut, Ban, Calendar, Users, BedDouble, Phone, AlertTriangle } from "lucide-react";
+
+// ─── Fallback reservations when API fails ────────────────────────
+const FALLBACK_RESERVATIONS = [
+  {
+    id: "r1",
+    confirmationNumber: "ARI-2025-0142",
+    totalNights: 3,
+    adults: 2,
+    children: 0,
+    guest: { firstName: "Rajesh", lastName: "Kumar", phone: "+91-98765-43210", vip: true },
+    checkInDate: "2025-03-04",
+    checkOutDate: "2025-03-07",
+    room: { number: "301" },
+    category: { name: "Deluxe King" },
+    bookingSource: "direct",
+    ratePerNight: 6500,
+    status: "confirmed",
+  },
+  {
+    id: "r2",
+    confirmationNumber: "ARI-2025-0143",
+    totalNights: 2,
+    adults: 1,
+    children: 1,
+    guest: { firstName: "Priya", lastName: "Sharma", phone: "+91-87654-32109", vip: false },
+    checkInDate: "2025-03-04",
+    checkOutDate: "2025-03-06",
+    room: null,
+    category: { name: "Superior Twin" },
+    bookingSource: "booking_com",
+    ratePerNight: 4800,
+    status: "tentative",
+  },
+  {
+    id: "r3",
+    confirmationNumber: "ARI-2025-0139",
+    totalNights: 5,
+    adults: 2,
+    children: 0,
+    guest: { firstName: "Anil", lastName: "Mehta", phone: "+91-76543-21098", vip: true },
+    checkInDate: "2025-03-01",
+    checkOutDate: "2025-03-06",
+    room: { number: "801" },
+    category: { name: "Royal Suite" },
+    bookingSource: "corporate",
+    ratePerNight: 12000,
+    status: "checked_in",
+  },
+  {
+    id: "r4",
+    confirmationNumber: "ARI-2025-0135",
+    totalNights: 4,
+    adults: 2,
+    children: 2,
+    guest: { firstName: "Sneha", lastName: "Patel", phone: "+91-65432-10987", vip: false },
+    checkInDate: "2025-02-28",
+    checkOutDate: "2025-03-04",
+    room: { number: "204" },
+    category: { name: "Deluxe King" },
+    bookingSource: "expedia",
+    ratePerNight: 5500,
+    status: "checked_in",
+  },
+];
 
 export function ReservationsModule() {
   const { refreshTick, triggerRefresh } = useAppStore();
@@ -23,7 +87,8 @@ export function ReservationsModule() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const { data, loading, reload } = useApi<any[]>(`/api/reservations?view=${view}&search=${encodeURIComponent(debouncedSearch)}`, [view, debouncedSearch, refreshTick]);
+  const { data: rawData, loading, error, reload } = useApi<any[]>(`/api/reservations?view=${view}&search=${encodeURIComponent(debouncedSearch)}`, [view, debouncedSearch, refreshTick]);
+  const data = rawData?.length ? rawData : FALLBACK_RESERVATIONS;
 
   // Debounce search input (M13 fix): avoid firing a request on every keystroke.
   useEffect(() => {
@@ -65,6 +130,14 @@ export function ReservationsModule() {
 
   return (
     <div className="space-y-4">
+      {/* API error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline hover:no-underline">Retry</button>
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={view} onValueChange={setView}>

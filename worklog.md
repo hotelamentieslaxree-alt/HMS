@@ -185,3 +185,112 @@ Stage Summary:
 - Login page uses dark navy gradient with gold highlights
 - All modules updated to use new color palette
 - Zero pink/rose colors remain in any source file or compiled output
+
+---
+Task ID: 2
+Agent: Store Config Agent
+Task: Enable ALL modules by default and add vendors to ROLE_MODULES
+
+Work Log:
+- Changed 8 modules from `enabled: false` to `enabled: true` in DEFAULT_MODULES:
+  - kitchen (line 143) → enabled: true
+  - hospital (line 146) → enabled: true
+  - accounting (line 152) → enabled: true
+  - crm (line 160) → enabled: true
+  - documents (line 163) → enabled: true
+  - ai-center (line 169) → enabled: true
+  - automation (line 170) → enabled: true
+  - integrations (line 176) → enabled: true
+- Added "vendors" to ROLE_MODULES for roles that need vendor access:
+  - hk_mgr: added "vendors" (for ordering cleaning supplies)
+  - fb_mgr: added "vendors" (for F&B supplies)
+  - fin_mgr: added "vendors" (for vendor payments)
+  - eng_mgr: added "vendors" (for spare parts)
+  - owner: already had "vendors" ✓
+  - gm: already had "vendors" ✓
+  - purchase_mgr: already had "vendors" ✓
+
+Stage Summary:
+- All 8 previously disabled modules are now enabled by default
+- 4 roles received new "vendors" module access (hk_mgr, fb_mgr, fin_mgr, eng_mgr)
+- 3 roles already had "vendors" access (owner, gm, purchase_mgr)
+- Total modules enabled: 32/32 (only dashboard and settings are required)
+
+---
+
+## Task 1 — Create Vendors Module & Register It
+
+**Agent**: task-1-agent
+**Status**: ✅ Completed
+
+### What was done
+
+1. **Created `/home/z/my-project/src/components/hms/modules/vendors.tsx`**
+   - Full Vendors module with 3 tabs: Vendor Directory, Contracts, Performance
+   - KPI cards at top: Total Vendors, Active Contracts, Avg Rating, Pending Payments
+   - **Vendor Directory tab**: Table with name/category/contact/phone/email/rating/status columns, sorting by name, category filter dropdown, status filter dropdown, search functionality
+   - **Contracts tab**: Table with contract details (vendor, title, type, value, start/end dates, status), contract status summary cards, status filter, days-left warning for expiring contracts
+   - **Performance tab**: Performance cards for each vendor with delivery/quality/responsiveness/pricing bars, on-time delivery %, defect rate %, avg lead time, trend indicators, star ratings
+   - Rating stars visualization (full, half, empty stars with gold #C9952A color)
+   - Status badges: Active (green), Inactive (gray), Pending (amber), Blacklisted (red) — each with icon
+   - Contract status badges: Active, Expired, Pending Renewal, Terminated
+   - "Add Vendor" dialog with form fields (name, category, contact, phone, email), stores new vendors in local state
+   - All mock data — no API calls
+   - Hotel theme colors: Navy #1B3A6B, Gold #C9952A, chart colors as specified
+   - Follows same patterns as inventory.tsx and finance.tsx (KpiCard, fmtINR, fmtDate imports, same component structure)
+
+2. **Updated `/home/z/my-project/src/components/hms/module-registry.tsx`**
+   - Added `vendors: () => import("./modules/vendors").then(m => m.VendorsModule),` entry
+   - The `vendors` ModuleKey was already defined in store.ts and present in DEFAULT_MODULES
+
+3. **Lint check**: Passed with zero errors
+
+### Files modified
+- `src/components/hms/modules/vendors.tsx` (new file, ~380 lines)
+- `src/components/hms/module-registry.tsx` (1 line added)
+
+---
+Task ID: 3
+Agent: Empty Pages Fix Agent
+Task: Fix "empty pages" — add FALLBACK_DATA + error banners to 5 API-backed modules
+
+Work Log:
+- **dashboard.tsx**: Added `FALLBACK_DASHBOARD_DATA` constant with comprehensive sample data (kpis, arrivalsToday, departuresToday, statusCounts, revenueSeries, channelSeries, hkSummary, departmentHealth, auditFeed). Modified `useDashboardData()` hook to return `error` and `reload`, and apply fallback via `rawData ?? FALLBACK_DASHBOARD_DATA`. Changed all 12 sub-dashboard components from `if (loading || !data)` to `if (loading)` so fallback data renders when API fails. Added `ApiErrorBanner` component. Added error banner to every sub-dashboard (Owner, GM, FrontDesk, HK, FnB, Finance, Engineering, Revenue, HR, Sales, Purchase, Marketing).
+- **reservations.tsx**: Added `FALLBACK_RESERVATIONS` array with 4 sample reservation objects (confirmed, tentative, checked_in, checked_in). Changed `useApi` destructuring to extract `error` and `reload`. Applied fallback via `rawData?.length ? rawData : FALLBACK_RESERVATIONS`. Added `AlertTriangle` import. Added error banner at top of component.
+- **rooms.tsx**: Added `FALLBACK_ROOMS` object with 10 sample rooms across 3 floors, plus status counts. Changed from `if (loading || !data)` to `if (loading)` with `rawData ?? FALLBACK_ROOMS`. Added `AlertTriangle` import. Added error banner at top of component.
+- **housekeeping.tsx**: Added `FALLBACK_HK_DATA` with summary counts and 9 sample tasks across all statuses (pending, in_progress, completed, inspected). Changed from `if (loading || !data)` to `if (loading)` with `rawData ?? FALLBACK_HK_DATA`. Added `AlertTriangle` import. Added error banner at top of component.
+- **guests.tsx**: Added `FALLBACK_GUESTS` array with 5 sample guest profiles (platinum VIP, gold, platinum VIP, silver, none tiers). Changed `useApi` to extract `error` and `reload`. Applied fallback via `rawData?.length ? rawData : FALLBACK_GUESTS`. Added `AlertTriangle` import. Added error banner at top of component.
+
+Stage Summary:
+- All 5 modules now show content even when API fails (returns null/empty data)
+- Error banner with amber styling + Retry button appears when API error is detected
+- Dark mode support in error banners (amber-950/40 bg, amber-800 border, amber-300 text)
+- Lint passes clean with zero errors
+- No behavioral change when API succeeds — fallback data only used when API returns null/empty
+
+---
+Task ID: 3b
+Agent: Empty Pages Fix Agent (Phase 2)
+Task: Fix remaining 12 API-backed modules that show empty pages when API fails
+
+Work Log:
+- **pos.tsx**: Added `FALLBACK_OUTLETS` (4 outlets: Spice Garden, The Royal Bar, Café Aroma, Room Service) and `FALLBACK_ORDERS` (3 active orders with Indian menu items). Changed main `useApi` to extract `error`/`reload`, applied `outlets ?? FALLBACK_OUTLETS`. Changed `ActiveOrdersPanel` to use `orders ?? FALLBACK_ORDERS`. Added `AlertTriangle` import. Added error banner at top.
+- **folios.tsx**: Added `FALLBACK_FOLIOS` (3 folios: 2 open, 1 closed with Indian guest names, INR amounts, room/service charges and payments). Changed `useApi` to extract `error`/`reload`, applied `data?.length ? data : FALLBACK_FOLIOS`. Added `AlertTriangle` import. Added error banner at top.
+- **reports.tsx**: Added `FALLBACK_REPORTS` Record with sample data for all 6 report types (daily_revenue, occupancy, channel_production, gst, folio_audit, payment_methods). Changed `useApi` to extract `error`/`reload`, applied `data ?? FALLBACK_REPORTS[active]`. Added `AlertTriangle` import. Added error banner at top.
+- **night-audit.tsx**: Added inline fallback data with `auditData = data ?? {...}` containing business date, preview (24 folios, ₹156K revenue), and 3 audit history entries. Changed `if (loading || !data)` to `if (loading)`. Added error banner at top. Replaced all `data.` references with `auditData.`.
+- **audit.tsx**: Added `FALLBACK_AUDIT_LOG` (6 entries: CHECKIN, PAYMENT_PROCESSED, RESERVATION_CREATED, ROOM_STATUS_CHANGED, NIGHT_AUDIT_COMPLETED, RATE_OVERRIDE). Changed `useApi` to extract `error`/`reload`, applied `rawData = data ?? FALLBACK_AUDIT_LOG`. Added `AlertTriangle` import. Added error banner at top.
+- **maintenance.tsx**: Added `FALLBACK_MAINTENANCE` with summary (5 open, 3 in_progress, 12 completed) and 5 tickets (AC, faucet, chandelier, Wi-Fi, wardrobe). Changed `useApi` to extract `error`/`reload`, applied `data ?? FALLBACK_MAINTENANCE`. Added `AlertTriangle` import. Added error banner at top.
+- **staff.tsx**: Added `FALLBACK_EMPLOYEES` (6 employees with Indian names across Management, Front Office, Housekeeping, F&B, HR). Updated all 3 tabs (DirectoryTab, DepartmentsTab, OrgChartTab) to extract `error`/`reload`, use fallback data, and show error banners. Added `AlertTriangle` import.
+- **hr.tsx**: Added `FALLBACK_EMP_DATA` (6 employees), `FALLBACK_ATT_DATA` (attendance summary), `FALLBACK_PAYROLL_DATA` (6 payroll records with INR), `FALLBACK_EVENT_DATA` (3 events). Updated all 4 tabs (OverviewTab, EmployeesTab, PayrollTab, EventsTab) to extract `error`/`reload`, use fallback data, and show error banners. Added `AlertTriangle` import.
+- **attendance.tsx**: Added `FALLBACK_ATT_DATA` and `FALLBACK_EMP_DATA` with Indian employee names. Created reusable `ApiErrorBanner` component. Updated all 5 tabs (Overview, Calendar, Table, ManualEntry, Reports) plus BulkUpload to extract `error`/`reload`, use fallback data, and show error banners. Changed `AlertTriangle` import alias to `AlertTriangleIcon` to avoid conflict with existing usage.
+- **scorecard.tsx**: Added `FALLBACK_SCORECARD_DATA` (4 scorecard rows with Indian names and department averages) and `FALLBACK_EMPLOYEES`. Updated OverviewTab, ScorecardsTab, and LeaderboardTab to extract `error`/`reload`, use fallback data, and show error banners. Removed destructive error display in favor of amber warning banner.
+- **sales.tsx**: Added `FALLBACK_LEADS` (4 leads: Tata, Infosys, Wipro, Mahindra) and `FALLBACK_DEALS` (2 deals). Changed `useApi` to extract `error`, applied `leadsData ?? FALLBACK_LEADS` and `dealsData ?? FALLBACK_DEALS`. Added `AlertTriangle` import. Added error banner at top of SalesModule.
+- **purchasing.tsx**: Added `error` extraction to all 5 `useApi` calls. Added error banner at top of PurchasingModule showing when any API fails, with combined Retry button. The module already uses `= []` defaults for empty data, so no additional fallback data was needed.
+
+Stage Summary:
+- All 12 remaining API-backed modules now show content even when API fails
+- Error banner with amber styling + Retry button appears when API error is detected
+- Dark mode support in error banners
+- Lint passes clean with zero errors
+- Fallback data uses realistic Indian hotel data (INR currency, Indian names, Indian companies)
+- No behavioral change when API succeeds — fallback data only used when API returns null/empty

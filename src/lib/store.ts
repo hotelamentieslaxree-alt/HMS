@@ -140,16 +140,16 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
   { key: "guests", label: "Guests", group: "operations", enabled: true },
   // Commerce
   { key: "pos", label: "Restaurant / POS", group: "commerce", enabled: true },
-  { key: "kitchen", label: "Kitchen Display", group: "commerce", enabled: false },
+  { key: "kitchen", label: "Kitchen Display", group: "commerce", enabled: true },
   { key: "folios", label: "Folios & Billing", group: "commerce", enabled: true },
   // Hospital
-  { key: "hospital", label: "Hospital", group: "hospitality", enabled: false },
+  { key: "hospital", label: "Hospital", group: "hospitality", enabled: true },
   { key: "inventory", label: "Inventory", group: "inventory", enabled: true },
   { key: "purchasing", label: "Purchasing", group: "inventory", enabled: true },
   { key: "vendors", label: "Vendors", group: "inventory", enabled: true },
   // Finance
   { key: "finance", label: "Finance", group: "finance", enabled: true },
-  { key: "accounting", label: "Accounting", group: "finance", enabled: false },
+  { key: "accounting", label: "Accounting", group: "finance", enabled: true },
   // HRMS
   { key: "hr", label: "HR Hub", group: "hrms", enabled: true },
   { key: "attendance", label: "Attendance", group: "hrms", enabled: true },
@@ -157,23 +157,23 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
   // CRM & Sales
   { key: "sales", label: "Sales Pipeline", group: "crm", enabled: true },
   { key: "marketing", label: "Marketing Hub", group: "crm", enabled: true },
-  { key: "crm", label: "CRM", group: "crm", enabled: false },
+  { key: "crm", label: "CRM", group: "crm", enabled: true },
   // Productivity
   { key: "tasks", label: "Tasks", group: "productivity", enabled: true },
-  { key: "documents", label: "Documents", group: "productivity", enabled: false },
+  { key: "documents", label: "Documents", group: "productivity", enabled: true },
   // Intelligence
   { key: "reports", label: "Reports", group: "intelligence", enabled: true },
   { key: "night-audit", label: "Night Audit", group: "intelligence", enabled: true },
   { key: "audit", label: "Audit Log", group: "intelligence", enabled: true },
   // AI & Automation
-  { key: "ai-center", label: "AI Center", group: "ai", enabled: false },
-  { key: "automation", label: "Automation", group: "ai", enabled: false },
+  { key: "ai-center", label: "AI Center", group: "ai", enabled: true },
+  { key: "automation", label: "Automation", group: "ai", enabled: true },
   // Admin
   { key: "staff", label: "Staff Directory", group: "admin", enabled: true },
   { key: "maintenance", label: "Maintenance", group: "admin", enabled: true },
   { key: "properties", label: "Properties", group: "admin", enabled: true },
   { key: "settings", label: "Settings", group: "admin", enabled: true, required: true },
-  { key: "integrations", label: "Integrations", group: "admin", enabled: false },
+  { key: "integrations", label: "Integrations", group: "admin", enabled: true },
 ];
 
 // Which modules each role can access (among enabled modules)
@@ -182,13 +182,13 @@ export const ROLE_MODULES: Record<string, ModuleKey[]> = {
   gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
   fom: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "folios", "reports", "night-audit", "staff", "scorecard", "tasks"],
   receptionist: ["dashboard", "reservations", "rooms", "guests", "folios", "staff", "tasks"],
-  hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard", "tasks", "laundry", "inventory", "purchasing"],
+  hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard", "tasks", "laundry", "inventory", "purchasing", "vendors"],
   hk_attendant: ["dashboard", "housekeeping", "tasks"],
-  fb_mgr: ["dashboard", "pos", "kitchen", "reports", "staff", "scorecard", "inventory", "tasks"],
+  fb_mgr: ["dashboard", "pos", "kitchen", "reports", "staff", "scorecard", "inventory", "tasks", "vendors"],
   waiter: ["dashboard", "pos", "kitchen", "tasks"],
   rev_mgr: ["dashboard", "reservations", "reports", "night-audit", "sales", "marketing", "crm", "scorecard", "ai-center"],
-  fin_mgr: ["dashboard", "folios", "finance", "reports", "night-audit", "audit", "scorecard", "inventory"],
-  eng_mgr: ["dashboard", "maintenance", "rooms", "staff", "scorecard", "inventory", "tasks"],
+  fin_mgr: ["dashboard", "folios", "finance", "reports", "night-audit", "audit", "scorecard", "inventory", "vendors"],
+  eng_mgr: ["dashboard", "maintenance", "rooms", "staff", "scorecard", "inventory", "tasks", "vendors"],
   technician: ["dashboard", "maintenance", "tasks"],
   hr_mgr: ["dashboard", "hr", "attendance", "scorecard", "staff", "audit", "tasks", "documents"],
   sales_mgr: ["dashboard", "sales", "crm", "scorecard", "staff", "reports", "tasks"],

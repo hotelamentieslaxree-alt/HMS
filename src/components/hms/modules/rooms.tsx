@@ -14,19 +14,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { DoorOpen, Ban, CheckCircle2, Wrench } from "lucide-react";
+import { DoorOpen, Ban, CheckCircle2, Wrench, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// ─── Fallback rooms data when API fails ──────────────────────────
+const FALLBACK_ROOMS = {
+  rooms: [
+    { id: "rm101", roomNumber: "101", floor: 1, wing: "East", currentStatus: "vacant_clean", category: { id: "c1", name: "Standard Double", code: "STD", baseRate: 3500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC"] }, isAccessible: false, blockedReason: null },
+    { id: "rm102", roomNumber: "102", floor: 1, wing: "East", currentStatus: "occupied_clean", category: { id: "c1", name: "Standard Double", code: "STD", baseRate: 3500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC"] }, isAccessible: true, blockedReason: null },
+    { id: "rm103", roomNumber: "103", floor: 1, wing: "East", currentStatus: "vacant_dirty", category: { id: "c2", name: "Deluxe King", code: "DLX", baseRate: 5500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC", "Minibar"] }, isAccessible: false, blockedReason: null },
+    { id: "rm104", roomNumber: "104", floor: 1, wing: "West", currentStatus: "out_of_order", category: { id: "c1", name: "Standard Double", code: "STD", baseRate: 3500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC"] }, isAccessible: false, blockedReason: "AC repair" },
+    { id: "rm201", roomNumber: "201", floor: 2, wing: "East", currentStatus: "occupied_clean", category: { id: "c2", name: "Deluxe King", code: "DLX", baseRate: 5500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC", "Minibar"] }, isAccessible: false, blockedReason: null },
+    { id: "rm202", roomNumber: "202", floor: 2, wing: "East", currentStatus: "occupied_dirty", category: { id: "c2", name: "Deluxe King", code: "DLX", baseRate: 5500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC", "Minibar"] }, isAccessible: false, blockedReason: null },
+    { id: "rm203", roomNumber: "203", floor: 2, wing: "West", currentStatus: "vacant_clean", category: { id: "c3", name: "Superior Twin", code: "SUP", baseRate: 4800, maxAdults: 3, maxChildren: 2, amenities: ["WiFi", "TV", "AC", "Minibar", "Safe"] }, isAccessible: false, blockedReason: null },
+    { id: "rm301", roomNumber: "301", floor: 3, wing: "East", currentStatus: "occupied_clean", category: { id: "c4", name: "Royal Suite", code: "SUI", baseRate: 12000, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC", "Minibar", "Safe", "Bathtub", "Lounge"] }, isAccessible: false, blockedReason: null },
+    { id: "rm302", roomNumber: "302", floor: 3, wing: "East", currentStatus: "vacant_clean", category: { id: "c3", name: "Superior Twin", code: "SUP", baseRate: 4800, maxAdults: 3, maxChildren: 2, amenities: ["WiFi", "TV", "AC", "Minibar", "Safe"] }, isAccessible: false, blockedReason: null },
+    { id: "rm303", roomNumber: "303", floor: 3, wing: "West", currentStatus: "out_of_service", category: { id: "c1", name: "Standard Double", code: "STD", baseRate: 3500, maxAdults: 2, maxChildren: 1, amenities: ["WiFi", "TV", "AC"] }, isAccessible: false, blockedReason: "Deep cleaning" },
+  ],
+  counts: {
+    vacant_clean: 4,
+    vacant_dirty: 1,
+    occupied_clean: 3,
+    occupied_dirty: 1,
+    out_of_order: 1,
+    out_of_service: 1,
+  },
+};
 
 export function RoomsModule() {
   const { refreshTick, triggerRefresh } = useAppStore();
   const [filter, setFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
   const [actionRoom, setActionRoom] = useState<any>(null);
-  const { data, loading, reload } = useApi<any>(`/api/rooms`, [refreshTick]);
+  const { data: rawData, loading, error, reload } = useApi<any>(`/api/rooms`, [refreshTick]);
 
-  if (loading || !data) {
-    return <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28" />)}</div>;
-  }
+  if (loading) return <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28" />)}</div>;
+
+  const data = rawData ?? FALLBACK_ROOMS;
 
   const floors = Array.from(new Set(data.rooms.map((r: any) => r.floor))).sort();
   let rooms = data.rooms;
@@ -64,6 +88,14 @@ export function RoomsModule() {
 
   return (
     <div className="space-y-4">
+      {/* API error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline hover:no-underline">Retry</button>
+        </div>
+      )}
       {/* Stats + filters */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
         {Object.entries(ROOM_STATUS_META).map(([key, m]) => {

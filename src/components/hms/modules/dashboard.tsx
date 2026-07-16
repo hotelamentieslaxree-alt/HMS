@@ -24,6 +24,80 @@ import {
 
 const CHART_COLORS = ["#1B3A6B", "#C9952A", "#16A34A", "#0369A1", "#D97706", "#7C3AED"];
 
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_DASHBOARD_DATA = {
+  businessDate: new Date().toISOString().slice(0, 10),
+  kpis: {
+    occupancyRate: 72,
+    adr: 5800,
+    revpar: 4176,
+    trevpar: 5320,
+    goppar: 2890,
+    cpor: 1420,
+    occupiedRooms: 72,
+    availableRooms: 100,
+    totalRooms: 100,
+  },
+  inHouseCount: 72,
+  arrivalsToday: [
+    { id: "f1", guestName: "Mr. Rajesh Kumar", category: "Deluxe King", nights: 3, assignedRoom: "301", ratePerNight: 6500, vip: true },
+    { id: "f2", guestName: "Ms. Priya Sharma", category: "Superior Twin", nights: 2, assignedRoom: "505", ratePerNight: 4800, vip: false },
+    { id: "f3", guestName: "Dr. Anil Mehta", category: "Suite", nights: 5, assignedRoom: "801", ratePerNight: 12000, vip: true },
+  ],
+  departuresToday: [
+    { id: "d1", guestName: "Ms. Sneha Patel", category: "Deluxe King", nights: 4, roomNumber: "204" },
+    { id: "d2", guestName: "Mr. John Smith", category: "Standard Double", nights: 2, roomNumber: "112" },
+  ],
+  statusCounts: {
+    vacant_clean: 18,
+    vacant_dirty: 5,
+    occupied_clean: 65,
+    occupied_dirty: 7,
+    out_of_order: 3,
+    out_of_service: 2,
+  },
+  revenueSeries: [
+    { day: "2025-02-01", room: 320000, fb: 85000, other: 12000 },
+    { day: "2025-02-02", room: 345000, fb: 92000, other: 15000 },
+    { day: "2025-02-03", room: 310000, fb: 78000, other: 10000 },
+    { day: "2025-02-04", room: 380000, fb: 105000, other: 18000 },
+    { day: "2025-02-05", room: 355000, fb: 96000, other: 14000 },
+    { day: "2025-02-06", room: 400000, fb: 112000, other: 20000 },
+    { day: "2025-02-07", room: 420000, fb: 125000, other: 22000 },
+  ],
+  channelSeries: [
+    { source: "direct", revenue: 480000 },
+    { source: "booking_com", revenue: 320000 },
+    { source: "expedia", revenue: 180000 },
+    { source: "corporate", revenue: 150000 },
+    { source: "walk_in", revenue: 60000 },
+  ],
+  hkSummary: { pending: 8, in_progress: 5, completed: 22, inspected: 15, total: 50 },
+  departmentHealth: [
+    { code: "FO", name: "Front Office", status: "healthy", metric: "92%", detail: "3 arrivals pending" },
+    { code: "HK", name: "Housekeeping", status: "busy", metric: "74%", detail: "8 rooms pending" },
+    { code: "FB", name: "F&B", status: "healthy", metric: "88%", detail: "All outlets open" },
+    { code: "ENG", name: "Engineering", status: "healthy", metric: "96%", detail: "1 open ticket" },
+  ],
+  auditFeed: [
+    { id: "a1", action: "CHECK_IN", userRole: "Receptionist", userEmail: "front@hotel.com", occurredAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "a2", action: "ROOM_STATUS_CHANGE", userRole: "HK Manager", userEmail: "hk@hotel.com", occurredAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "a3", action: "RESERVATION_CREATED", userRole: "Front Desk", userEmail: "fd@hotel.com", occurredAt: new Date(Date.now() - 10800000).toISOString() },
+  ],
+};
+
+/** Reusable error banner shown when API data fails to load */
+function ApiErrorBanner({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  if (!error) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+      <AlertTriangle className="h-4 w-4 shrink-0" />
+      <span>Could not load live data. Showing sample data instead.</span>
+      <button onClick={onRetry} className="ml-auto text-xs font-medium underline hover:no-underline">Retry</button>
+    </div>
+  );
+}
+
 export function DashboardModule() {
   const { role } = useAppStore();
 
@@ -61,20 +135,22 @@ export function DashboardModule() {
 
 // ─── Shared hook for dashboard data ─────────────────────────────
 function useDashboardData() {
-  const { data, loading, reload } = useApi<any>("/api/dashboard", []);
+  const { data: rawData, loading, error, reload } = useApi<any>("/api/dashboard", []);
   const { refreshTick } = useAppStore();
   useEffect(() => {
     if (refreshTick > 0) reload();
   }, [refreshTick, reload]);
-  return { data, loading };
+  // Use fallback data when API returns null/empty
+  const data = rawData ?? FALLBACK_DASHBOARD_DATA;
+  return { data, loading, error, reload };
 }
 
 // ─── OWNER DASHBOARD ────────────────────────────────────────────
 function OwnerDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const k = data.kpis;
   const revenueSeries = data.revenueSeries?.slice(-14) ?? [];
@@ -82,6 +158,7 @@ function OwnerDashboard() {
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* Owner banner */}
       <div className="rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#1B3A6B] to-[#2E5FA3] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -171,15 +248,16 @@ function OwnerDashboard() {
 
 // ─── GM DASHBOARD ────────────────────────────────────────────────
 function GMDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const k = data.kpis;
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* GM banner */}
       <div className="rounded-xl border border-gold/30 bg-gradient-to-r from-navy to-[#2E5FA3] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -227,13 +305,14 @@ function GMDashboard() {
 
 // ─── FRONT DESK DASHBOARD ────────────────────────────────────────
 function FrontDeskDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* Front Desk banner */}
       <div className="rounded-xl border border-[#0369A1]/30 bg-gradient-to-r from-[#0369A1] to-[#0284C7] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -276,17 +355,18 @@ function FrontDeskDashboard() {
 
 // ─── HOUSEKEEPING DASHBOARD ──────────────────────────────────────
 function HousekeepingDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
   const { data: hkData } = useApi<any>("/api/housekeeping", []);
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const hk = hkData?.summary ?? data.hkSummary;
   const tasks = hkData?.tasks ?? [];
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* HK banner */}
       <div className="rounded-xl border border-[#0F766E]/30 bg-gradient-to-r from-[#0F766E] to-[#14B8A6] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -359,16 +439,17 @@ function HousekeepingDashboard() {
 
 // ─── F&B DASHBOARD ───────────────────────────────────────────────
 function FnBDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
   const { data: posData } = useApi<any>("/api/pos/outlets", []);
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const outlets = Array.isArray(posData) ? posData : (posData?.outlets ?? []);
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* F&B banner */}
       <div className="rounded-xl border border-[#B45309]/30 bg-gradient-to-r from-[#B45309] to-[#D97706] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -425,16 +506,17 @@ function FnBDashboard() {
 
 // ─── FINANCE DASHBOARD ───────────────────────────────────────────
 function FinanceDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
   const { data: reportData } = useApi<any>("/api/reports?type=daily_revenue", []);
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const k = data.kpis;
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* Finance banner */}
       <div className="rounded-xl border border-[#15803D]/30 bg-gradient-to-r from-[#15803D] to-[#16A34A] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -495,17 +577,18 @@ function FinanceDashboard() {
 
 // ─── ENGINEERING DASHBOARD ───────────────────────────────────────
 function EngineeringDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
   const { data: maintData } = useApi<any>("/api/maintenance", []);
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const tickets = maintData?.tickets ?? [];
   const openTickets = tickets.filter((t: any) => t.status === "open" || t.status === "in_progress");
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       {/* Engineering banner */}
       <div className="rounded-xl border border-[#DC2626]/30 bg-gradient-to-r from-[#7F1D1D] to-[#DC2626] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
@@ -568,16 +651,17 @@ function EngineeringDashboard() {
 
 // ─── REVENUE DASHBOARD ───────────────────────────────────────────
 function RevenueDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const k = data.kpis;
   const revenueSeries = data.revenueSeries?.slice(-14) ?? [];
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       <div className="rounded-xl border border-[#7C3AED]/30 bg-gradient-to-r from-[#5B21B6] to-[#7C3AED] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -647,7 +731,7 @@ function RevenueDashboard() {
 
 // ─── HR DASHBOARD ────────────────────────────────────────────────
 function HRDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
   const { data: staffData } = useApi<any>("/api/staff", []);
   const { data: attnData } = useApi<any>("/api/hr/attendance?view=monthly", []);
@@ -655,7 +739,7 @@ function HRDashboard() {
   const { data: eventsData } = useApi<any>("/api/hr/events", []);
   const { data: scoreData } = useApi<any>("/api/hr/scorecards?period=" + new Date().toISOString().slice(0, 7), []);
 
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const staff = Array.isArray(staffData) ? staffData : (staffData?.users ?? []);
   const deptMap = new Map<string, { id: string; name: string; code: string }>();
@@ -676,6 +760,7 @@ function HRDashboard() {
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       <div className="rounded-xl border border-[#BE185D]/30 bg-gradient-to-r from-[#9D174D] to-[#BE185D] px-5 py-4 text-white shadow-card">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -1026,11 +1111,12 @@ function Divider() { return <div className="h-8 w-px bg-white/20" />; }
 
 // ─── SALES DASHBOARD ─────────────────────────────────────────────
 function SalesDashboard() {
-  const { data, loading } = useDashboardData();
-  if (loading || !data) return <Skeleton className="h-96" />;
+  const { data, loading, error, reload } = useDashboardData();
+  if (loading) return <Skeleton className="h-96" />;
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold">Sales Dashboard</h2>
@@ -1106,14 +1192,15 @@ function SalesDashboard() {
 
 // ─── PURCHASE MANAGER DASHBOARD ──────────────────────────────────
 function PurchaseDashboard() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, reload } = useDashboardData();
   const { setActiveModule } = useAppStore();
-  if (loading || !data) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
 
   const k = data.kpis;
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold">Purchase Manager Dashboard</h2>
@@ -1244,11 +1331,12 @@ function PurchaseDashboard() {
 
 // ─── MARKETING DASHBOARD ─────────────────────────────────────────
 function MarketingDashboard() {
-  const { data, loading } = useDashboardData();
-  if (loading || !data) return <Skeleton className="h-96" />;
+  const { data, loading, error, reload } = useDashboardData();
+  if (loading) return <Skeleton className="h-96" />;
 
   return (
     <div className="space-y-6">
+      <ApiErrorBanner error={error} onRetry={reload} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold">Marketing Dashboard</h2>

@@ -22,6 +22,7 @@ import {
   Award, BarChart3, Plus, Search, ChevronRight, ChevronLeft,
   Filter, Trophy, XCircle, Clock, UserCircle,
   Briefcase, Percent, Handshake, CircleDot, Globe, Activity,
+  AlertTriangle,
 } from "lucide-react";
 import {
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
@@ -32,6 +33,19 @@ import {
 const NAVY = "#1B3A6B";
 const GOLD = "#C9952A";
 const SUCCESS = "#16A34A";
+
+// ─── Fallback data when API fails ────────────────────────────────
+const FALLBACK_LEADS: Lead[] = [
+  { id: "l1", company: "Tata Consulting", contact: "Arun Mehta", email: "arun@tata.com", phone: "+91-98100-11111", source: "corporate", status: "qualified", estimatedValue: 450000, probability: 75, assignedTo: "Sales Team", lastContacted: new Date(Date.now() - 86400000).toISOString(), notes: "Corporate retreat enquiry for 40 rooms" },
+  { id: "l2", company: "Infosys Ltd", contact: "Priya Iyer", email: "priya.i@infosys.com", phone: "+91-98000-22222", source: "referral", status: "proposal", estimatedValue: 280000, probability: 60, assignedTo: "Sales Team", lastContacted: new Date(Date.now() - 172800000).toISOString(), notes: "Annual conference booking" },
+  { id: "l3", company: "Wipro Technologies", contact: "Raj Malhotra", email: "raj.m@wipro.com", phone: "+91-97000-33333", source: "website", status: "new", estimatedValue: 180000, probability: 30, assignedTo: "Sales Team", lastContacted: new Date().toISOString(), notes: "Training program accomodation" },
+  { id: "l4", company: "Mahindra Group", contact: "Neha Sharma", email: "neha.s@mahindra.com", phone: "+91-96000-44444", source: "trade_show", status: "negotiation", estimatedValue: 520000, probability: 85, assignedTo: "Sales Team", lastContacted: new Date(Date.now() - 43200000).toISOString(), notes: "Board meeting + stay for 15 executives" },
+];
+
+const FALLBACK_DEALS: Deal[] = [
+  { id: "d1", title: "Tata Annual Retreat 2025", leadId: "l1", leadCompany: "Tata Consulting", value: 450000, stage: "proposal", probability: 75, closeDate: new Date(Date.now() + 30*86400000).toISOString().slice(0,10), assignedTo: "Sales Team", createdAt: new Date(Date.now() - 7*86400000).toISOString() },
+  { id: "d2", title: "Infosys Conference Q2", leadId: "l2", leadCompany: "Infosys Ltd", value: 280000, stage: "negotiation", probability: 60, closeDate: new Date(Date.now() + 45*86400000).toISOString().slice(0,10), assignedTo: "Sales Team", createdAt: new Date(Date.now() - 14*86400000).toISOString() },
+];
 
 const PIPELINE_STAGES = [
   { key: "new", label: "New", color: "#6366F1", bg: "#EEF2FF" },
@@ -1141,11 +1155,11 @@ export function SalesModule() {
   const [leadDialog, setLeadDialog] = useState<{ open: boolean; lead: Lead | null }>({ open: false, lead: null });
   const [dealDialog, setDealDialog] = useState(false);
 
-  const { data: leadsData, loading: leadsLoading, reload: reloadLeads } = useApi<Lead[]>("/api/sales/leads", [refreshTick]);
-  const { data: dealsData, loading: dealsLoading, reload: reloadDeals } = useApi<Deal[]>("/api/sales/deals", [refreshTick]);
+  const { data: leadsData, loading: leadsLoading, reload: reloadLeads, error: leadsError } = useApi<Lead[]>("/api/sales/leads", [refreshTick]);
+  const { data: dealsData, loading: dealsLoading, reload: reloadDeals, error: dealsError } = useApi<Deal[]>("/api/sales/deals", [refreshTick]);
 
-  const leads = leadsData ?? [];
-  const deals = dealsData ?? [];
+  const leads = leadsData ?? FALLBACK_LEADS;
+  const deals = dealsData ?? FALLBACK_DEALS;
 
   // ─── Move lead to new stage
   const handleMoveLead = async (id: string, newStatus: string) => {
@@ -1214,6 +1228,14 @@ export function SalesModule() {
 
   return (
     <div className="space-y-5">
+      {/* API error banner */}
+      {(leadsError || dealsError) && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={() => { reloadLeads(); reloadDeals(); }} className="ml-auto text-xs font-medium underline">Retry</button>
+        </div>
+      )}
       {/* Module Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">

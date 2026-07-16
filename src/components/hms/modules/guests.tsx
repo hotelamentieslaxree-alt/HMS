@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Users, Mail, Phone, Star, Crown, MapPin, CreditCard } from "lucide-react";
+import { Search, Users, Mail, Phone, Star, Crown, MapPin, CreditCard, AlertTriangle } from "lucide-react";
 import { VipBadge, fmtINR, fmtDate } from "../shared";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +20,119 @@ const TIER_META: Record<string, { color: string; icon: any }> = {
   none: { color: "#64748B", icon: Star },
 };
 
+// ─── Fallback guests when API fails ──────────────────────────────
+const FALLBACK_GUESTS = [
+  {
+    id: "g1",
+    title: "Mr.",
+    firstName: "Rajesh",
+    lastName: "Kumar",
+    fullName: "Rajesh Kumar",
+    email: "rajesh.kumar@email.com",
+    phone: "+91-98765-43210",
+    vipStatus: true,
+    loyaltyTier: "platinum",
+    totalStays: 24,
+    totalRevenue: 485000,
+    loyaltyPoints: 48500,
+    nationality: "Indian",
+    idType: "Aadhaar",
+    preferences: { roomType: "Deluxe King", floor: "High floor" },
+    stayHistory: [
+      { id: "sh1", confirmationNumber: "ARI-2024-0089", checkIn: "2024-12-15", checkOut: "2024-12-18", roomNumber: "301", total: 22500, status: "checked_out" },
+    ],
+  },
+  {
+    id: "g2",
+    title: "Ms.",
+    firstName: "Priya",
+    lastName: "Sharma",
+    fullName: "Priya Sharma",
+    email: "priya.sharma@email.com",
+    phone: "+91-87654-32109",
+    vipStatus: false,
+    loyaltyTier: "gold",
+    totalStays: 12,
+    totalRevenue: 285000,
+    loyaltyPoints: 28500,
+    nationality: "Indian",
+    idType: "Passport",
+    preferences: { bedType: "Twin" },
+    stayHistory: [],
+  },
+  {
+    id: "g3",
+    title: "Dr.",
+    firstName: "Anil",
+    lastName: "Mehta",
+    fullName: "Anil Mehta",
+    email: "anil.mehta@email.com",
+    phone: "+91-76543-21098",
+    vipStatus: true,
+    loyaltyTier: "platinum",
+    totalStays: 36,
+    totalRevenue: 1250000,
+    loyaltyPoints: 125000,
+    nationality: "Indian",
+    idType: "Passport",
+    preferences: { roomType: "Suite", dietary: "Vegetarian" },
+    stayHistory: [],
+  },
+  {
+    id: "g4",
+    title: "Mr.",
+    firstName: "John",
+    lastName: "Smith",
+    fullName: "John Smith",
+    email: "john.smith@email.com",
+    phone: "+1-555-0123",
+    vipStatus: false,
+    loyaltyTier: "silver",
+    totalStays: 3,
+    totalRevenue: 62000,
+    loyaltyPoints: 6200,
+    nationality: "American",
+    idType: "Passport",
+    preferences: {},
+    stayHistory: [],
+  },
+  {
+    id: "g5",
+    title: "Ms.",
+    firstName: "Sneha",
+    lastName: "Patel",
+    fullName: "Sneha Patel",
+    email: "sneha.patel@email.com",
+    phone: "+91-65432-10987",
+    vipStatus: false,
+    loyaltyTier: "none",
+    totalStays: 1,
+    totalRevenue: 22000,
+    loyaltyPoints: 2200,
+    nationality: "Indian",
+    idType: "Aadhaar",
+    preferences: {},
+    stayHistory: [],
+  },
+];
+
 export function GuestsModule() {
   const [search, setSearch] = useState("");
   const [vipOnly, setVipOnly] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const { data, loading } = useApi<any[]>(`/api/guests?search=${encodeURIComponent(search)}&vip=${vipOnly}&limit=60`, [search, vipOnly]);
+  const { data: rawData, loading, error, reload } = useApi<any[]>(`/api/guests?search=${encodeURIComponent(search)}&vip=${vipOnly}&limit=60`, [search, vipOnly]);
+  const data = rawData?.length ? rawData : FALLBACK_GUESTS;
 
   return (
     <div className="space-y-4">
+      {/* API error banner */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Could not load live data. Showing sample data instead.</span>
+          <button onClick={reload} className="ml-auto text-xs font-medium underline hover:no-underline">Retry</button>
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 flex-1 min-w-56">

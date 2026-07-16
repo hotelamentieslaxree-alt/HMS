@@ -40,6 +40,9 @@ const MODULE_TITLES: Record<ModuleKey, { title: string; subtitle: string }> = {
   properties: { title: "Properties", subtitle: "Hotels · Branches · Configuration" },
   integrations: { title: "Integrations", subtitle: "OTAs · Payments · Accounting" },
   settings: { title: "Settings", subtitle: "Configuration · Security · Modules" },
+  accounting: { title: "Accounting", subtitle: "Chart of Accounts · Journals · Billing" },
+  purchasing: { title: "Purchase Orders", subtitle: "POs · RFQs · Approvals" },
+  vendors: { title: "Vendors", subtitle: "Directory · Contracts · Performance" },
 };
 
 export function Topbar({ propertyId }: { propertyId?: string }) {
