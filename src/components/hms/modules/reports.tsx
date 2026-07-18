@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, FileText, TrendingUp, Percent, Receipt, Users, Download, AlertTriangle } from "lucide-react";
+import { BarChart3, FileText, TrendingUp, Percent, Receipt, Users, Download, AlertTriangle, Database } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 import { fmtINR } from "../shared";
 import { cn } from "@/lib/utils";
@@ -67,17 +67,43 @@ const FALLBACK_REPORTS: Record<string, any> = {
 export function ReportsModule() {
   const [active, setActive] = useState("daily_revenue");
   const { data, loading, error, reload } = useApi<any>(`/api/reports?type=${active}`, [active]);
-  const reportData = data ?? FALLBACK_REPORTS[active];
+
+  // ─── Smart fallback logic ──────────────────────────────────────
+  const isUsingFallback = (() => {
+    if (!data) return true;
+    // Array-type reports: use fallback if empty or not an array
+    if (["daily_revenue", "occupancy", "channel_production", "payment_methods"].includes(active)) {
+      return !Array.isArray(data) || data.length === 0;
+    }
+    // Object-type reports: use fallback if missing expected keys
+    if (active === "gst") return !data || !data.period;
+    if (active === "folio_audit") return !data || !data.day;
+    return false;
+  })();
+
+  const reportData = isUsingFallback ? FALLBACK_REPORTS[active] : data;
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>Could not load live data. Showing sample data instead.</span>
-          <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
-        </div>
-      )}
+      {/* Live / Sample indicator */}
+      <div className="flex items-center gap-2">
+        {error ? (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>Could not load live data. Showing sample data instead.</span>
+            <button onClick={reload} className="ml-auto text-xs font-medium underline">Retry</button>
+          </div>
+        ) : (
+          <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            isUsingFallback
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+          )}>
+            <span className={cn("h-1.5 w-1.5 rounded-full", isUsingFallback ? "bg-amber-500" : "bg-emerald-500 animate-pulse")} />
+            {isUsingFallback ? "Sample" : "Live"}
+          </span>
+        )}
+      </div>
       {/* Report selector */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {REPORTS.map((r) => {
@@ -129,7 +155,20 @@ function ReportCard({ title, subtitle, action }: any) {
   );
 }
 
+function NoDataState({ label }: { label: string }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <Database className="h-10 w-10 mb-3 opacity-40" />
+        <p className="text-sm font-medium">No data available</p>
+        <p className="text-xs">{label} data is empty for the selected period.</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function DailyRevenueReport({ data }: any) {
+  if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Daily revenue" />;
   const total = data.reduce((s: number, d: any) => s + d.total, 0);
   const last = data[data.length - 1];
   return (
@@ -192,6 +231,7 @@ function DailyRevenueReport({ data }: any) {
 }
 
 function OccupancyReport({ data }: any) {
+  if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Occupancy" />;
   const avg = data.length ? (data.reduce((s: number, d: any) => s + d.occupancyRate, 0) / data.length).toFixed(1) : 0;
   return (
     <Card>
@@ -223,6 +263,7 @@ function OccupancyReport({ data }: any) {
 }
 
 function ChannelReport({ data }: any) {
+  if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Channel production" />;
   return (
     <Card>
       <CardHeader className="pb-2"><CardTitle className="text-base font-display">Channel Production</CardTitle></CardHeader>
@@ -270,6 +311,7 @@ function ChannelReport({ data }: any) {
 }
 
 function GstReport({ data }: any) {
+  if (!data || !data.period) return <NoDataState label="GST tax" />;
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -322,6 +364,7 @@ function GstReport({ data }: any) {
 }
 
 function FolioAuditReport({ data }: any) {
+  if (!data || !data.day) return <NoDataState label="Folio audit" />;
   return (
     <Card>
       <CardHeader className="pb-2"><CardTitle className="text-base font-display">Folio Audit · {data.day}</CardTitle></CardHeader>
@@ -343,6 +386,7 @@ function FolioAuditReport({ data }: any) {
 }
 
 function PaymentMethodsReport({ data }: any) {
+  if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Payment methods" />;
   const total = data.reduce((s: number, d: any) => s + d.total, 0);
   return (
     <Card>

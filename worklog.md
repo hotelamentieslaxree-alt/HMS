@@ -616,3 +616,133 @@ Stage Summary:
 - Dashboard shows Live/Offline indicator and improved error handling
 - 5 dead files deleted (~1,500 lines removed)
 - Lint clean, all APIs tested and returning real data
+
+---
+Task ID: 1
+Agent: Fix Reports Module
+Task: Fix Reports module crashes on empty API data
+
+Work Log:
+- Replaced naive nullish coalescing fallback (`data ?? FALLBACK_REPORTS[active]`) with smart fallback logic
+- Added `isUsingFallback` computed value that checks data validity per report type:
+  - Array reports (daily_revenue, occupancy, channel_production, payment_methods): fallback if data is not array or empty array
+  - Object reports (gst): fallback if data is missing `period` key
+  - Object reports (folio_audit): fallback if data is missing `day` key
+- Added Live/Sample indicator badge (green "Live" with pulse dot vs amber "Sample") similar to dashboard module
+- Preserved existing error banner with retry button for API failures
+- Added `NoDataState` component for defensive "no data" rendering in each sub-report
+- Added data validation guards at top of all 6 report sub-components:
+  - DailyRevenueReport: checks `Array.isArray(data) && data.length > 0`
+  - OccupancyReport: checks `Array.isArray(data) && data.length > 0`
+  - ChannelReport: checks `Array.isArray(data) && data.length > 0`
+  - GstReport: checks `data && data.period`
+  - FolioAuditReport: checks `data && data.day`
+  - PaymentMethodsReport: checks `Array.isArray(data) && data.length > 0`
+- Added `Database` icon import from lucide-react for NoDataState
+- Lint passes clean
+
+Stage Summary:
+- Core bug fixed: `[]` (empty array) no longer bypasses fallback due to smart type-aware validation
+- GST and Folio Audit reports no longer crash when API returns `[]` instead of expected object shape
+- Two layers of protection: (1) smart fallback at ReportsModule level, (2) NoDataState guard in each sub-component
+- Live/Sample indicator gives users visibility into data source
+
+---
+Task ID: 3
+Agent: Fix Inventory Module
+Task: Wire Inventory module to real API, add Add Item and New PO dialogs
+
+Work Log:
+- Replaced all hardcoded MOCK data references with useApi hook calls to /api/inventory/stock, /api/purchasing/orders, /api/inventory/vendors
+- Added search parameter support in stock API call (debounced via search state)
+- Added response normalization logic using useMemo — handles both paginated { items: [...] } and direct array responses
+- Added MOCK data as fallback when API returns empty results or errors (displayStock, displayPOs, displayVendors)
+- Created AddItemDialog component with form fields: name, SKU, category, unit, quantity, reorder level, unit cost, location
+- AddItemDialog posts to POST /api/inventory/stock via apiPost, shows toast on success/error, triggers refresh on success
+- Created NewPODialog component with form fields: vendor (select from vendors list), total amount, notes
+- NewPODialog posts to POST /api/purchasing/orders via apiPost, shows toast on success/error, triggers refresh on success
+- Wired "Add Item" button (onClick → setAddItemOpen(true)) and "New PO" button (onClick → setNewPOOpen(true))
+- Added getStockStatus() helper function to compute stock status from quantity and reorderLevel
+- Added helper functions: itemName(), reorderLvl(), stockValue(), vendorName(), poAmount(), poDate() for field normalization
+- Computed KPIs from real data: total items from enrichedStock.length, low stock from meta.lowStockCount or computed, pending orders filtered by status, total value summed from stock items
+- Added loading skeleton states for KPI cards, tables, and vendor cards
+- Added error banner with retry button when API calls fail
+- Added Live/Sample indicator (green dot "Live" or amber dot "Sample") in header
+- Added "Sample" indicator on Stock Movement tab (still uses MOCK_STOCK_MOVEMENT since no API exists)
+- Enriched MOCK fallback data with additional fields (reorderLevel, unitCost, name) for compatibility with helpers
+- Updated PO_STATUS_META to include draft, submitted, received statuses from the real API
+- All lint checks pass with zero errors
+
+Stage Summary:
+- Inventory module fully wired to real API with graceful fallback to sample data
+- Add Item and New PO dialogs fully functional with form validation and toast feedback
+- Loading states, error handling, and live/sample indicators added
+- Stock Movement tab remains on mock data with appropriate "Sample" badge
+
+---
+Task ID: fix-modules-1
+Agent: main
+Task: Fix Reports module crash on empty API data
+
+Work Log:
+- Identified that `data ?? FALLBACK_REPORTS[active]` doesn't trigger fallback when API returns `[]` (truthy, not nullish)
+- Added smart fallback logic that validates data per report type:
+  - Array reports (daily_revenue, occupancy, channel_production, payment_methods): checks `!Array.isArray(data) || data.length === 0`
+  - Object reports (gst): checks `!data || !data.period`
+  - Object reports (folio_audit): checks `!data || !data.day`
+- Added Live/Sample indicator with green pulse for live data, amber for sample
+- Added NoDataState defensive guard in report sub-components
+- Subagent completed the implementation
+
+Stage Summary:
+- Reports module no longer crashes on empty API data
+- Live/Sample indicator shows data source status
+- Fallback data properly used when API returns empty results
+
+---
+Task ID: fix-modules-3
+Agent: main
+Task: Wire Inventory module to real API, add Add Item and New PO dialogs
+
+Work Log:
+- Replaced hardcoded MOCK data with useApi calls to 3 real endpoints:
+  - `/api/inventory/stock` (paginated, with search)
+  - `/api/purchasing/orders` (paginated, with vendor info)
+  - `/api/inventory/vendors`
+- Added useMemo normalization for paginated vs direct array API responses
+- Kept MOCK data as fallback when API returns empty results
+- Created AddItemDialog with fields: name, SKU, category, unit, quantity, reorder level, unit cost, location
+- Created NewPODialog with fields: vendor (select from API vendors), total amount, notes
+- Both dialogs post to real API endpoints via apiPost and refresh data on success
+- Added loading skeletons and error banner with retry
+- Added Live/Sample indicator in header
+- Computed KPIs from real data (total items, low stock count from API meta, pending orders, total value)
+- Added helper functions: getStockStatus, itemName, reorderLvl, stockValue, vendorName, poAmount, poDate
+- Subagent completed the implementation
+
+Stage Summary:
+- Inventory module fully wired to real API with proper fallback
+- Add Item and New PO dialogs both functional with real API integration
+- Live/Sample indicator shows data source status
+
+---
+Task ID: seed-data
+Agent: main
+Task: Seed demo data for all modules
+
+Work Log:
+- Seeded 5 vendors with proper categories and contact info
+- Seeded 8 stock items across categories (linen, food, cleaning, amenity, engineering) with 3 low-stock items
+- Seeded 5 purchase orders with various statuses (draft, submitted, approved)
+- Seeded 6 guests with different loyalty tiers
+- Seeded 6 reservations with different statuses (confirmed, tentative, checked_in)
+- Created folios with room charges for checked-in reservations
+- Assigned rooms to checked-in reservations and updated room statuses
+- Fixed room assignment for ARI-2025-0139 (assigned to room 206)
+- Verified all API endpoints return correct data
+
+Stage Summary:
+- All modules now have real data in the database
+- API responses confirmed: 6 reservations, 8 stock items, 5 vendors, 6 purchase orders, 6 guests
+- GST report returns proper object structure with period and byTaxCode
+- Create PO API verified working (auto-generates PO number)
