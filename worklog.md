@@ -746,3 +746,239 @@ Stage Summary:
 - API responses confirmed: 6 reservations, 8 stock items, 5 vendors, 6 purchase orders, 6 guests
 - GST report returns proper object structure with period and byTaxCode
 - Create PO API verified working (auto-generates PO number)
+
+---
+Task ID: 2c
+Agent: Accounting/Finance Fix Agent
+Task: Fix broken click handlers in accounting and finance modules
+
+Work Log:
+- **Accounting Module (accounting.tsx)**:
+  - Added `apiPut` to imports from `@/lib/api` (was only importing `useApi, apiPost`)
+  - **"Post" button (line ~883)**: Added onClick → `apiPut('/api/accounting/journal-entries/[id]', {status: "posted"})` + toast.success + reloadJE
+  - **"Cancel" button (line ~884)**: Added onClick → `apiPut('/api/accounting/journal-entries/[id]', {status: "cancelled"})` + toast.success + reloadJE
+  - **"Verify" button (line ~888)**: Added onClick → `apiPut('/api/accounting/journal-entries/[id]', {status: "verified"})` + toast.success + reloadJE
+  - **"Verify" billing (line ~1252)**: Added onClick → `apiPut('/api/accounting/billing-verification/[id]', {status: "verified"})` + toast.success + reloadBV
+  - **"Approve" billing (line ~1255)**: Changed `disabled={true}` to `disabled={!allChecked(bv.id)}` (now conditionally enabled), added onClick → `apiPut('/api/accounting/billing-verification/[id]', {status: "approved"})` + toast.success + reloadBV
+  - **"Reject" billing (line ~1258)**: Added onClick → `apiPut('/api/accounting/billing-verification/[id]', {status: "rejected"})` + toast.success + reloadBV
+  - All handlers include try/catch with toast.error for failure feedback
+
+- **Finance Module (finance.tsx)**:
+  - Created `exportCSV()` utility function that converts JSON → CSV via Blob + URL.createObjectURL + auto-download
+  - **"Export" button (line ~349)**: Added onClick that exports all invoices as CSV with headers [Invoice #, Type, Party, Party GST, Amount, CGST, SGST, IGST, Total, Status, Due Date, Paid, Created]
+  - **"Download GSTR" button (line ~635)**: Added onClick that exports GST summary as CSV with headers [Category, Taxable Amount, CGST, SGST, IGST, Total]
+  - **"Export PDF" P&L button (line ~747)**: Added onClick that exports P&L statement as CSV with headers [Particulars, Type, Amount (₹)] including Total Income, Total Expenses, and NET PROFIT summary rows
+
+- **Verified existing API routes**:
+  - `/api/accounting/journal-entries/[id]` PUT endpoint already supports status transitions (draft→posted, draft→cancelled, posted→verified, posted→cancelled, verified→cancelled)
+  - `/api/accounting/billing-verification/[id]` PUT endpoint already supports status changes (pending→verified, pending→approved, pending→rejected, etc.)
+  - No new API routes needed — all backend handlers were already implemented
+
+- ESLint passes clean with zero errors
+
+Stage Summary:
+- 6 broken button handlers fixed in accounting.tsx (3 JE status buttons + 3 billing verification buttons)
+- 3 broken button handlers fixed in finance.tsx (Export CSV, Download GSTR, Export P&L)
+- Billing verification "Approve" button now conditionally enabled (when all checklist items checked) instead of always disabled
+- CSV export utility added to finance.tsx for browser-side download
+- All handlers provide toast feedback on success/failure and refresh data after API calls
+
+---
+Task ID: 2b
+Agent: main
+Task: Fix documents, properties, and reports modules broken click handlers
+
+Work Log:
+- Read previous agent worklog and understood project structure, API patterns (withHandler, ok, fail, parseBody, etc.), and Prisma schema
+- Read existing Document model from Prisma schema (fields: id, propertyId, name, category, fileType, fileUrl, fileSize, uploadedById, tags, isTemplate, version, status)
+
+### Documents Module (`src/components/hms/modules/documents.tsx`)
+- **Upload Document button**: Added onClick that opens an upload dialog with file picker, name input, category select. On submit, POSTs to `/api/documents/upload` via FormData. New document is prepended to the local docs list on success.
+- **View icon (grid + list views)**: Added onClick that opens a preview dialog showing document metadata (name, category, type, size, status, uploaded by, date). Includes a download button inside the preview.
+- **Download icon (grid + list views)**: Added onClick that fetches from `/api/documents/[id]/download` and triggers browser download via Blob URL.
+- **Delete icon (grid + list views)**: Added onClick that opens an AlertDialog confirmation. On confirm, calls DELETE `/api/documents/[id]` and removes the document from local state.
+
+### New API Routes Created:
+- `src/app/api/documents/route.ts` — GET (list with category/status/search filters) and POST (create document metadata)
+- `src/app/api/documents/upload/route.ts` — POST (handle file upload via FormData, saves metadata to Prisma Document model)
+- `src/app/api/documents/[id]/route.ts` — GET (single document), DELETE (soft-delete by setting status to "deleted")
+- `src/app/api/documents/[id]/download/route.ts` — GET (returns downloadable text file with document metadata)
+
+### Properties Module (`src/components/hms/modules/properties.tsx`)
+- **View button**: Added onClick that opens a property detail dialog showing: status badge, star rating, full address, performance stats (rooms, occupancy, avg rate, revenue), and configuration (check-in/out times, currency, timezone). Includes "Edit Settings" button to transition to settings dialog.
+- **Settings icon**: Added onClick that opens a property settings dialog with editable form fields: name, code, star rating, city, state, country, total rooms, check-in/out time, currency, timezone. Save button with loading state and toast feedback.
+
+### Reports Module (`src/components/hms/modules/reports.tsx`)
+- **Export buttons (DailyRevenue, Occupancy, Channel, GST, FolioAudit, PaymentMethods)**: All Export buttons now have onClick handlers that convert the report data to CSV format and trigger browser download.
+- Created CSV export utility functions: `escapeCsvField`, `objectsToCsv`, `downloadCsv`
+- Created report-specific exporters for each report type (daily_revenue, occupancy, channel_production, gst, folio_audit, payment_methods)
+- Added export button to Occupancy report header (was missing before)
+- Added export buttons to Channel report, GST report, FolioAudit report, and PaymentMethods report headers
+
+### Shared Improvements:
+- Added `sonner` toast notifications across all modules for user feedback
+- Used shadcn/ui Dialog, AlertDialog, Select components for consistent UI
+- All handlers properly handle loading states and error feedback
+- ESLint passes clean with zero errors
+
+---
+Task ID: 2d
+Agent: main
+Task: Fix broken click handlers in marketing module
+
+Work Log:
+- Rewrote `/api/marketing/campaigns/route.ts` from mock in-memory arrays to Prisma-backed DB with GET (list with filters) and POST (create with validation)
+- Created `/api/marketing/campaigns/[id]/route.ts` with GET (single), PUT (update), DELETE handlers using Prisma + broadcast + logAudit
+- Rewrote `/api/marketing/social/route.ts` from mock in-memory arrays to Prisma-backed DB with GET (list with platform filter) and POST (connect account with duplicate check)
+- Created `/api/marketing/social/[id]/disconnect/route.ts` with PUT handler that sets isActive=false and clears handle/followers/etc
+- Fixed "Refresh" button: now calls `triggerRefresh()` from useAppStore instead of just showing a fake toast
+- Fixed "View Profile" social account button: now opens platform URL via `window.open()` using `getPlatformUrl()` helper
+- Fixed `handleSaveCampaign()`: now calls `POST /api/marketing/campaigns` (new) or `PUT /api/marketing/campaigns/:id` (edit), refreshes data after success
+- Fixed `handleDeleteCampaign()`: now calls `DELETE /api/marketing/campaigns/:id`, refreshes data after success
+- Fixed `handleConnectAccount()`: now calls `POST /api/marketing/social` with platform+handle, refreshes data after success (removed Math.random() fake data)
+- Fixed `handleDisconnectAccount()`: now calls `PUT /api/marketing/social/:id/disconnect`, refreshes data after success
+- Added `exportToCSV()` utility function that converts JSON→CSV and triggers browser download via Blob + URL.createObjectURL
+- Added `getPlatformUrl()` helper for mapping platform names to profile URLs
+- Fixed all 6 export buttons (3 CSV + 3 PDF) to generate real CSV downloads with appropriate data:
+  - Campaign ROI CSV: exports campaign data (Name, Type, Platform, Status, Budget, Spent, Impressions, Clicks, Conversions, ROAS)
+  - Social Growth CSV: exports social account data (Platform, Handle, Followers, Following, Posts, EngagementRate, Connected)
+  - Lead Attribution CSV: exports channel performance data (Platform, Reach, Engagement, Conversions)
+  - PDF buttons use CSV fallback as specified
+- Fixed report table "Download" icon: now triggers actual CSV download using exportToCSV
+- Fixed report table "Open" icon: now opens CSV data in new browser tab via Blob URL
+- Added `useEffect` hook that fetches campaigns + social accounts from API whenever `refreshTick` changes
+- Added loading state to Campaign Dialog and Social Account Dialog buttons ("Saving..." / "Connecting...")
+- All API responses include proper error handling with toast notifications
+- ESLint passes clean with zero errors
+
+Stage Summary:
+- 4 API routes created/rewritten (campaigns CRUD, social connect/disconnect)
+- 10 broken click handlers fixed in marketing.tsx
+- 6 export buttons now generate real CSV downloads
+- All mutations now persist to database via Prisma
+- Data refreshes automatically after every mutation via triggerRefresh()
+
+---
+Task ID: 2e
+Agent: main
+Task: Fix kitchen and POS modules — wire dead buttons and local-only mutations to API
+
+Work Log:
+
+## Kitchen Module (kitchen.tsx)
+- Replaced static MOCK_ORDERS with API-fetched orders via useApi("/api/pos/orders")
+- Added status mapping: API "sent_to_kitchen" → kitchen "new", "in_preparation" → "preparing", "ready" → "ready"
+- **New KOT button**: Added onClick → opens Dialog with outlet selector, table #, order type, item lines, and notes → POST /api/pos/orders
+- **Start Preparing button**: Added onClick → PUT /api/pos/orders/{id}/status with {status: "in_preparation"} (optimistic UI)
+- **Mark Ready button**: Added onClick → PUT /api/pos/orders/{id}/status with {status: "ready"} (optimistic UI)
+- **Picked Up button**: Added onClick → PUT /api/pos/orders/{id}/status with {status: "served"} (optimistic removal from kitchen display)
+- Added fallback to FALLBACK_ORDERS when API returns empty kitchen orders
+- Added loading skeleton state, elapsed timer auto-update, updating spinner on buttons
+- Removed unused imports (fmtDate, CardHeader, CardTitle)
+
+## POS Module (pos.tsx)
+- Added `apiDelete` import from @/lib/api
+- Added `triggerRefresh` to useAppStore destructure in MenuBuilderView
+- Added outlet fetching via useApi("/api/pos/outlets") for default outletId
+- **handleAddCategory()**: Now POST /api/pos/menu/categories with {outletId, name}, replaces temp ID with DB ID, reverts on failure
+- **handleDeleteCategory()**: Now DELETE /api/pos/menu/categories/{id}, reverts on failure
+- **handleSaveItem()**: Now POST /api/pos/menu/items (new) or PUT /api/pos/menu/items/{id} (edit), replaces temp ID on create, reverts on failure
+- **handleDeleteItem()**: Now DELETE /api/pos/menu/items/{id}, reverts on failure
+- All four handlers use optimistic UI updates with API persistence
+
+## API Routes Created
+- `/api/pos/menu/categories/route.ts` — GET (list by outlet), POST (create with outletId)
+- `/api/pos/menu/categories/[id]/route.ts` — DELETE (with property ownership check)
+- `/api/pos/menu/items/route.ts` — POST (create with categoryId, validates category ownership)
+- `/api/pos/menu/items/[id]/route.ts` — PUT (update fields), DELETE (with ownership check)
+- All routes use HMS helpers: ok, fail, parseBody, broadcast, PROPERTY_ID, withHandler
+- All routes validate property ownership before mutations
+- All routes broadcast pos.menu.updated events
+
+Stage Summary:
+- 4 new API routes for menu categories and items CRUD
+- 4 dead kitchen buttons now wired to API with optimistic UI
+- 4 local-only POS handlers now persist to database
+- ESLint passes clean with zero errors
+---
+Task ID: 2f
+Agent: Click Handler Fix Agent
+Task: Fix housekeeping, CRM, and hospital module broken click handlers
+
+Work Log:
+
+### Schema Changes (prisma/schema.prisma):
+- Added `inspectionRating Int @default(0)` and `inspectorName String?` to HousekeepingTask model
+- Added `IpdAdmission` model (id, propertyId, patientId, bedNumber, ward, admissionDate, dischargeDate, admittingDoctor, diagnosis, status, notes)
+- Added `CorporateAccount` model (id, propertyId, companyName, code, contactPerson, email, phone, negotiatedRate, roomsPerYear, contractUntil, status, notes)
+- Added `ipdAdmissions IpdAdmission[]` relation to Patient model
+- Added `corporateAccounts CorporateAccount[]` and `ipdAdmissions IpdAdmission[]` relations to Property model
+- Ran `bun run db:push` successfully
+
+### API Routes Created:
+1. **`/api/housekeeping/inspections/[id]/route.ts`** — PUT handler for inspection approve/reject
+   - Accepts {status, inspector, notes, rating, checklist}
+   - Updates HousekeepingTask with inspection data (inspectorName, inspectionRating, notes, checklist)
+   - Sets task status to "inspected", records inspectedAt
+   - On "passed", marks room as vacant_clean if it was vacant_dirty
+   - Broadcasts hk.inspection.completed event
+
+2. **`/api/crm/guests/route.ts`** — GET (list with search) + POST (create guest)
+   - POST creates Guest with firstName, lastName, email, phone, city, preferences, vipStatus
+   - Checks for duplicates by email
+   - Logs audit + broadcasts crm:guest_created
+
+3. **`/api/crm/leads/route.ts`** — GET (list with search/filter) + POST (create lead)
+   - POST creates Lead with companyName, contactName, source, estimatedValue, probability
+   - Logs audit + broadcasts crm:lead_created
+
+4. **`/api/crm/corporates/route.ts`** — GET (list with search) + POST (create corporate)
+   - POST creates CorporateAccount with companyName, code, negotiatedRate, roomsPerYear, contractUntil
+   - Checks for duplicate codes
+   - Logs audit + broadcasts crm:corporate_created
+
+5. **`/api/hospital/ipd/admit/route.ts`** — GET (list admissions) + POST (admit patient)
+   - POST creates IpdAdmission with patientId, bedId, ward, admittingDoctor, diagnosis
+   - Verifies patient exists before admission
+   - Updates patient status to "active"
+   - Logs audit + broadcasts hospital:ipd_admitted
+
+### Frontend Fixes:
+
+**Housekeeping Module (`housekeeping.tsx`):**
+- `handleApprove()`: Changed from local-only state mutation → async function that calls `apiPut('/api/housekeeping/inspections/[id]', {status: "passed", inspector, notes, rating, checklist})`, then updates local state on success
+- `handleReject()`: Changed from local-only state mutation → async function that calls `apiPut('/api/housekeeping/inspections/[id]', {status: "failed", inspector, notes, rating, checklist})`, then updates local state on success
+- Both now have proper error handling with toast.error on API failure
+
+**CRM Module (`crm.tsx`):**
+- Added imports: `apiPost` from `@/lib/api`, `Label`, `Dialog`/`DialogContent`/`DialogHeader`/`DialogTitle`/`DialogFooter` from UI, `toast` from sonner
+- **"Add Guest" button**: Added `onClick={() => setGuestDialogOpen(true)}` → opens form dialog → POST `/api/crm/guests`
+- **"Call" button**: Added `onClick={() => window.open('tel:' + g.phone)}` 
+- **"Email" button**: Added `onClick={() => window.open('mailto:' + g.email)}`
+- **"Add Lead" button**: Added `onClick={() => setLeadDialogOpen(true)}` → opens form dialog → POST `/api/crm/leads`
+- **"Manage" lead button** (Travel Agents tab): Added `onClick` → opens agent management dialog (shows members list)
+- **"Add Corporate" button**: Added `onClick={() => setCorporateDialogOpen(true)}` → opens form dialog → POST `/api/crm/corporates`
+- **"View Members" button**: Added `onClick={() => { setSelectedTier(m.tier); setMembersDialogOpen(true); }}` → opens members list dialog filtered by tier
+- Lead rows: Added `onClick` → opens lead detail dialog showing all lead info
+- All dialogs have proper form fields, validation, submit handlers with loading states, and success/error toasts
+
+**Hospital Module (`hospital.tsx`):**
+- Added imports: `apiPost` from `@/lib/api`, `Label`, `Dialog`/`DialogContent`/`DialogHeader`/`DialogTitle`/`DialogFooter`, `Select`/`SelectContent`/`SelectItem`/`SelectTrigger`/`SelectValue`, `toast` from sonner
+- **"New Patient" button**: Added `onClick={() => setPatientDialogOpen(true)}` → opens form dialog → POST `/api/hospital/patients`
+- **"Call" button** (Doctors tab): Added `onClick={() => window.open('tel:' + d.phone)}`
+- **"New Appointment" button**: Added `onClick={() => setAppointmentDialogOpen(true)}` → opens form dialog → POST `/api/hospital/appointments`
+- **"Admit" button** (Emergency tab): Added `onClick={() => handleAdmit(e)}` → POST `/api/hospital/ipd/admit` with {patientId, bedId, ward, admittingDoctor, diagnosis}
+- All dialogs have proper form fields, validation, submit handlers with loading states, and success/error toasts
+
+### Verification:
+- ESLint passes clean with zero errors
+- Dev server running and compiling successfully
+
+Stage Summary:
+- 5 API routes created (housekeeping inspections, CRM guests/leads/corporates, hospital IPD admit)
+- 2 schema models added (IpdAdmission, CorporateAccount) + 2 fields added to HousekeepingTask
+- 2 housekeeping handlers fixed (handleApprove, handleReject) now use API persistence
+- 7 CRM dead buttons fixed (Add Guest, Call, Email, Add Lead, Manage, Add Corporate, View Members)
+- 4 Hospital dead buttons fixed (New Patient, Call, New Appointment, Admit)
+- All mutations now persist to database via Prisma API routes
+- All buttons have proper loading states, error handling, and success toasts

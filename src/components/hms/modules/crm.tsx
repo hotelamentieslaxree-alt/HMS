@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiPost } from "@/lib/api";
 import { KpiCard, fmtINR, fmtDate } from "../shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import {
   Users, UserPlus, Plane, Building2, Crown, Gift, Star,
   Plus, Search, Heart, Phone, Mail, MapPin, TrendingUp,
@@ -90,10 +94,114 @@ export function CrmModule() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("guest-crm");
 
+  // Dialog states
+  const [guestDialogOpen, setGuestDialogOpen] = useState(false);
+  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  const [corporateDialogOpen, setCorporateDialogOpen] = useState(false);
+  const [leadDetailDialogOpen, setLeadDetailDialogOpen] = useState(false);
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [selectedTier, setSelectedTier] = useState("");
+  const [selectedLead, setSelectedLead] = useState<typeof MOCK_LEADS[0] | null>(null);
+
+  // Guest form state
+  const [guestForm, setGuestForm] = useState({ firstName: "", lastName: "", email: "", phone: "", city: "", preferences: "", vipStatus: false });
+
+  // Lead form state
+  const [leadForm, setLeadForm] = useState({ companyName: "", contactName: "", contactEmail: "", contactPhone: "", source: "direct", estimatedValue: 0, probability: 20, notes: "" });
+
+  // Corporate form state
+  const [corporateForm, setCorporateForm] = useState({ companyName: "", code: "", contactPerson: "", email: "", phone: "", negotiatedRate: 0, roomsPerYear: 0, contractUntil: "", status: "active" });
+
+  const [submitting, setSubmitting] = useState(false);
+
   const totalGuests = MOCK_GUEST_PROFILES.length;
   const vipGuests = MOCK_GUEST_PROFILES.filter((g) => g.vip).length;
   const activeLeads = MOCK_LEADS.filter((l) => l.stage !== "won" && l.stage !== "lost").length;
   const pipelineValue = MOCK_LEADS.filter((l) => l.stage !== "lost").reduce((s, l) => s + l.value, 0);
+
+  // ─── Guest form submit ─────────────────────────────────────────
+  const handleAddGuest = async () => {
+    if (!guestForm.firstName.trim() || !guestForm.lastName.trim()) {
+      toast.error("First name and last name are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiPost("/api/crm/guests", {
+        firstName: guestForm.firstName,
+        lastName: guestForm.lastName,
+        email: guestForm.email || undefined,
+        phone: guestForm.phone || undefined,
+        city: guestForm.city || undefined,
+        preferences: guestForm.preferences ? { notes: guestForm.preferences } : undefined,
+        vipStatus: guestForm.vipStatus,
+      });
+      toast.success(`Guest ${guestForm.firstName} ${guestForm.lastName} added successfully`);
+      setGuestDialogOpen(false);
+      setGuestForm({ firstName: "", lastName: "", email: "", phone: "", city: "", preferences: "", vipStatus: false });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add guest");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── Lead form submit ──────────────────────────────────────────
+  const handleAddLead = async () => {
+    if (!leadForm.companyName.trim() || !leadForm.contactName.trim()) {
+      toast.error("Company name and contact name are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiPost("/api/crm/leads", {
+        companyName: leadForm.companyName,
+        contactName: leadForm.contactName,
+        contactEmail: leadForm.contactEmail || undefined,
+        contactPhone: leadForm.contactPhone || undefined,
+        source: leadForm.source,
+        estimatedValue: leadForm.estimatedValue,
+        probability: leadForm.probability,
+        notes: leadForm.notes || undefined,
+      });
+      toast.success(`Lead for ${leadForm.companyName} added successfully`);
+      setLeadDialogOpen(false);
+      setLeadForm({ companyName: "", contactName: "", contactEmail: "", contactPhone: "", source: "direct", estimatedValue: 0, probability: 20, notes: "" });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add lead");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── Corporate form submit ─────────────────────────────────────
+  const handleAddCorporate = async () => {
+    if (!corporateForm.companyName.trim() || !corporateForm.code.trim()) {
+      toast.error("Company name and code are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiPost("/api/crm/corporates", {
+        companyName: corporateForm.companyName,
+        code: corporateForm.code,
+        contactPerson: corporateForm.contactPerson || undefined,
+        email: corporateForm.email || undefined,
+        phone: corporateForm.phone || undefined,
+        negotiatedRate: corporateForm.negotiatedRate,
+        roomsPerYear: corporateForm.roomsPerYear,
+        contractUntil: corporateForm.contractUntil || undefined,
+        status: corporateForm.status,
+      });
+      toast.success(`Corporate account ${corporateForm.companyName} added successfully`);
+      setCorporateDialogOpen(false);
+      setCorporateForm({ companyName: "", code: "", contactPerson: "", email: "", phone: "", negotiatedRate: 0, roomsPerYear: 0, contractUntil: "", status: "active" });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add corporate account");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -110,7 +218,7 @@ export function CrmModule() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search CRM..." className="pl-8 h-9 w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button className="bg-navy hover:bg-navy-light text-white h-9"><Plus className="h-4 w-4 mr-1" /> Add Guest</Button>
+          <Button className="bg-navy hover:bg-navy-light text-white h-9" onClick={() => setGuestDialogOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add Guest</Button>
         </div>
       </div>
 
@@ -158,8 +266,8 @@ export function CrmModule() {
                         <p className="text-[10px] text-muted-foreground"><span className="font-medium">Prefs:</span> {g.preferences}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-2">
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2"><Phone className="h-3 w-3 mr-1" />Call</Button>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2"><Mail className="h-3 w-3 mr-1" />Email</Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => window.open(`tel:${g.phone}`)}><Phone className="h-3 w-3 mr-1" />Call</Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => window.open(`mailto:${g.email}`)}><Mail className="h-3 w-3 mr-1" />Email</Button>
                         <span className="text-[10px] text-muted-foreground ml-auto">Last: {fmtDate(g.lastVisit)}</span>
                       </div>
                     </div>
@@ -178,7 +286,7 @@ export function CrmModule() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Target className="h-4 w-4 text-navy" /> Sales Pipeline
                 </CardTitle>
-                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs"><Plus className="h-3 w-3 mr-1" /> Add Lead</Button>
+                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs" onClick={() => setLeadDialogOpen(true)}><Plus className="h-3 w-3 mr-1" /> Add Lead</Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -199,7 +307,7 @@ export function CrmModule() {
                   {MOCK_LEADS.map((l) => {
                     const st = STAGE_META[l.stage] ?? STAGE_META.lead;
                     return (
-                      <TableRow key={l.id} className="hover:bg-muted/50 cursor-pointer">
+                      <TableRow key={l.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => { setSelectedLead(l); setLeadDetailDialogOpen(true); }}>
                         <TableCell className="text-xs font-mono text-muted-foreground">{l.id}</TableCell>
                         <TableCell className="text-xs font-medium">{l.company}</TableCell>
                         <TableCell className="text-xs">{l.contact}</TableCell>
@@ -246,7 +354,7 @@ export function CrmModule() {
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
                         <span className="text-[10px] text-[#D97706] font-medium">★ {ta.rating}</span>
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2"><Handshake className="h-3 w-3 mr-1" />Manage</Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => { setSelectedTier(ta.name); setMembersDialogOpen(true); }}><Handshake className="h-3 w-3 mr-1" />Manage</Button>
                       </div>
                     </div>
                   </div>
@@ -264,7 +372,7 @@ export function CrmModule() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-navy" /> Corporate Accounts
                 </CardTitle>
-                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs"><Plus className="h-3 w-3 mr-1" /> Add Corporate</Button>
+                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs" onClick={() => setCorporateDialogOpen(true)}><Plus className="h-3 w-3 mr-1" /> Add Corporate</Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -320,7 +428,7 @@ export function CrmModule() {
                   <p className="text-xs text-muted-foreground mb-2">{m.benefits}</p>
                   <div className="pt-2 border-t border-border flex items-center justify-between">
                     <span className="text-xs font-medium">{m.fee > 0 ? fmtINR(m.fee) + "/yr" : "Free"}</span>
-                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2">View Members</Button>
+                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => { setSelectedTier(m.tier); setMembersDialogOpen(true); }}>View Members</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -369,6 +477,246 @@ export function CrmModule() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Add Guest Dialog ── */}
+      <Dialog open={guestDialogOpen} onOpenChange={setGuestDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-navy" /> Add Guest</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">First Name *</Label>
+                <Input className="h-8 text-sm" value={guestForm.firstName} onChange={(e) => setGuestForm({ ...guestForm, firstName: e.target.value })} placeholder="First name" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Last Name *</Label>
+                <Input className="h-8 text-sm" value={guestForm.lastName} onChange={(e) => setGuestForm({ ...guestForm, lastName: e.target.value })} placeholder="Last name" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input className="h-8 text-sm" type="email" value={guestForm.email} onChange={(e) => setGuestForm({ ...guestForm, email: e.target.value })} placeholder="email@example.com" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input className="h-8 text-sm" value={guestForm.phone} onChange={(e) => setGuestForm({ ...guestForm, phone: e.target.value })} placeholder="+91 98765 00000" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">City</Label>
+              <Input className="h-8 text-sm" value={guestForm.city} onChange={(e) => setGuestForm({ ...guestForm, city: e.target.value })} placeholder="City" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Preferences</Label>
+              <Input className="h-8 text-sm" value={guestForm.preferences} onChange={(e) => setGuestForm({ ...guestForm, preferences: e.target.value })} placeholder="e.g. King bed, High floor" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="vipStatus" checked={guestForm.vipStatus} onChange={(e) => setGuestForm({ ...guestForm, vipStatus: e.target.checked })} className="rounded" />
+              <Label htmlFor="vipStatus" className="text-xs">VIP Status</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGuestDialogOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={handleAddGuest} disabled={submitting}>{submitting ? "Adding..." : "Add Guest"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Lead Dialog ── */}
+      <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-navy" /> Add Lead</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Company Name *</Label>
+              <Input className="h-8 text-sm" value={leadForm.companyName} onChange={(e) => setLeadForm({ ...leadForm, companyName: e.target.value })} placeholder="Company name" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Contact Name *</Label>
+                <Input className="h-8 text-sm" value={leadForm.contactName} onChange={(e) => setLeadForm({ ...leadForm, contactName: e.target.value })} placeholder="Contact person" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Source</Label>
+                <Input className="h-8 text-sm" value={leadForm.source} onChange={(e) => setLeadForm({ ...leadForm, source: e.target.value })} placeholder="direct, referral, etc." />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input className="h-8 text-sm" type="email" value={leadForm.contactEmail} onChange={(e) => setLeadForm({ ...leadForm, contactEmail: e.target.value })} placeholder="email@company.com" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input className="h-8 text-sm" value={leadForm.contactPhone} onChange={(e) => setLeadForm({ ...leadForm, contactPhone: e.target.value })} placeholder="+91 98765 00000" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Estimated Value (₹)</Label>
+                <Input className="h-8 text-sm" type="number" value={leadForm.estimatedValue} onChange={(e) => setLeadForm({ ...leadForm, estimatedValue: Number(e.target.value) })} placeholder="0" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Probability (%)</Label>
+                <Input className="h-8 text-sm" type="number" min={0} max={100} value={leadForm.probability} onChange={(e) => setLeadForm({ ...leadForm, probability: Number(e.target.value) })} placeholder="20" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Input className="h-8 text-sm" value={leadForm.notes} onChange={(e) => setLeadForm({ ...leadForm, notes: e.target.value })} placeholder="Additional notes" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLeadDialogOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={handleAddLead} disabled={submitting}>{submitting ? "Adding..." : "Add Lead"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Lead Detail Dialog ── */}
+      <Dialog open={leadDetailDialogOpen} onOpenChange={setLeadDetailDialogOpen}>
+        <DialogContent className="max-w-md">
+          {selectedLead && (() => {
+            const st = STAGE_META[selectedLead.stage] ?? STAGE_META.lead;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-navy" /> Lead: {selectedLead.company}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Contact</p>
+                      <p className="text-sm font-medium">{selectedLead.contact}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Value</p>
+                      <p className="text-sm font-bold">{fmtINR(selectedLead.value)}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Stage</p>
+                      <span className={cn("inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium", st.cls)}>{st.label}</span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Probability</p>
+                      <p className="text-sm font-medium">{selectedLead.probability}%</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Source</p>
+                      <p className="text-sm">{selectedLead.source}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Next Action</p>
+                    <p className="text-sm">{selectedLead.nextAction}</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setLeadDetailDialogOpen(false)}>Close</Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Corporate Dialog ── */}
+      <Dialog open={corporateDialogOpen} onOpenChange={setCorporateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-navy" /> Add Corporate Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Company Name *</Label>
+                <Input className="h-8 text-sm" value={corporateForm.companyName} onChange={(e) => setCorporateForm({ ...corporateForm, companyName: e.target.value })} placeholder="Company name" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Code *</Label>
+                <Input className="h-8 text-sm" value={corporateForm.code} onChange={(e) => setCorporateForm({ ...corporateForm, code: e.target.value.toUpperCase() })} placeholder="e.g. TCS" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Contact Person</Label>
+                <Input className="h-8 text-sm" value={corporateForm.contactPerson} onChange={(e) => setCorporateForm({ ...corporateForm, contactPerson: e.target.value })} placeholder="Contact name" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input className="h-8 text-sm" type="email" value={corporateForm.email} onChange={(e) => setCorporateForm({ ...corporateForm, email: e.target.value })} placeholder="email@company.com" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input className="h-8 text-sm" value={corporateForm.phone} onChange={(e) => setCorporateForm({ ...corporateForm, phone: e.target.value })} placeholder="+91 98765 00000" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Contract Until</Label>
+                <Input className="h-8 text-sm" type="date" value={corporateForm.contractUntil} onChange={(e) => setCorporateForm({ ...corporateForm, contractUntil: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Negotiated Rate (₹)</Label>
+                <Input className="h-8 text-sm" type="number" value={corporateForm.negotiatedRate} onChange={(e) => setCorporateForm({ ...corporateForm, negotiatedRate: Number(e.target.value) })} placeholder="0" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Rooms/Year</Label>
+                <Input className="h-8 text-sm" type="number" value={corporateForm.roomsPerYear} onChange={(e) => setCorporateForm({ ...corporateForm, roomsPerYear: Number(e.target.value) })} placeholder="0" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCorporateDialogOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={handleAddCorporate} disabled={submitting}>{submitting ? "Adding..." : "Add Corporate"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── View Members Dialog ── */}
+      <Dialog open={membersDialogOpen} onOpenChange={setMembersDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-navy" /> {selectedTier} Members</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {MOCK_LOYALTY.filter((ly) => {
+              if (selectedTier === "Platinum") return ly.tier === "Platinum";
+              if (selectedTier === "Gold") return ly.tier === "Gold";
+              if (selectedTier === "Silver") return ly.tier === "Silver";
+              return true; // For travel agent names or "Classic", show all
+            }).map((ly) => (
+              <div key={ly.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">{ly.member}</p>
+                  <p className="text-[10px] text-muted-foreground">{ly.tier} · {ly.points.toLocaleString()} pts</p>
+                </div>
+                <Badge variant="outline" className="text-[10px]">{ly.tier}</Badge>
+              </div>
+            ))}
+            {MOCK_LOYALTY.filter((ly) => {
+              if (selectedTier === "Platinum") return ly.tier === "Platinum";
+              if (selectedTier === "Gold") return ly.tier === "Gold";
+              if (selectedTier === "Silver") return ly.tier === "Silver";
+              return true;
+            }).length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-4">No members found</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMembersDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

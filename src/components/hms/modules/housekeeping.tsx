@@ -708,60 +708,92 @@ function InspectionsView() {
     });
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!selectedInspection) return;
     if (!inspectorName.trim()) {
       toast.error("Please enter inspector name");
       return;
     }
-    const updated = inspections.map((insp) => {
-      if (insp.id === selectedInspection.id) {
-        return {
-          ...insp,
-          status: "passed" as const,
-          inspector: inspectorName,
-          inspectedAt: new Date().toISOString(),
-          notes: inspectionNotes,
-          rating: inspectionRating,
-          checklist: insp.checklist.map((item, idx) => ({
-            ...item,
-            passed: checklistState[`${idx}`] ?? item.passed,
-          })),
-        };
-      }
-      return insp;
-    });
-    setInspections(updated);
-    setSelectedInspection(null);
-    toast.success(`Room ${selectedInspection.room} — Inspection PASSED`);
+    try {
+      const checklistItems = selectedInspection.checklist.map((item, idx) => ({
+        item: item.item,
+        passed: checklistState[`${idx}`] ?? item.passed,
+      }));
+      await apiPut(`/api/housekeeping/inspections/${selectedInspection.id}`, {
+        status: "passed",
+        inspector: inspectorName,
+        notes: inspectionNotes,
+        rating: inspectionRating,
+        checklist: checklistItems,
+      });
+      // Update local state to reflect the change
+      const updated = inspections.map((insp) => {
+        if (insp.id === selectedInspection.id) {
+          return {
+            ...insp,
+            status: "passed" as const,
+            inspector: inspectorName,
+            inspectedAt: new Date().toISOString(),
+            notes: inspectionNotes,
+            rating: inspectionRating,
+            checklist: insp.checklist.map((item, idx) => ({
+              ...item,
+              passed: checklistState[`${idx}`] ?? item.passed,
+            })),
+          };
+        }
+        return insp;
+      });
+      setInspections(updated);
+      setSelectedInspection(null);
+      toast.success(`Room ${selectedInspection.room} — Inspection PASSED`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to approve inspection");
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedInspection) return;
     if (!inspectorName.trim()) {
       toast.error("Please enter inspector name");
       return;
     }
-    const updated = inspections.map((insp) => {
-      if (insp.id === selectedInspection.id) {
-        return {
-          ...insp,
-          status: "failed" as const,
-          inspector: inspectorName,
-          inspectedAt: new Date().toISOString(),
-          notes: inspectionNotes,
-          rating: inspectionRating,
-          checklist: insp.checklist.map((item, idx) => ({
-            ...item,
-            passed: checklistState[`${idx}`] ?? item.passed,
-          })),
-        };
-      }
-      return insp;
-    });
-    setInspections(updated);
-    setSelectedInspection(null);
-    toast.error(`Room ${selectedInspection.room} — Inspection FAILED`);
+    try {
+      const checklistItems = selectedInspection.checklist.map((item, idx) => ({
+        item: item.item,
+        passed: checklistState[`${idx}`] ?? item.passed,
+      }));
+      await apiPut(`/api/housekeeping/inspections/${selectedInspection.id}`, {
+        status: "failed",
+        inspector: inspectorName,
+        notes: inspectionNotes,
+        rating: inspectionRating,
+        checklist: checklistItems,
+      });
+      // Update local state to reflect the change
+      const updated = inspections.map((insp) => {
+        if (insp.id === selectedInspection.id) {
+          return {
+            ...insp,
+            status: "failed" as const,
+            inspector: inspectorName,
+            inspectedAt: new Date().toISOString(),
+            notes: inspectionNotes,
+            rating: inspectionRating,
+            checklist: insp.checklist.map((item, idx) => ({
+              ...item,
+              passed: checklistState[`${idx}`] ?? item.passed,
+            })),
+          };
+        }
+        return insp;
+      });
+      setInspections(updated);
+      setSelectedInspection(null);
+      toast.error(`Room ${selectedInspection.room} — Inspection FAILED`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to reject inspection");
+    }
   };
 
   const pendingCount = inspections.filter((i) => i.status === "pending_inspection").length;

@@ -810,7 +810,7 @@ function PayrollTab() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => toast.info("Print functionality coming soon")}>
+            <Button variant="outline" onClick={() => window.print()}>
               <Printer className="h-3.5 w-3.5 mr-1" />Print
             </Button>
           </DialogFooter>

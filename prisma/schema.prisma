@@ -77,6 +77,9 @@ model Property {
   journalEntries           JournalEntry[]
   billingVerifications     BillingVerification[]
   budgetEntries            BudgetEntry[]
+  // CRM & Hospital extended relations
+  corporateAccounts        CorporateAccount[]
+  ipdAdmissions            IpdAdmission[]
 }
 
 model Department {
@@ -408,11 +411,13 @@ model HousekeepingTask {
   completedAt     DateTime?
   inspectedById   String?
   inspectedAt     DateTime?
-  rejectionReason String?
-  checklist       String    @default("[]")
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  rejectionReason  String?
+  checklist        String    @default("[]")
+  notes            String?
+  inspectionRating Int       @default(0) // 1-5 rating from inspector
+  inspectorName    String?   // name of inspector (free text)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   property  Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -1007,8 +1012,9 @@ model Patient {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  ipdAdmissions IpdAdmission[]
 
   @@index([propertyId])
   @@index([patientId])
@@ -1059,6 +1065,50 @@ model Appointment {
   @@index([propertyId, appointmentDate])
   @@index([doctorId, appointmentDate])
   @@index([patientId])
+}
+
+model IpdAdmission {
+  id              String   @id @default(cuid())
+  propertyId      String
+  patientId       String
+  bedNumber       String?  // e.g. "Ward-A-12", "ICU-3"
+  ward            String?  // e.g. "Ward-A", "ICU", "Ward-B"
+  admissionDate   DateTime @default(now())
+  dischargeDate   DateTime?
+  admittingDoctor String?
+  diagnosis       String?
+  status          String   @default("admitted") // admitted | discharged | critical | transfer
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([patientId])
+}
+
+model CorporateAccount {
+  id             String    @id @default(cuid())
+  propertyId     String
+  companyName    String
+  code           String    @unique // e.g. "TCS", "INFY"
+  contactPerson  String?
+  email          String?
+  phone          String?
+  negotiatedRate Float     @default(0)
+  roomsPerYear   Int       @default(0)
+  contractUntil  DateTime?
+  status         String    @default("active") // active | expiring | expired | suspended
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@index([propertyId, companyName])
 }
 
 // ════════════════════════════════════════════════════════════════

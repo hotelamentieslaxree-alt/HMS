@@ -515,7 +515,16 @@ export function VendorsModule() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search vendors..." className="pl-8 h-9 w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button variant="outline" size="sm" className="h-9"><Download className="h-3.5 w-3.5 mr-1" /> Export</Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => {
+            const csv = ["Name,Category,Contact,Email,Phone,Rating,Status",
+              ...vendors.map(v => `"${v.name}","${v.category}","${v.contactName}","${v.email}","${v.phone}",${v.rating ?? "N/A"},"${v.status}"`)
+            ].join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = "vendors.csv"; a.click();
+            URL.revokeObjectURL(url);
+            toast.success("Vendors exported as CSV");
+          }}><Download className="h-3.5 w-3.5 mr-1" /> Export</Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button className="bg-[#1B3A6B] hover:bg-[#1B3A6B]/90 text-white h-9"><Plus className="h-4 w-4 mr-1" /> Add Vendor</Button>

@@ -4,7 +4,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useApi, apiPost } from "@/lib/api";
+import { useApi, apiPost, apiPut } from "@/lib/api";
 import { KpiCard, fmtINR, fmtDate } from "../shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -880,12 +880,12 @@ function JournalEntriesTab() {
                                 <div className="flex gap-2">
                                   {entry.status === "draft" && (
                                     <>
-                                      <Button variant="outline" size="sm" className="h-6 text-[10px]"><Eye className="h-3 w-3 mr-1" /> Post</Button>
-                                      <Button variant="outline" size="sm" className="h-6 text-[10px] text-[#DC2626]"><Ban className="h-3 w-3 mr-1" /> Cancel</Button>
+                                      <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={async () => { try { await apiPut(`/api/accounting/journal-entries/${entry.id}`, { status: "posted" }); toast.success("Journal entry posted"); reloadJE(); } catch (e: any) { toast.error(e.message || "Failed to post entry"); } }}><Eye className="h-3 w-3 mr-1" /> Post</Button>
+                                      <Button variant="outline" size="sm" className="h-6 text-[10px] text-[#DC2626]" onClick={async () => { try { await apiPut(`/api/accounting/journal-entries/${entry.id}`, { status: "cancelled" }); toast.success("Journal entry cancelled"); reloadJE(); } catch (e: any) { toast.error(e.message || "Failed to cancel entry"); } }}><Ban className="h-3 w-3 mr-1" /> Cancel</Button>
                                     </>
                                   )}
                                   {entry.status === "posted" && (
-                                    <Button variant="outline" size="sm" className="h-6 text-[10px]"><CheckCircle2 className="h-3 w-3 mr-1" /> Verify</Button>
+                                    <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={async () => { try { await apiPut(`/api/accounting/journal-entries/${entry.id}`, { status: "verified" }); toast.success("Journal entry verified"); reloadJE(); } catch (e: any) { toast.error(e.message || "Failed to verify entry"); } }}><CheckCircle2 className="h-3 w-3 mr-1" /> Verify</Button>
                                   )}
                                 </div>
                               </div>
@@ -1249,13 +1249,13 @@ function BillingVerificationTab() {
                               )}
                               {bv.status === "pending" && (
                                 <div className="flex items-center gap-2 pt-2 border-t border-border">
-                                  <Button size="sm" className="bg-[#16A34A] hover:bg-[#15803D] text-white h-7 text-[10px]" disabled={!allChecked(bv.id)}>
+                                  <Button size="sm" className="bg-[#16A34A] hover:bg-[#15803D] text-white h-7 text-[10px]" disabled={!allChecked(bv.id)} onClick={async () => { try { await apiPut(`/api/accounting/billing-verification/${bv.id}`, { status: "verified" }); toast.success("Billing verified"); reloadBV(); } catch (e: any) { toast.error(e.message || "Failed to verify"); } }}>
                                     <CheckCircle2 className="h-3 w-3 mr-1" /> Verify
                                   </Button>
-                                  <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-[10px]" disabled={true}>
+                                  <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-[10px]" disabled={!allChecked(bv.id)} onClick={async () => { try { await apiPut(`/api/accounting/billing-verification/${bv.id}`, { status: "approved" }); toast.success("Billing approved"); reloadBV(); } catch (e: any) { toast.error(e.message || "Failed to approve"); } }}>
                                     Approve
                                   </Button>
-                                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-[#DC2626] border-[#DC2626] hover:bg-[#FFE4E6]">
+                                  <Button variant="outline" size="sm" className="h-7 text-[10px] text-[#DC2626] border-[#DC2626] hover:bg-[#FFE4E6]" onClick={async () => { try { await apiPut(`/api/accounting/billing-verification/${bv.id}`, { status: "rejected" }); toast.success("Billing rejected"); reloadBV(); } catch (e: any) { toast.error(e.message || "Failed to reject"); } }}>
                                     <XCircle className="h-3 w-3 mr-1" /> Reject
                                   </Button>
                                 </div>

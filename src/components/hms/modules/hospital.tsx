@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiPost } from "@/lib/api";
 import { KpiCard, fmtINR, fmtDate } from "../shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   Stethoscope, Users, Activity, Heart, Ambulance, FlaskConical,
   Plus, Search, Calendar, Clock, BedDouble, UserCheck, AlertTriangle,
@@ -105,6 +110,96 @@ export function HospitalModule() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("patients");
 
+  // Dialog states
+  const [patientDialogOpen, setPatientDialogOpen] = useState(false);
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Patient form state
+  const [patientForm, setPatientForm] = useState({
+    firstName: "", lastName: "", age: "", gender: "Male", phone: "", email: "", bloodGroup: "", address: "",
+  });
+
+  // Appointment form state
+  const [appointmentForm, setAppointmentForm] = useState({
+    patientId: "", doctorId: "", appointmentDate: "", timeSlot: "", type: "opd", notes: "",
+  });
+
+  // ─── Patient form submit ───────────────────────────────────────
+  const handleAddPatient = async () => {
+    if (!patientForm.firstName.trim() || !patientForm.lastName.trim()) {
+      toast.error("First name and last name are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiPost("/api/hospital/patients", {
+        firstName: patientForm.firstName,
+        lastName: patientForm.lastName,
+        age: patientForm.age ? Number(patientForm.age) : undefined,
+        gender: patientForm.gender || undefined,
+        phone: patientForm.phone || undefined,
+        email: patientForm.email || undefined,
+        bloodGroup: patientForm.bloodGroup || undefined,
+        address: patientForm.address || undefined,
+        status: "active",
+      });
+      toast.success(`Patient ${patientForm.firstName} ${patientForm.lastName} registered successfully`);
+      setPatientDialogOpen(false);
+      setPatientForm({ firstName: "", lastName: "", age: "", gender: "Male", phone: "", email: "", bloodGroup: "", address: "" });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to register patient");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── Appointment form submit ───────────────────────────────────
+  const handleAddAppointment = async () => {
+    if (!appointmentForm.patientId || !appointmentForm.doctorId || !appointmentForm.appointmentDate) {
+      toast.error("Patient, doctor, and date are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiPost("/api/hospital/appointments", {
+        patientId: appointmentForm.patientId,
+        doctorId: appointmentForm.doctorId,
+        appointmentDate: appointmentForm.appointmentDate,
+        timeSlot: appointmentForm.timeSlot || undefined,
+        type: appointmentForm.type,
+        notes: appointmentForm.notes || undefined,
+        status: "scheduled",
+      });
+      toast.success("Appointment created successfully");
+      setAppointmentDialogOpen(false);
+      setAppointmentForm({ patientId: "", doctorId: "", appointmentDate: "", timeSlot: "", type: "opd", notes: "" });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to create appointment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── IPD Admit handler ─────────────────────────────────────────
+  const handleAdmit = async (erPatient: typeof MOCK_EMERGENCY[0]) => {
+    setSubmitting(true);
+    try {
+      await apiPost("/api/hospital/ipd/admit", {
+        patientId: erPatient.id, // Using ER patient ID
+        bedId: erPatient.bed,
+        ward: "Emergency",
+        admittingDoctor: erPatient.doctor,
+        diagnosis: erPatient.complaint,
+      });
+      toast.success(`${erPatient.patient} admitted to IPD from ER`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to admit patient");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -120,7 +215,7 @@ export function HospitalModule() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search patients, doctors..." className="pl-8 h-9 w-56" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button className="bg-navy hover:bg-navy-light text-white"><Plus className="h-4 w-4 mr-1" /> New Patient</Button>
+          <Button className="bg-navy hover:bg-navy-light text-white" onClick={() => setPatientDialogOpen(true)}><Plus className="h-4 w-4 mr-1" /> New Patient</Button>
         </div>
       </div>
 
@@ -210,7 +305,7 @@ export function HospitalModule() {
                         </div>
                         <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
                           <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> {d.patients} patients</span>
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2"><PhoneCall className="h-3 w-3 mr-1" /> Call</Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => window.open(`tel:${d.phone}`)}><PhoneCall className="h-3 w-3 mr-1" /> Call</Button>
                         </div>
                       </div>
                     </div>
@@ -229,7 +324,7 @@ export function HospitalModule() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-navy" /> Today&apos;s Appointments
                 </CardTitle>
-                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs">
+                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs" onClick={() => setAppointmentDialogOpen(true)}>
                   <Plus className="h-3 w-3 mr-1" /> New Appointment
                 </Button>
               </div>
@@ -393,7 +488,7 @@ export function HospitalModule() {
                         <TableCell className="text-xs">{e.bed}</TableCell>
                         <TableCell className="text-xs">{e.doctor}</TableCell>
                         <TableCell className="text-xs">{e.admittedAt}</TableCell>
-                        <TableCell><Button variant="outline" size="sm" className="h-6 text-[10px] px-2"><ArrowRight className="h-3 w-3 mr-1" />Admit</Button></TableCell>
+                        <TableCell><Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleAdmit(e)} disabled={submitting}><ArrowRight className="h-3 w-3 mr-1" />Admit</Button></TableCell>
                       </TableRow>
                     );
                   })}
@@ -480,6 +575,130 @@ export function HospitalModule() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* ── New Patient Dialog ── */}
+      <Dialog open={patientDialogOpen} onOpenChange={setPatientDialogOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-navy" /> New Patient</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">First Name *</Label>
+                <Input className="h-8 text-sm" value={patientForm.firstName} onChange={(e) => setPatientForm({ ...patientForm, firstName: e.target.value })} placeholder="First name" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Last Name *</Label>
+                <Input className="h-8 text-sm" value={patientForm.lastName} onChange={(e) => setPatientForm({ ...patientForm, lastName: e.target.value })} placeholder="Last name" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Age</Label>
+                <Input className="h-8 text-sm" type="number" value={patientForm.age} onChange={(e) => setPatientForm({ ...patientForm, age: e.target.value })} placeholder="Age" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Gender</Label>
+                <Select value={patientForm.gender} onValueChange={(v) => setPatientForm({ ...patientForm, gender: v })}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Blood Group</Label>
+                <Input className="h-8 text-sm" value={patientForm.bloodGroup} onChange={(e) => setPatientForm({ ...patientForm, bloodGroup: e.target.value })} placeholder="e.g. B+" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input className="h-8 text-sm" value={patientForm.phone} onChange={(e) => setPatientForm({ ...patientForm, phone: e.target.value })} placeholder="+91 98765 00000" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input className="h-8 text-sm" type="email" value={patientForm.email} onChange={(e) => setPatientForm({ ...patientForm, email: e.target.value })} placeholder="email@example.com" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Address</Label>
+              <Input className="h-8 text-sm" value={patientForm.address} onChange={(e) => setPatientForm({ ...patientForm, address: e.target.value })} placeholder="Address" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPatientDialogOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={handleAddPatient} disabled={submitting}>{submitting ? "Registering..." : "Register Patient"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── New Appointment Dialog ── */}
+      <Dialog open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-navy" /> New Appointment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Patient *</Label>
+                <Select value={appointmentForm.patientId} onValueChange={(v) => setAppointmentForm({ ...appointmentForm, patientId: v })}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select patient" /></SelectTrigger>
+                  <SelectContent>
+                    {MOCK_PATIENTS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Doctor *</Label>
+                <Select value={appointmentForm.doctorId} onValueChange={(v) => setAppointmentForm({ ...appointmentForm, doctorId: v })}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                  <SelectContent>
+                    {MOCK_DOCTORS.filter((d) => d.availability === "Available").map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Date *</Label>
+                <Input className="h-8 text-sm" type="date" value={appointmentForm.appointmentDate} onChange={(e) => setAppointmentForm({ ...appointmentForm, appointmentDate: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Time Slot</Label>
+                <Input className="h-8 text-sm" value={appointmentForm.timeSlot} onChange={(e) => setAppointmentForm({ ...appointmentForm, timeSlot: e.target.value })} placeholder="e.g. 09:00 AM" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Type</Label>
+              <Select value={appointmentForm.type} onValueChange={(v) => setAppointmentForm({ ...appointmentForm, type: v })}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="opd">OPD</SelectItem>
+                  <SelectItem value="follow_up">Follow-up</SelectItem>
+                  <SelectItem value="emergency">Emergency</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Input className="h-8 text-sm" value={appointmentForm.notes} onChange={(e) => setAppointmentForm({ ...appointmentForm, notes: e.target.value })} placeholder="Reason for visit" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAppointmentDialogOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={handleAddAppointment} disabled={submitting}>{submitting ? "Creating..." : "Create Appointment"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useApi, apiPost, apiPut } from "@/lib/api";
+import { useApi, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -947,7 +947,7 @@ function OrderCard({
 // ═══════════════════════════════════════════════════════════════════════
 
 function MenuBuilderView() {
-  const { setActiveSubModule } = useAppStore();
+  const { setActiveSubModule, triggerRefresh } = useAppStore();
   const [categories, setCategories] = useState<MenuCategory[]>(INITIAL_MENU_CATEGORIES);
   const [showPreview, setShowPreview] = useState(false);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
@@ -956,6 +956,10 @@ function MenuBuilderView() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "category" | "item"; id: string } | null>(null);
+
+  // Fetch outlets to determine the default outlet for menu operations
+  const { data: outlets } = useApi<any[]>("/api/pos/outlets", []);
+  const defaultOutletId = outlets?.[0]?.id ?? "";
 
   // New item form state
   const [itemForm, setItemForm] = useState({
@@ -976,8 +980,10 @@ function MenuBuilderView() {
   };
 
   // Add new category
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (!newCategoryName.trim()) { toast.error("Category name is required"); return; }
+
+    // Optimistic local update
     const newCat: MenuCategory = {
       id: `cat-${Date.now()}`,
       name: newCategoryName.trim(),
@@ -988,15 +994,47 @@ function MenuBuilderView() {
     setCategories((prev) => [...prev, newCat]);
     setNewCategoryName("");
     setAddCategoryOpen(false);
-    toast.success(`Category "${newCat.name}" added`);
+
+    // Persist to API
+    try {
+      const result = await apiPost("/api/pos/menu/categories", {
+        outletId: defaultOutletId,
+        name: newCat.name,
+      });
+      // Replace the temp ID with the real DB ID
+      setCategories((prev) =>
+        prev.map((c) => c.id === newCat.id ? { ...c, id: result.id } : c)
+      );
+      toast.success(`Category "${newCat.name}" added`);
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to create category");
+      // Revert on failure
+      setCategories((prev) => prev.filter((c) => c.id !== newCat.id));
+    }
   };
 
   // Delete category
-  const handleDeleteCategory = (catId: string) => {
+  const handleDeleteCategory = async (catId: string) => {
+    const catToDelete = categories.find((c) => c.id === catId);
+
+    // Optimistic local update
     setCategories((prev) => prev.filter((c) => c.id !== catId));
     setDeleteConfirmOpen(false);
     setDeleteTarget(null);
-    toast.success("Category deleted");
+
+    // Persist to API
+    try {
+      await apiDelete(`/api/pos/menu/categories/${catId}`);
+      toast.success("Category deleted");
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete category");
+      // Revert on failure
+      if (catToDelete) {
+        setCategories((prev) => [...prev, catToDelete]);
+      }
+    }
   };
 
   // Open add item form
@@ -1030,12 +1068,12 @@ function MenuBuilderView() {
   };
 
   // Save item (add or edit)
-  const handleSaveItem = () => {
+  const handleSaveItem = async () => {
     if (!itemForm.name.trim()) { toast.error("Item name is required"); return; }
     if (itemForm.price <= 0) { toast.error("Price must be greater than 0"); return; }
 
     if (editItem) {
-      // Edit existing
+      // Edit existing — optimistic local update
       setCategories((prev) =>
         prev.map((cat) => ({
           ...cat,
@@ -1072,9 +1110,25 @@ function MenuBuilderView() {
           });
         });
       }
-      toast.success(`"${itemForm.name}" updated`);
+
+      // Persist edit to API
+      try {
+        await apiPut(`/api/pos/menu/items/${editItem.id}`, {
+          name: itemForm.name.trim(),
+          description: itemForm.description.trim(),
+          price: itemForm.price,
+          dietType: itemForm.dietType,
+          categoryId: itemForm.categoryId,
+          isFeatured: itemForm.isFeatured,
+          isAvailable: itemForm.isAvailable,
+        });
+        toast.success(`"${itemForm.name}" updated`);
+        triggerRefresh();
+      } catch (e: any) {
+        toast.error(e.message || "Failed to update item");
+      }
     } else {
-      // Add new
+      // Add new — optimistic local update
       const newItem: MenuItem = {
         id: `mi-${Date.now()}`,
         name: itemForm.name.trim(),
@@ -1093,7 +1147,39 @@ function MenuBuilderView() {
             : cat
         )
       );
-      toast.success(`"${itemForm.name}" added`);
+
+      // Persist new item to API
+      try {
+        const result = await apiPost("/api/pos/menu/items", {
+          categoryId: itemForm.categoryId,
+          name: itemForm.name.trim(),
+          description: itemForm.description.trim(),
+          price: itemForm.price,
+          dietType: itemForm.dietType,
+          isFeatured: itemForm.isFeatured,
+          isAvailable: itemForm.isAvailable,
+        });
+        // Replace the temp ID with the real DB ID
+        setCategories((prev) =>
+          prev.map((cat) =>
+            cat.id === itemForm.categoryId
+              ? { ...cat, items: cat.items.map((it) => it.id === newItem.id ? { ...it, id: result.id } : it) }
+              : cat
+          )
+        );
+        toast.success(`"${itemForm.name}" added`);
+        triggerRefresh();
+      } catch (e: any) {
+        toast.error(e.message || "Failed to create item");
+        // Revert on failure
+        setCategories((prev) =>
+          prev.map((cat) =>
+            cat.id === itemForm.categoryId
+              ? { ...cat, items: cat.items.filter((it) => it.id !== newItem.id) }
+              : cat
+          )
+        );
+      }
     }
 
     setEditItemOpen(false);
@@ -1101,7 +1187,12 @@ function MenuBuilderView() {
   };
 
   // Delete item
-  const handleDeleteItem = (itemId: string) => {
+  const handleDeleteItem = async (itemId: string) => {
+    // Find the item being deleted for potential revert
+    const itemToDelete = categories.flatMap((c) => c.items).find((i) => i.id === itemId);
+    const parentCatId = categories.find((c) => c.items.some((i) => i.id === itemId))?.id;
+
+    // Optimistic local update
     setCategories((prev) =>
       prev.map((cat) => ({
         ...cat,
@@ -1110,7 +1201,25 @@ function MenuBuilderView() {
     );
     setDeleteConfirmOpen(false);
     setDeleteTarget(null);
-    toast.success("Item deleted");
+
+    // Persist to API
+    try {
+      await apiDelete(`/api/pos/menu/items/${itemId}`);
+      toast.success("Item deleted");
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete item");
+      // Revert on failure
+      if (itemToDelete && parentCatId) {
+        setCategories((prev) =>
+          prev.map((cat) =>
+            cat.id === parentCatId
+              ? { ...cat, items: [...cat.items, itemToDelete] }
+              : cat
+          )
+        );
+      }
+    }
   };
 
   // Move item up/down within category

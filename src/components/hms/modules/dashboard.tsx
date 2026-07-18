@@ -1179,11 +1179,11 @@ function SalesDashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
-          { icon: TrendingUp, label: "View Pipeline", desc: "Manage leads & deals" },
-          { icon: Users, label: "Lead Database", desc: "38 active prospects" },
-          { icon: BarChart3, label: "Sales Reports", desc: "Performance analytics" },
+          { icon: TrendingUp, label: "View Pipeline", desc: "Manage leads & deals", mod: "sales" },
+          { icon: Users, label: "Lead Database", desc: "38 active prospects", mod: "sales" },
+          { icon: BarChart3, label: "Sales Reports", desc: "Performance analytics", mod: "reports" },
         ].map((a, i) => (
-          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => setActiveModule(a.mod!)} />
         ))}
       </div>
     </div>
@@ -1399,11 +1399,11 @@ function MarketingDashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
-          { icon: BarChart3, label: "Campaign Manager", desc: "8 active campaigns" },
-          { icon: Users, label: "Social Accounts", desc: "5 connected platforms" },
-          { icon: TrendingUp, label: "Analytics", desc: "Performance reports" },
+          { icon: BarChart3, label: "Campaign Manager", desc: "8 active campaigns", mod: "marketing" },
+          { icon: Users, label: "Social Accounts", desc: "5 connected platforms", mod: "marketing" },
+          { icon: TrendingUp, label: "Analytics", desc: "Performance reports", mod: "reports" },
         ].map((a, i) => (
-          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => {}} />
+          <QuickAction key={i} icon={a.icon} label={a.label} onClick={() => setActiveModule(a.mod!)} />
         ))}
       </div>
     </div>

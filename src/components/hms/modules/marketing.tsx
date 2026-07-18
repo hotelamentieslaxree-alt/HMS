@@ -425,7 +425,7 @@ const MKT_TABS = [
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════
 export function MarketingModule() {
-  const { user, activeSubModule, setActiveSubModule } = useAppStore();
+  const { user, activeSubModule, setActiveSubModule, triggerRefresh, refreshTick } = useAppStore();
   const [localTab, setLocalTab] = useState("overview");
   const activeTab = (activeSubModule && MKT_TABS.some(t => t.key === activeSubModule)) ? activeSubModule : localTab;
 
@@ -443,6 +443,47 @@ export function MarketingModule() {
   const [analyticsDateRange, setAnalyticsDateRange] = useState("30");
   const [campaigns, setCampaigns] = useState<Campaign[]>(MOCK_CAMPAIGNS);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>(MOCK_SOCIAL_ACCOUNTS);
+  const [loading, setLoading] = useState(false);
+
+  // ─── Fetch data from API on refresh ───────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        const [campRes, socRes] = await Promise.all([
+          fetch("/api/marketing/campaigns"),
+          fetch("/api/marketing/social"),
+        ]);
+        const campJson = await campRes.json();
+        const socJson = await socRes.json();
+        if (!cancelled) {
+          if (campJson.success) {
+            setCampaigns(campJson.data.map((c: any) => ({
+              id: c.id, name: c.name, type: c.type, platform: c.platform,
+              status: c.status, budget: c.budget, spent: c.spent,
+              impressions: c.impressions, clicks: c.clicks, conversions: c.conversions,
+              roas: c.budget > 0 && c.spent > 0 ? parseFloat(((c.revenue || 0) / c.spent).toFixed(1)) : 0,
+              startDate: c.startDate ? c.startDate.split("T")[0] : "",
+              endDate: c.endDate ? c.endDate.split("T")[0] : "",
+            })));
+          }
+          if (socJson.success) {
+            setSocialAccounts(socJson.data.map((a: any) => ({
+              id: a.id, platform: a.platform, handle: a.handle || "",
+              followers: a.followerCount || 0, following: a.followingCount || 0,
+              posts: a.postCount || 0, engagementRate: a.engagementRate || 0,
+              connected: a.isActive, lastSynced: a.lastSyncedAt || "",
+              avatarUrl: a.avatarUrl || undefined,
+            })));
+          }
+        }
+      } catch {
+        // Silently keep existing data on fetch error
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, [refreshTick]);
 
   // Campaign form state
   const [campaignForm, setCampaignForm] = useState({
@@ -480,38 +521,89 @@ export function MarketingModule() {
     return { totalFollowers, avgEngagement, totalAccounts: connected.length };
   }, [socialAccounts]);
 
+  // ─── CSV Export Utility ─────────────────────────────────────
+  const exportToCSV = useCallback((data: Record<string, unknown>[], filename: string) => {
+    if (!data.length) {
+      toast.error("No data to export");
+      return;
+    }
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(","),
+      ...data.map((row) =>
+        headers.map((h) => {
+          const val = row[h];
+          const str = val === null || val === undefined ? "" : String(val);
+          return `"${str.replace(/"/g, '""')}"`;
+        }).join(",")
+      ),
+    ];
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`${filename}.csv exported successfully`);
+  }, []);
+
+  // ─── Platform URL helper ─────────────────────────────────────
+  const getPlatformUrl = useCallback((platform: string, handle: string) => {
+    const h = handle.replace("@", "");
+    switch (platform) {
+      case "instagram": return `https://instagram.com/${h}`;
+      case "facebook": return `https://facebook.com/${h}`;
+      case "linkedin": return `https://linkedin.com/company/${h}`;
+      case "youtube": return `https://youtube.com/${h}`;
+      case "twitter": return `https://x.com/${h}`;
+      case "tiktok": return `https://tiktok.com/@${h}`;
+      case "pinterest": return `https://pinterest.com/${h}`;
+      case "google": return `https://google.com`;
+      default: return "#";
+    }
+  }, []);
+
   // ─── Campaign Handlers ───────────────────────────────────────
-  const handleSaveCampaign = useCallback(() => {
+  const handleSaveCampaign = useCallback(async () => {
     if (!campaignForm.name.trim()) {
       toast.error("Campaign name is required");
       return;
     }
-    if (editingCampaign) {
-      setCampaigns((prev) =>
-        prev.map((c) =>
-          c.id === editingCampaign.id
-            ? { ...c, ...campaignForm }
-            : c
-        )
-      );
-      toast.success("Campaign updated successfully");
-    } else {
-      const newCampaign: Campaign = {
-        id: "c" + Date.now(),
-        ...campaignForm,
-        spent: 0,
-        impressions: 0,
-        clicks: 0,
-        conversions: 0,
-        roas: 0,
-      };
-      setCampaigns((prev) => [...prev, newCampaign]);
-      toast.success("Campaign created successfully");
+    setLoading(true);
+    try {
+      if (editingCampaign) {
+        const res = await fetch(`/api/marketing/campaigns/${editingCampaign.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(campaignForm),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.errors?.[0]?.message || "Failed to update campaign");
+        toast.success("Campaign updated successfully");
+      } else {
+        const res = await fetch("/api/marketing/campaigns", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(campaignForm),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.errors?.[0]?.message || "Failed to create campaign");
+        toast.success("Campaign created successfully");
+      }
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save campaign");
+    } finally {
+      setLoading(false);
     }
     setCampaignDialogOpen(false);
     setEditingCampaign(null);
     setCampaignForm({ name: "", type: "brand_awareness", platform: "instagram", status: "draft", budget: 0, startDate: "", endDate: "" });
-  }, [campaignForm, editingCampaign]);
+  }, [campaignForm, editingCampaign, triggerRefresh]);
 
   const handleEditCampaign = useCallback((campaign: Campaign) => {
     setEditingCampaign(campaign);
@@ -527,48 +619,55 @@ export function MarketingModule() {
     setCampaignDialogOpen(true);
   }, []);
 
-  const handleDeleteCampaign = useCallback((id: string) => {
-    setCampaigns((prev) => prev.filter((c) => c.id !== id));
-    toast.success("Campaign deleted");
-  }, []);
+  const handleDeleteCampaign = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/marketing/campaigns/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.errors?.[0]?.message || "Failed to delete campaign");
+      toast.success("Campaign deleted");
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete campaign");
+    }
+  }, [triggerRefresh]);
 
   // ─── Social Account Handlers ─────────────────────────────────
-  const handleConnectAccount = useCallback(() => {
+  const handleConnectAccount = useCallback(async () => {
     if (!socialForm.handle.trim()) {
       toast.error("Handle is required");
       return;
     }
-    setSocialAccounts((prev) =>
-      prev.map((a) =>
-        a.platform === socialForm.platform && !a.connected
-          ? {
-              ...a,
-              handle: socialForm.handle,
-              connected: true,
-              lastSynced: new Date().toISOString(),
-              followers: Math.floor(Math.random() * 50000) + 5000,
-              following: Math.floor(Math.random() * 500) + 50,
-              posts: Math.floor(Math.random() * 1000) + 100,
-              engagementRate: parseFloat((Math.random() * 5 + 1).toFixed(1)),
-            }
-          : a
-      )
-    );
+    setLoading(true);
+    try {
+      const res = await fetch("/api/marketing/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: socialForm.platform, handle: socialForm.handle }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.errors?.[0]?.message || "Failed to connect account");
+      toast.success(`${socialForm.platform.charAt(0).toUpperCase() + socialForm.platform.slice(1)} account connected!`);
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to connect account");
+    } finally {
+      setLoading(false);
+    }
     setSocialDialogOpen(false);
     setSocialForm({ platform: "instagram", handle: "" });
-    toast.success(`${socialForm.platform.charAt(0).toUpperCase() + socialForm.platform.slice(1)} account connected!`);
-  }, [socialForm]);
+  }, [socialForm, triggerRefresh]);
 
-  const handleDisconnectAccount = useCallback((id: string) => {
-    setSocialAccounts((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, connected: false, handle: "", followers: 0, following: 0, posts: 0, engagementRate: 0, lastSynced: "" }
-          : a
-      )
-    );
-    toast.success("Account disconnected");
-  }, []);
+  const handleDisconnectAccount = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/marketing/social/${id}/disconnect`, { method: "PUT" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.errors?.[0]?.message || "Failed to disconnect account");
+      toast.success("Account disconnected");
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to disconnect account");
+    }
+  }, [triggerRefresh]);
 
   // ─── Conversion Funnel data ──────────────────────────────────
   const funnelChartData = useMemo(() => {
@@ -599,7 +698,7 @@ export function MarketingModule() {
             variant="outline"
             size="sm"
             className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
-            onClick={() => toast.info("Data refreshed")}
+            onClick={() => { triggerRefresh(); toast.info("Data refreshed"); }}
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Refresh
@@ -1060,7 +1159,7 @@ export function MarketingModule() {
                               variant="outline"
                               size="sm"
                               className="flex-1 border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                              onClick={() => toast.info("Opening " + account.platform + " profile...")}
+                              onClick={() => window.open(getPlatformUrl(account.platform, account.handle), "_blank")}
                             >
                               <ExternalLink className="mr-1.5 h-3 w-3" />
                               View Profile
@@ -1260,7 +1359,7 @@ export function MarketingModule() {
                     variant="outline"
                     size="sm"
                     className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                    onClick={() => toast.success("CSV export started")}
+                    onClick={() => exportToCSV(campaigns.map(c => ({ Name: c.name, Type: c.type, Platform: c.platform, Status: c.status, Budget: c.budget, Spent: c.spent, Impressions: c.impressions, Clicks: c.clicks, Conversions: c.conversions, ROAS: c.roas })), "campaign-roi-report")}
                   >
                     <Download className="mr-1.5 h-3 w-3" />
                     CSV
@@ -1269,7 +1368,7 @@ export function MarketingModule() {
                     variant="outline"
                     size="sm"
                     className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                    onClick={() => toast.info("PDF export coming soon")}
+                    onClick={() => exportToCSV(campaigns.map(c => ({ Name: c.name, Type: c.type, Platform: c.platform, Status: c.status, Budget: c.budget, Spent: c.spent, Impressions: c.impressions, Clicks: c.clicks, Conversions: c.conversions, ROAS: c.roas })), "campaign-roi-report")}
                   >
                     <FileText className="mr-1.5 h-3 w-3" />
                     PDF
@@ -1294,7 +1393,7 @@ export function MarketingModule() {
                     variant="outline"
                     size="sm"
                     className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                    onClick={() => toast.success("CSV export started")}
+                    onClick={() => exportToCSV(socialAccounts.map(a => ({ Platform: a.platform, Handle: a.handle, Followers: a.followers, Following: a.following, Posts: a.posts, EngagementRate: a.engagementRate, Connected: a.connected })), "social-growth-report")}
                   >
                     <Download className="mr-1.5 h-3 w-3" />
                     CSV
@@ -1303,7 +1402,7 @@ export function MarketingModule() {
                     variant="outline"
                     size="sm"
                     className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                    onClick={() => toast.info("PDF export coming soon")}
+                    onClick={() => exportToCSV(socialAccounts.map(a => ({ Platform: a.platform, Handle: a.handle, Followers: a.followers, Following: a.following, Posts: a.posts, EngagementRate: a.engagementRate, Connected: a.connected })), "social-growth-report")}
                   >
                     <FileText className="mr-1.5 h-3 w-3" />
                     PDF
@@ -1328,7 +1427,7 @@ export function MarketingModule() {
                     variant="outline"
                     size="sm"
                     className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                    onClick={() => toast.success("CSV export started")}
+                    onClick={() => exportToCSV(MOCK_CHANNEL_PERF.map(c => ({ Platform: c.platform, Reach: c.reach, Engagement: c.engagement, Conversions: c.conversions })), "lead-attribution-report")}
                   >
                     <Download className="mr-1.5 h-3 w-3" />
                     CSV
@@ -1337,7 +1436,7 @@ export function MarketingModule() {
                     variant="outline"
                     size="sm"
                     className="border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white text-xs"
-                    onClick={() => toast.info("PDF export coming soon")}
+                    onClick={() => exportToCSV(MOCK_CHANNEL_PERF.map(c => ({ Platform: c.platform, Reach: c.reach, Engagement: c.engagement, Conversions: c.conversions })), "lead-attribution-report")}
                   >
                     <FileText className="mr-1.5 h-3 w-3" />
                     PDF
@@ -1400,7 +1499,7 @@ export function MarketingModule() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-[#6E7681] hover:text-[#F5A623] hover:bg-[#F5A623]/10"
-                                onClick={() => toast.success("Downloading " + report.name)}
+                                onClick={() => exportToCSV(campaigns.map(c => ({ Name: c.name, Type: c.type, Platform: c.platform, Status: c.status, Budget: c.budget, Spent: c.spent, Impressions: c.impressions, Clicks: c.clicks, Conversions: c.conversions, ROAS: c.roas })), report.name.replace(/\s+/g, "-").toLowerCase())}
                               >
                                 <Download className="h-3.5 w-3.5" />
                               </Button>
@@ -1408,7 +1507,7 @@ export function MarketingModule() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-[#6E7681] hover:text-blue-400 hover:bg-blue-500/10"
-                                onClick={() => toast.info("Opening " + report.name)}
+                                onClick={() => { const csvData = campaigns.map(c => ({ Name: c.name, Type: c.type, Platform: c.platform, Status: c.status, Budget: c.budget, Spent: c.spent, Impressions: c.impressions, Clicks: c.clicks, Conversions: c.conversions, ROAS: c.roas })); const headers = Object.keys(csvData[0] || {}); const csvRows = [headers.join(","), ...csvData.map((row) => headers.map((h) => { const val = row[h as keyof typeof row]; const str = val === null || val === undefined ? "" : String(val); return `"${str.replace(/"/g, '""')}"`; }).join(","))]; const blob = new Blob([csvRows.join("\n")], { type: "text/csv" }); const url = URL.createObjectURL(blob); window.open(url, "_blank"); }}
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </Button>
@@ -1542,7 +1641,7 @@ export function MarketingModule() {
               onClick={handleSaveCampaign}
               className="bg-[#F5A623] text-[#0D1117] hover:bg-[#E09510] font-semibold"
             >
-              {editingCampaign ? "Update Campaign" : "Create Campaign"}
+              {loading ? "Saving..." : editingCampaign ? "Update Campaign" : "Create Campaign"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1608,7 +1707,7 @@ export function MarketingModule() {
               className="bg-[#F5A623] text-[#0D1117] hover:bg-[#E09510] font-semibold"
             >
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-              Connect Account
+              {loading ? "Connecting..." : "Connect Account"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,7 +1,7 @@
 // ARIA HMS — Automation Center Module (Workflows, Templates, Approval Flows, Communication)
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { KpiCard, fmtDate, fmtDateTime } from "../shared";
@@ -11,6 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   Zap, Workflow, Mail, MessageSquare, Smartphone, CheckCircle2,
   Clock, Play, Pause, Plus, ArrowRight, Settings, Shield,
@@ -20,7 +30,7 @@ import {
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────
 
-const MOCK_WORKFLOWS = [
+const INITIAL_WORKFLOWS = [
   { id: "WF-001", name: "Guest Check-in Automation", trigger: "Reservation checked in", actions: 4, status: "active", lastRun: "2025-01-15T10:30:00", runs: 156 },
   { id: "WF-002", name: "Pre-Arrival Email", trigger: "1 day before arrival", actions: 2, status: "active", lastRun: "2025-01-15T08:00:00", runs: 210 },
   { id: "WF-003", name: "Post-Checkout Survey", trigger: "Guest checks out", actions: 3, status: "active", lastRun: "2025-01-14T14:20:00", runs: 189 },
@@ -40,7 +50,7 @@ const MOCK_TEMPLATES = [
   { id: "TPL-08", name: "Birthday Greeting", category: "CRM", actions: 2, popular: false },
 ];
 
-const MOCK_APPROVALS = [
+const INITIAL_APPROVALS = [
   { id: "APR-001", title: "Corporate rate approval - TCS Ltd", requestedBy: "Karan Rao", type: "Rate", amount: 3500, status: "pending", date: "2025-01-15" },
   { id: "APR-002", title: "Vendor payment - Linen Solutions", requestedBy: "Priya Sharma", type: "Payment", amount: 150000, status: "pending", date: "2025-01-14" },
   { id: "APR-003", title: "Event discount - Wedding reception", requestedBy: "Suresh Menon", type: "Discount", amount: 25000, status: "approved", date: "2025-01-13" },
@@ -54,7 +64,7 @@ const MOCK_COMM_STATUS = [
   { channel: "SMS", icon: Smartphone, active: true, sentToday: 12, pending: 0, provider: "MSG91" },
 ];
 
-const MOCK_TASK_AUTOMATIONS = [
+const INITIAL_TASK_AUTOMATIONS = [
   { id: "TA-01", rule: "Auto-assign housekeeping on check-out", trigger: "Check-out event", enabled: true },
   { id: "TA-02", rule: "Create maintenance ticket for room issues", trigger: "Guest complaint", enabled: true },
   { id: "TA-03", rule: "Send invoice 2 hours after check-out", trigger: "Check-out event", enabled: true },
@@ -73,12 +83,205 @@ const APPROVAL_STATUS_META: Record<string, { label: string; cls: string }> = {
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────
 
 export function AutomationModule() {
-  const { refreshTick } = useAppStore();
+  const { refreshTick, triggerRefresh } = useAppStore();
   const [activeTab, setActiveTab] = useState("workflows");
+  const [workflows, setWorkflows] = useState(INITIAL_WORKFLOWS);
+  const [approvals, setApprovals] = useState(INITIAL_APPROVALS);
+  const [taskAutomations, setTaskAutomations] = useState(INITIAL_TASK_AUTOMATIONS);
+  const [loading, setLoading] = useState<string | null>(null);
 
-  const activeWorkflows = MOCK_WORKFLOWS.filter((w) => w.status === "active").length;
-  const totalRuns = MOCK_WORKFLOWS.reduce((s, w) => s + w.runs, 0);
-  const pendingApprovals = MOCK_APPROVALS.filter((a) => a.status === "pending").length;
+  // Dialog states
+  const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
+  const [showWorkflowSettings, setShowWorkflowSettings] = useState<string | null>(null);
+  const [showSendMessage, setShowSendMessage] = useState<string | null>(null);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
+
+  // Form states
+  const [wfName, setWfName] = useState("");
+  const [wfTrigger, setWfTrigger] = useState("");
+  const [wfActions, setWfActions] = useState("");
+  const [msgChannel, setMsgChannel] = useState("");
+  const [msgTo, setMsgTo] = useState("");
+  const [msgBody, setMsgBody] = useState("");
+  const [ruleName, setRuleName] = useState("");
+  const [ruleTrigger, setRuleTrigger] = useState("");
+
+  const activeWorkflows = workflows.filter((w) => w.status === "active").length;
+  const totalRuns = workflows.reduce((s, w) => s + w.runs, 0);
+  const pendingApprovals = approvals.filter((a) => a.status === "pending").length;
+
+  // ─── Handlers ────────────────────────────────────────────────────
+
+  const handleCreateWorkflow = useCallback(async () => {
+    if (!wfName.trim()) { toast.error("Workflow name is required"); return; }
+    setLoading("create-wf");
+    try {
+      const res = await fetch("/api/automation/workflows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: wfName, trigger: wfTrigger, actions: wfActions ? parseInt(wfActions) : 1 }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const newWf = {
+          id: `WF-${String(workflows.length + 1).padStart(3, "0")}`,
+          name: wfName,
+          trigger: wfTrigger || "Manual trigger",
+          actions: wfActions ? parseInt(wfActions) : 1,
+          status: "paused" as const,
+          lastRun: new Date().toISOString(),
+          runs: 0,
+        };
+        setWorkflows((prev) => [...prev, newWf]);
+        toast.success(`Workflow "${wfName}" created`);
+        setShowWorkflowDialog(false);
+        setWfName(""); setWfTrigger(""); setWfActions("");
+        triggerRefresh();
+      } else {
+        toast.error(json.errors?.[0]?.message || "Failed to create workflow");
+      }
+    } catch {
+      toast.error("Network error creating workflow");
+    } finally {
+      setLoading(null);
+    }
+  }, [wfName, wfTrigger, wfActions, workflows.length, triggerRefresh]);
+
+  const handleToggleWorkflow = useCallback(async (wfId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "paused" : "active";
+    setLoading(wfId);
+    try {
+      const res = await fetch(`/api/automation/workflows/${wfId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setWorkflows((prev) => prev.map((w) => w.id === wfId ? { ...w, status: newStatus } : w));
+        toast.success(`Workflow ${newStatus === "active" ? "activated" : "paused"}`);
+        triggerRefresh();
+      } else {
+        toast.error(json.errors?.[0]?.message || "Failed to update workflow");
+      }
+    } catch {
+      toast.error("Network error updating workflow");
+    } finally {
+      setLoading(null);
+    }
+  }, [triggerRefresh]);
+
+  const handleUseTemplate = useCallback(async (tplId: string, tplName: string) => {
+    setLoading(`tpl-${tplId}`);
+    try {
+      const res = await fetch(`/api/automation/workflows/from-template/${tplId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json();
+      if (json.success) {
+        const tpl = MOCK_TEMPLATES.find((t) => t.id === tplId);
+        const newWf = {
+          id: `WF-${String(workflows.length + 1).padStart(3, "0")}`,
+          name: `${tplName} (Copy)`,
+          trigger: "From template",
+          actions: tpl?.actions ?? 2,
+          status: "paused" as const,
+          lastRun: new Date().toISOString(),
+          runs: 0,
+        };
+        setWorkflows((prev) => [...prev, newWf]);
+        toast.success(`Workflow created from template "${tplName}"`);
+        triggerRefresh();
+      } else {
+        toast.error(json.errors?.[0]?.message || "Failed to use template");
+      }
+    } catch {
+      toast.error("Network error using template");
+    } finally {
+      setLoading(null);
+    }
+  }, [workflows.length, triggerRefresh]);
+
+  const handleApproval = useCallback(async (aprId: string, action: "approve" | "reject") => {
+    setLoading(`apr-${aprId}`);
+    try {
+      const res = await fetch(`/api/automation/approvals/${aprId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApprovals((prev) => prev.map((a) => a.id === aprId ? { ...a, status: action === "approve" ? "approved" : "rejected" } : a));
+        toast.success(`Request ${action === "approve" ? "approved" : "rejected"}`);
+        triggerRefresh();
+      } else {
+        toast.error(json.errors?.[0]?.message || `Failed to ${action} request`);
+      }
+    } catch {
+      toast.error("Network error processing approval");
+    } finally {
+      setLoading(null);
+    }
+  }, [triggerRefresh]);
+
+  const handleSendMessage = useCallback(async () => {
+    if (!msgTo.trim() || !msgBody.trim()) { toast.error("Recipient and message are required"); return; }
+    setLoading("send-msg");
+    try {
+      const res = await fetch("/api/automation/communications/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: msgChannel, to: msgTo, message: msgBody }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Message sent via ${msgChannel || "Email"}`);
+        setShowSendMessage(null);
+        setMsgTo(""); setMsgBody(""); setMsgChannel("");
+        triggerRefresh();
+      } else {
+        toast.error(json.errors?.[0]?.message || "Failed to send message");
+      }
+    } catch {
+      toast.error("Network error sending message");
+    } finally {
+      setLoading(null);
+    }
+  }, [msgChannel, msgTo, msgBody, triggerRefresh]);
+
+  const handleAddRule = useCallback(async () => {
+    if (!ruleName.trim()) { toast.error("Rule name is required"); return; }
+    setLoading("add-rule");
+    try {
+      const res = await fetch("/api/automation/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rule: ruleName, trigger: ruleTrigger || "Manual", enabled: true }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const newRule = {
+          id: `TA-${String(taskAutomations.length + 1).padStart(2, "0")}`,
+          rule: ruleName,
+          trigger: ruleTrigger || "Manual",
+          enabled: true,
+        };
+        setTaskAutomations((prev) => [...prev, newRule]);
+        toast.success(`Rule "${ruleName}" created`);
+        setShowRuleDialog(false);
+        setRuleName(""); setRuleTrigger("");
+        triggerRefresh();
+      } else {
+        toast.error(json.errors?.[0]?.message || "Failed to add rule");
+      }
+    } catch {
+      toast.error("Network error adding rule");
+    } finally {
+      setLoading(null);
+    }
+  }, [ruleName, ruleTrigger, taskAutomations.length, triggerRefresh]);
 
   return (
     <div className="space-y-4">
@@ -90,13 +293,15 @@ export function AutomationModule() {
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">Workflow automation, approval flows & communication triggers</p>
         </div>
-        <Button className="bg-navy hover:bg-navy-light text-white h-9"><Plus className="h-4 w-4 mr-1" /> Create Workflow</Button>
+        <Button className="bg-navy hover:bg-navy-light text-white h-9" onClick={() => setShowWorkflowDialog(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Create Workflow
+        </Button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Active Workflows" value={activeWorkflows} icon={Workflow} accent="navy" />
-        <KpiCard label="Total Automations" value={MOCK_WORKFLOWS.length} icon={Zap} accent="gold" />
+        <KpiCard label="Total Automations" value={workflows.length} icon={Zap} accent="gold" />
         <KpiCard label="Total Runs" value={totalRuns} icon={Play} accent="success" delta={15} deltaLabel="this week" />
         <KpiCard label="Pending Approvals" value={pendingApprovals} icon={Clock} accent="warning" />
       </div>
@@ -114,7 +319,7 @@ export function AutomationModule() {
         {/* ── Workflows Tab ── */}
         <TabsContent value="workflows" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {MOCK_WORKFLOWS.map((wf) => (
+            {workflows.map((wf) => (
               <Card key={wf.id} className="hover:shadow-card-lg transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -140,8 +345,14 @@ export function AutomationModule() {
                       <span className="flex items-center gap-0.5"><RefreshCw className="h-3 w-3" />{wf.runs} runs</span>
                       <span className="flex items-center gap-0.5"><Timer className="h-3 w-3" />Last: {fmtDateTime(wf.lastRun)}</span>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      {wf.status === "active" ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      disabled={loading === wf.id}
+                      onClick={() => handleToggleWorkflow(wf.id, wf.status)}
+                    >
+                      {loading === wf.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : wf.status === "active" ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                     </Button>
                   </div>
                 </CardContent>
@@ -164,8 +375,14 @@ export function AutomationModule() {
                   </div>
                   <p className="text-xs font-semibold mb-1">{tpl.name}</p>
                   <p className="text-[10px] text-muted-foreground mb-3">{tpl.category} · {tpl.actions} actions</p>
-                  <Button variant="outline" size="sm" className="w-full h-7 text-[10px]">
-                    <Plus className="h-3 w-3 mr-1" /> Use Template
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-7 text-[10px]"
+                    disabled={loading === `tpl-${tpl.id}`}
+                    onClick={() => handleUseTemplate(tpl.id, tpl.name)}
+                  >
+                    {loading === `tpl-${tpl.id}` ? <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} Use Template
                   </Button>
                 </CardContent>
               </Card>
@@ -196,7 +413,7 @@ export function AutomationModule() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {MOCK_APPROVALS.map((apr) => {
+                  {approvals.map((apr) => {
                     const st = APPROVAL_STATUS_META[apr.status] ?? APPROVAL_STATUS_META.pending;
                     return (
                       <TableRow key={apr.id} className="hover:bg-muted/50">
@@ -210,11 +427,34 @@ export function AutomationModule() {
                         <TableCell>
                           {apr.status === "pending" ? (
                             <div className="flex items-center gap-1">
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 text-[#16A34A]"><CheckCircle2 className="h-3 w-3 mr-1" />Approve</Button>
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 text-[#DC2626]"><span>✕</span></Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-[10px] px-2 text-[#16A34A]"
+                                disabled={loading === `apr-${apr.id}`}
+                                onClick={() => handleApproval(apr.id, "approve")}
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1" />Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-[10px] px-2 text-[#DC2626]"
+                                disabled={loading === `apr-${apr.id}`}
+                                onClick={() => handleApproval(apr.id, "reject")}
+                              >
+                                <span>✕</span>
+                              </Button>
                             </div>
                           ) : (
-                            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2"><Settings className="h-3 w-3" /></Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] px-2"
+                              onClick={() => setShowWorkflowSettings(apr.id)}
+                            >
+                              <Settings className="h-3 w-3" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -256,7 +496,14 @@ export function AutomationModule() {
                         <p className="text-lg font-bold font-display">{comm.pending}</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full h-7 text-[10px] mt-3"><Send className="h-3 w-3 mr-1" /> Send Message</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-7 text-[10px] mt-3"
+                      onClick={() => { setShowSendMessage(comm.channel); setMsgChannel(comm.channel); }}
+                    >
+                      <Send className="h-3 w-3 mr-1" /> Send Message
+                    </Button>
                   </CardContent>
                 </Card>
               );
@@ -272,11 +519,13 @@ export function AutomationModule() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Bot className="h-4 w-4 text-navy" /> Task Automation Rules
                 </CardTitle>
-                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs"><Plus className="h-3 w-3 mr-1" /> Add Rule</Button>
+                <Button size="sm" className="bg-navy hover:bg-navy-light text-white h-7 text-xs" onClick={() => setShowRuleDialog(true)}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Rule
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              {MOCK_TASK_AUTOMATIONS.map((ta) => (
+              {taskAutomations.map((ta) => (
                 <div key={ta.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50">
                   <div className="flex items-center gap-3">
                     <div className={cn("h-8 w-8 flex items-center justify-center rounded-lg", ta.enabled ? "bg-[#16A34A]/10" : "bg-muted")}>
@@ -294,6 +543,154 @@ export function AutomationModule() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Create Workflow Dialog ── */}
+      <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Workflow</DialogTitle>
+            <DialogDescription>Build a new automation workflow for your property.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Workflow Name</Label>
+              <Input placeholder="e.g. Guest Welcome Flow" value={wfName} onChange={(e) => setWfName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Trigger Event</Label>
+              <Select value={wfTrigger} onValueChange={setWfTrigger}>
+                <SelectTrigger><SelectValue placeholder="Select trigger" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="reservation_checked_in">Reservation checked in</SelectItem>
+                  <SelectItem value="reservation_created">Reservation created</SelectItem>
+                  <SelectItem value="guest_checkout">Guest checks out</SelectItem>
+                  <SelectItem value="daily_schedule">Daily schedule</SelectItem>
+                  <SelectItem value="stock_low">Stock below reorder level</SelectItem>
+                  <SelectItem value="manual">Manual trigger</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Number of Actions</Label>
+              <Input type="number" min={1} max={10} placeholder="1" value={wfActions} onChange={(e) => setWfActions(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWorkflowDialog(false)}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" disabled={loading === "create-wf"} onClick={handleCreateWorkflow}>
+              {loading === "create-wf" ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />} Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Workflow Settings Dialog ── */}
+      <Dialog open={!!showWorkflowSettings} onOpenChange={() => setShowWorkflowSettings(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Workflow Settings</DialogTitle>
+            <DialogDescription>Configure settings for this workflow/approval item.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Notification Recipients</Label>
+              <Input placeholder="Email addresses (comma separated)" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Auto-escalation timeout</Label>
+              <Select defaultValue="1h">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30m">30 minutes</SelectItem>
+                  <SelectItem value="1h">1 hour</SelectItem>
+                  <SelectItem value="4h">4 hours</SelectItem>
+                  <SelectItem value="24h">24 hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Enable logging</Label>
+              <Switch defaultChecked />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWorkflowSettings(null)}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={() => { toast.success("Settings saved"); setShowWorkflowSettings(null); }}>Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Send Message Dialog ── */}
+      <Dialog open={!!showSendMessage} onOpenChange={() => { setShowSendMessage(null); setMsgTo(""); setMsgBody(""); setMsgChannel(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+            <DialogDescription>Send a message via {showSendMessage}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Channel</Label>
+              <Select value={msgChannel} onValueChange={setMsgChannel}>
+                <SelectTrigger><SelectValue placeholder="Select channel" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Email">Email</SelectItem>
+                  <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                  <SelectItem value="SMS">SMS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Recipient</Label>
+              <Input placeholder="Email or phone number" value={msgTo} onChange={(e) => setMsgTo(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Message</Label>
+              <Textarea placeholder="Type your message..." rows={4} value={msgBody} onChange={(e) => setMsgBody(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendMessage(null)}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" disabled={loading === "send-msg"} onClick={handleSendMessage}>
+              {loading === "send-msg" ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />} Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Rule Dialog ── */}
+      <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Automation Rule</DialogTitle>
+            <DialogDescription>Create a new task automation rule.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Rule Description</Label>
+              <Input placeholder="e.g. Auto-assign housekeeping on check-out" value={ruleName} onChange={(e) => setRuleName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Trigger</Label>
+              <Select value={ruleTrigger} onValueChange={setRuleTrigger}>
+                <SelectTrigger><SelectValue placeholder="Select trigger" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Check-out event">Check-out event</SelectItem>
+                  <SelectItem value="Guest complaint">Guest complaint</SelectItem>
+                  <SelectItem value="Daily at 6PM">Daily at 6PM</SelectItem>
+                  <SelectItem value="Folio > ₹50,000">Folio exceeds threshold</SelectItem>
+                  <SelectItem value="Manual">Manual trigger</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRuleDialog(false)}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" disabled={loading === "add-rule"} onClick={handleAddRule}>
+              {loading === "add-rule" ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />} Add Rule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

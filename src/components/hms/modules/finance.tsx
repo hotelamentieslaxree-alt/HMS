@@ -5,6 +5,20 @@ import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useApi, apiPost } from "@/lib/api";
+
+// ─── CSV EXPORT UTILITY ────────────────────────────────────────────────
+function exportCSV(filename: string, headers: string[], rows: string[][]) {
+  const csvContent = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 import { KpiCard, fmtINR, fmtDate } from "../shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -346,7 +360,14 @@ export function FinanceModule() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search invoices..." className="pl-8 h-9 w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button variant="outline" size="sm" className="h-9"><Download className="h-3.5 w-3.5 mr-1" /> Export</Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => {
+            try {
+              const headers = ["Invoice #", "Type", "Party", "Party GST", "Amount", "CGST", "SGST", "IGST", "Total", "Status", "Due Date", "Paid", "Created"];
+              const rows = invoices.map((inv) => [inv.invoiceNumber, inv.invoiceType, inv.partyName, inv.partyGst || "", String(inv.amount), String(inv.cgst), String(inv.sgst), String(inv.igst), String(inv.totalAmount), inv.status, inv.dueDate || "", String(inv.paidAmount), inv.createdAt]);
+              exportCSV("invoices.csv", headers, rows);
+              toast.success("Invoices exported as CSV");
+            } catch { toast.error("Export failed"); }
+          }}><Download className="h-3.5 w-3.5 mr-1" /> Export</Button>
           <Button className="bg-navy hover:bg-navy-light text-white h-9" onClick={() => setInvoiceDialogOpen(true)}><Plus className="h-4 w-4 mr-1" /> New Invoice</Button>
         </div>
       </div>
@@ -632,7 +653,14 @@ export function FinanceModule() {
                   <Calculator className="h-4 w-4 text-navy" /> GST Report Summary
                   {gstSummary.length > 0 && <span className="text-muted-foreground font-normal">(computed from invoices)</span>}
                 </CardTitle>
-                <Button variant="outline" size="sm" className="h-7 text-xs"><Download className="h-3 w-3 mr-1" /> Download GSTR</Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                  try {
+                    const headers = ["Category", "Taxable Amount", "CGST", "SGST", "IGST", "Total"];
+                    const rows = gstSummary.map((g) => [g.category, String(g.taxable), String(g.cgst), String(g.sgst), String(g.igst), String(g.total)]);
+                    exportCSV("gstr-report.csv", headers, rows);
+                    toast.success("GST report downloaded");
+                  } catch { toast.error("GSTR download failed"); }
+                }}><Download className="h-3 w-3 mr-1" /> Download GSTR</Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -744,7 +772,19 @@ export function FinanceModule() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <PieChart className="h-4 w-4 text-navy" /> Profit & Loss Statement
                 </CardTitle>
-                <Button variant="outline" size="sm" className="h-7 text-xs"><Download className="h-3 w-3 mr-1" /> Export PDF</Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                  try {
+                    const headers = ["Particulars", "Type", "Amount (₹)"];
+                    const rows = plData.map((p) => [p.category, p.type, String(p.amount)]);
+                    const totalIncome = plData.filter((p) => p.type === "income").reduce((s, p) => s + p.amount, 0);
+                    const totalExpense = plData.filter((p) => p.type === "expense").reduce((s, p) => s + p.amount, 0);
+                    rows.push(["Total Income", "income", String(totalIncome)]);
+                    rows.push(["Total Expenses", "expense", String(totalExpense)]);
+                    rows.push(["NET PROFIT", "net", String(totalIncome - totalExpense)]);
+                    exportCSV("profit-and-loss.csv", headers, rows);
+                    toast.success("P&L exported as CSV");
+                  } catch { toast.error("P&L export failed"); }
+                }}><Download className="h-3 w-3 mr-1" /> Export PDF</Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">

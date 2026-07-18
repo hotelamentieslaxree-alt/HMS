@@ -1,7 +1,7 @@
 // Reports module
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { BarChart3, FileText, TrendingUp, Percent, Receipt, Users, Download, Ale
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 import { fmtINR } from "../shared";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const REPORTS = [
   { key: "daily_revenue", label: "Daily Revenue Summary", icon: BarChart3, desc: "Room, F&B, minibar, laundry breakdown by day" },
@@ -64,6 +65,121 @@ const FALLBACK_REPORTS: Record<string, any> = {
   ],
 };
 
+// ─── CSV Export Utility ──────────────────────────────────────────
+
+function escapeCsvField(value: any): string {
+  const str = String(value ?? "");
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function objectsToCsv(headers: string[], rows: Record<string, any>[]): string {
+  const headerLine = headers.map(escapeCsvField).join(",");
+  const dataLines = rows.map((row) =>
+    headers.map((h) => escapeCsvField(row[h])).join(",")
+  );
+  return [headerLine, ...dataLines].join("\n");
+}
+
+function downloadCsv(filename: string, csvContent: string) {
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─── Report-specific CSV exporters ──────────────────────────────
+
+function exportDailyRevenueCsv(data: any[]) {
+  const headers = ["day", "room", "fb", "minibar", "laundry", "other", "tax", "total"];
+  const csv = objectsToCsv(headers, data);
+  downloadCsv("daily_revenue_report.csv", csv);
+}
+
+function exportOccupancyCsv(data: any[]) {
+  const headers = ["day", "occupancyRate"];
+  const csv = objectsToCsv(headers, data);
+  downloadCsv("occupancy_report.csv", csv);
+}
+
+function exportChannelCsv(data: any[]) {
+  const headers = ["source", "reservations", "roomNights", "grossRevenue", "commission", "netRevenue", "cancellations"];
+  const csv = objectsToCsv(headers, data);
+  downloadCsv("channel_production_report.csv", csv);
+}
+
+function exportGstCsv(data: any) {
+  const rows = Object.entries(data.byTaxCode || {}).map(([code, v]: [string, any]) => ({
+    taxCode: code,
+    taxable: v.taxable,
+    cgst: v.cgst,
+    sgst: v.sgst,
+    igst: v.igst,
+    totalTax: v.total,
+  }));
+  const headers = ["taxCode", "taxable", "cgst", "sgst", "igst", "totalTax"];
+  const csv = objectsToCsv(headers, rows);
+  downloadCsv("gst_report.csv", csv);
+}
+
+function exportFolioAuditCsv(data: any) {
+  const rows = [
+    { metric: "Day", value: data.day },
+    { metric: "Folio Count", value: data.count },
+    { metric: "Open Folios", value: data.open },
+    { metric: "Closed Folios", value: data.closed },
+    { metric: "Total Charges", value: data.totalCharges },
+    { metric: "Total Tax", value: data.totalTax },
+    { metric: "Total Payments", value: data.totalPayments },
+    { metric: "Voids", value: data.voids },
+  ];
+  const headers = ["metric", "value"];
+  const csv = objectsToCsv(headers, rows);
+  downloadCsv("folio_audit_report.csv", csv);
+}
+
+function exportPaymentMethodsCsv(data: any[]) {
+  const headers = ["method", "total", "count"];
+  const csv = objectsToCsv(headers, data);
+  downloadCsv("payment_methods_report.csv", csv);
+}
+
+function exportReportCsv(reportKey: string, data: any) {
+  switch (reportKey) {
+    case "daily_revenue":
+      exportDailyRevenueCsv(data);
+      break;
+    case "occupancy":
+      exportOccupancyCsv(data);
+      break;
+    case "channel_production":
+      exportChannelCsv(data);
+      break;
+    case "gst":
+      exportGstCsv(data);
+      break;
+    case "folio_audit":
+      exportFolioAuditCsv(data);
+      break;
+    case "payment_methods":
+      exportPaymentMethodsCsv(data);
+      break;
+    default:
+      toast.error("Export not supported for this report type");
+      return;
+  }
+  toast.success("Report exported as CSV");
+}
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────
+
 export function ReportsModule() {
   const [active, setActive] = useState("daily_revenue");
   const { data, loading, error, reload } = useApi<any>(`/api/reports?type=${active}`, [active]);
@@ -82,6 +198,14 @@ export function ReportsModule() {
   })();
 
   const reportData = isUsingFallback ? FALLBACK_REPORTS[active] : data;
+
+  const handleExport = useCallback(() => {
+    if (!reportData) {
+      toast.error("No data to export");
+      return;
+    }
+    exportReportCsv(active, reportData);
+  }, [active, reportData]);
 
   return (
     <div className="space-y-4">
@@ -125,23 +249,23 @@ export function ReportsModule() {
       {loading ? (
         <Skeleton className="h-96" />
       ) : active === "daily_revenue" ? (
-        <DailyRevenueReport data={reportData} />
+        <DailyRevenueReport data={reportData} onExport={handleExport} />
       ) : active === "occupancy" ? (
-        <OccupancyReport data={reportData} />
+        <OccupancyReport data={reportData} onExport={handleExport} />
       ) : active === "channel_production" ? (
-        <ChannelReport data={reportData} />
+        <ChannelReport data={reportData} onExport={handleExport} />
       ) : active === "gst" ? (
-        <GstReport data={reportData} />
+        <GstReport data={reportData} onExport={handleExport} />
       ) : active === "folio_audit" ? (
-        <FolioAuditReport data={reportData} />
+        <FolioAuditReport data={reportData} onExport={handleExport} />
       ) : (
-        <PaymentMethodsReport data={reportData} />
+        <PaymentMethodsReport data={reportData} onExport={handleExport} />
       )}
     </div>
   );
 }
 
-function ReportCard({ title, subtitle, action }: any) {
+function ReportCard({ title, subtitle, action, onExport }: any) {
   return (
     <Card>
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
@@ -149,7 +273,7 @@ function ReportCard({ title, subtitle, action }: any) {
           <CardTitle className="text-base font-display">{title}</CardTitle>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        {action && <Button size="sm" variant="outline" className="h-7 text-xs"><Download className="h-3 w-3 mr-1" /> Export</Button>}
+        {action && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>}
       </CardHeader>
     </Card>
   );
@@ -167,7 +291,7 @@ function NoDataState({ label }: { label: string }) {
   );
 }
 
-function DailyRevenueReport({ data }: any) {
+function DailyRevenueReport({ data, onExport }: any) {
   if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Daily revenue" />;
   const total = data.reduce((s: number, d: any) => s + d.total, 0);
   const last = data[data.length - 1];
@@ -178,7 +302,7 @@ function DailyRevenueReport({ data }: any) {
           <CardTitle className="text-base font-display">Daily Revenue Summary</CardTitle>
           <p className="text-xs text-muted-foreground">Last {data.length} days · Total {fmtINR(total)}</p>
         </div>
-        <Button size="sm" variant="outline" className="h-7 text-xs"><Download className="h-3 w-3 mr-1" /> Export</Button>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={320}>
@@ -230,7 +354,7 @@ function DailyRevenueReport({ data }: any) {
   );
 }
 
-function OccupancyReport({ data }: any) {
+function OccupancyReport({ data, onExport }: any) {
   if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Occupancy" />;
   const avg = data.length ? (data.reduce((s: number, d: any) => s + d.occupancyRate, 0) / data.length).toFixed(1) : 0;
   return (
@@ -240,6 +364,7 @@ function OccupancyReport({ data }: any) {
           <CardTitle className="text-base font-display">Occupancy Trend</CardTitle>
           <p className="text-xs text-muted-foreground">{data.length} days · Average {avg}%</p>
         </div>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={320}>
@@ -262,11 +387,14 @@ function OccupancyReport({ data }: any) {
   );
 }
 
-function ChannelReport({ data }: any) {
+function ChannelReport({ data, onExport }: any) {
   if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Channel production" />;
   return (
     <Card>
-      <CardHeader className="pb-2"><CardTitle className="text-base font-display">Channel Production</CardTitle></CardHeader>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-display">Channel Production</CardTitle>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>
+      </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data} layout="vertical" margin={{ top: 8, right: 8, left: 60, bottom: 0 }}>
@@ -310,12 +438,13 @@ function ChannelReport({ data }: any) {
   );
 }
 
-function GstReport({ data }: any) {
+function GstReport({ data, onExport }: any) {
   if (!data || !data.period) return <NoDataState label="GST tax" />;
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-base font-display">GST Tax Report · {data.period.from} → {data.period.to}</CardTitle>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 mb-4">
@@ -363,11 +492,14 @@ function GstReport({ data }: any) {
   );
 }
 
-function FolioAuditReport({ data }: any) {
+function FolioAuditReport({ data, onExport }: any) {
   if (!data || !data.day) return <NoDataState label="Folio audit" />;
   return (
     <Card>
-      <CardHeader className="pb-2"><CardTitle className="text-base font-display">Folio Audit · {data.day}</CardTitle></CardHeader>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-display">Folio Audit · {data.day}</CardTitle>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>
+      </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Box label="Folios" value={data.count} />
@@ -385,12 +517,15 @@ function FolioAuditReport({ data }: any) {
   );
 }
 
-function PaymentMethodsReport({ data }: any) {
+function PaymentMethodsReport({ data, onExport }: any) {
   if (!Array.isArray(data) || data.length === 0) return <NoDataState label="Payment methods" />;
   const total = data.reduce((s: number, d: any) => s + d.total, 0);
   return (
     <Card>
-      <CardHeader className="pb-2"><CardTitle className="text-base font-display">Payment Methods · Total {fmtINR(total)}</CardTitle></CardHeader>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-display">Payment Methods · Total {fmtINR(total)}</CardTitle>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onExport}><Download className="h-3 w-3 mr-1" /> Export</Button>
+      </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {data.map((p: any) => (

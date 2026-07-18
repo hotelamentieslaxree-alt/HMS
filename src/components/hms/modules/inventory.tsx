@@ -439,7 +439,17 @@ export function InventoryModule() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search items..." className="pl-8 h-9 w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button variant="outline" size="sm" className="h-9"><Download className="h-3.5 w-3.5 mr-1" /> Export</Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => {
+            const items = displayStock;
+            const csv = ["Name,Category,SKU,Quantity,Unit,ReorderLevel,UnitPrice,Status",
+              ...items.map(i => `"${i.name}","${i.category}","${i.sku ?? ""}",${i.quantity ?? 0},"${i.unit ?? ""}",${i.reorderLevel ?? 0},${i.unitPrice ?? 0},"${i.status ?? ""}"`)
+            ].join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = "inventory.csv"; a.click();
+            URL.revokeObjectURL(url);
+            toast.success("Inventory exported as CSV");
+          }}><Download className="h-3.5 w-3.5 mr-1" /> Export</Button>
           <Button className="bg-navy hover:bg-navy-light text-white h-9" onClick={() => setAddItemOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>

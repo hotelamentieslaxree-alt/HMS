@@ -1,13 +1,25 @@
 // ARIA HMS — Kitchen Display Module (KOT orders, timer, completion, analytics)
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { KpiCard, fmtINR, fmtDate } from "../shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useApi, apiPost, apiPut } from "@/lib/api";
+import { KpiCard, fmtINR } from "../shared";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   ChefHat, Clock, CheckCircle2, AlertTriangle, Flame,
   Timer, Plus, Bell,
@@ -30,9 +42,9 @@ interface KitchenOrder {
   elapsed: number; // minutes
 }
 
-// ─── MOCK DATA ──────────────────────────────────────────────────────
+// ─── FALLBACK DATA ──────────────────────────────────────────────────
 
-const MOCK_ORDERS: KitchenOrder[] = [
+const FALLBACK_ORDERS: KitchenOrder[] = [
   {
     id: "KO-001", kotNumber: "KOT-1015", table: "T-05",
     items: [
@@ -40,7 +52,7 @@ const MOCK_ORDERS: KitchenOrder[] = [
       { name: "Naan Basket", qty: 2 },
       { name: "Dal Makhani", qty: 1 },
     ],
-    orderTime: "2025-01-15T12:15:00", status: "new", priority: "normal",
+    orderTime: new Date(Date.now() - 3 * 60000).toISOString(), status: "new", priority: "normal",
     orderType: "dine-in", elapsed: 3,
   },
   {
@@ -50,7 +62,7 @@ const MOCK_ORDERS: KitchenOrder[] = [
       { name: "French Fries", qty: 1 },
       { name: "Coffee", qty: 2 },
     ],
-    orderTime: "2025-01-15T12:05:00", status: "preparing", priority: "normal",
+    orderTime: new Date(Date.now() - 13 * 60000).toISOString(), status: "preparing", priority: "normal",
     orderType: "room-service", elapsed: 13,
   },
   {
@@ -60,7 +72,7 @@ const MOCK_ORDERS: KitchenOrder[] = [
       { name: "Tandoori Roti", qty: 4 },
       { name: "Veg Biryani", qty: 2, special: "Extra raita" },
     ],
-    orderTime: "2025-01-15T11:55:00", status: "preparing", priority: "normal",
+    orderTime: new Date(Date.now() - 23 * 60000).toISOString(), status: "preparing", priority: "normal",
     orderType: "dine-in", elapsed: 23,
   },
   {
@@ -70,7 +82,7 @@ const MOCK_ORDERS: KitchenOrder[] = [
       { name: "Mashed Potatoes", qty: 1 },
       { name: "Caesar Salad", qty: 1 },
     ],
-    orderTime: "2025-01-15T11:45:00", status: "preparing", priority: "urgent",
+    orderTime: new Date(Date.now() - 33 * 60000).toISOString(), status: "preparing", priority: "urgent",
     orderType: "dine-in", elapsed: 33,
   },
   {
@@ -79,7 +91,7 @@ const MOCK_ORDERS: KitchenOrder[] = [
       { name: "Masala Dosa", qty: 2 },
       { name: "Filter Coffee", qty: 2 },
     ],
-    orderTime: "2025-01-15T11:40:00", status: "ready", priority: "normal",
+    orderTime: new Date(Date.now() - 38 * 60000).toISOString(), status: "ready", priority: "normal",
     orderType: "dine-in", elapsed: 38,
   },
   {
@@ -89,29 +101,61 @@ const MOCK_ORDERS: KitchenOrder[] = [
       { name: "Garlic Bread", qty: 1 },
       { name: "Lemonade", qty: 1 },
     ],
-    orderTime: "2025-01-15T11:35:00", status: "ready", priority: "normal",
+    orderTime: new Date(Date.now() - 43 * 60000).toISOString(), status: "ready", priority: "normal",
     orderType: "room-service", elapsed: 43,
   },
-  {
-    id: "KO-007", kotNumber: "KOT-1016", table: "T-15",
-    items: [
-      { name: "Chicken Biryani", qty: 2 },
-      { name: "Raita", qty: 2 },
-      { name: "Gulab Jamun", qty: 2 },
-    ],
-    orderTime: "2025-01-15T12:20:00", status: "new", priority: "urgent",
-    orderType: "dine-in", elapsed: 0,
-  },
-  {
-    id: "KO-008", kotNumber: "KOT-1009", table: "Takeaway",
-    items: [
-      { name: "Chilli Paneer", qty: 1 },
-      { name: "Fried Rice", qty: 1 },
-    ],
-    orderTime: "2025-01-15T11:30:00", status: "ready", priority: "normal",
-    orderType: "takeaway", elapsed: 48,
-  },
 ];
+
+// ─── API STATUS ↔ KITCHEN STATUS MAPPING ────────────────────────────
+
+const API_TO_KITCHEN: Record<string, OrderStatus | null> = {
+  sent_to_kitchen: "new",
+  in_preparation: "preparing",
+  ready: "ready",
+  // served, billed, paid, void, draft → not shown in kitchen
+};
+
+// What API status to send for each kitchen button action
+const KITCHEN_ACTION_TO_API: Record<string, string> = {
+  start_preparing: "in_preparation",
+  mark_ready: "ready",
+  picked_up: "served",
+};
+
+function mapApiOrderToKitchen(apiOrder: any): KitchenOrder | null {
+  const kitchenStatus = API_TO_KITCHEN[apiOrder.status];
+  if (!kitchenStatus) return null;
+
+  const elapsed = Math.max(0, Math.round((Date.now() - new Date(apiOrder.createdAt).getTime()) / 60000));
+
+  const tableLabel = apiOrder.table
+    ? `T-${apiOrder.table.number}`
+    : apiOrder.orderType === "room_service"
+      ? "Room Service"
+      : "Takeaway";
+
+  const orderTypeMap: Record<string, "dine-in" | "room-service" | "takeaway"> = {
+    dine_in: "dine-in",
+    room_service: "room-service",
+    takeaway: "takeaway",
+  };
+
+  return {
+    id: apiOrder.id,
+    kotNumber: apiOrder.kotNumber ? `KOT-${apiOrder.kotNumber}` : "—",
+    items: (apiOrder.lines || []).map((l: any) => ({
+      name: l.name,
+      qty: l.quantity,
+      special: l.specialInstructions || undefined,
+    })),
+    table: tableLabel,
+    orderTime: apiOrder.createdAt,
+    status: kitchenStatus,
+    priority: elapsed > 25 ? "urgent" : "normal",
+    orderType: orderTypeMap[apiOrder.orderType] || "dine-in",
+    elapsed,
+  };
+}
 
 // ─── STATUS META ─────────────────────────────────────────────────────
 
@@ -130,8 +174,45 @@ const ORDER_TYPE_ICON: Record<string, { icon: any; color: string }> = {
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────
 
 export function KitchenModule() {
-  const { refreshTick } = useAppStore();
+  const { refreshTick, triggerRefresh } = useAppStore();
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [orders, setOrders] = useState<KitchenOrder[]>(FALLBACK_ORDERS);
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+
+  // New KOT dialog state
+  const [newKotOpen, setNewKotOpen] = useState(false);
+
+  // Fetch orders from API
+  const { data: apiOrders, loading, reload } = useApi<any[]>("/api/pos/orders", [refreshTick]);
+
+  // Fetch outlets for the New KOT dialog
+  const { data: outlets } = useApi<any[]>("/api/pos/outlets", [refreshTick]);
+
+  // New KOT form state
+  const [kotForm, setKotForm] = useState({
+    outletId: "",
+    tableNumber: "",
+    orderType: "dine_in",
+    notes: "",
+  });
+  const [kotLines, setKotLines] = useState<{ itemName: string; quantity: number }[]>([
+    { itemName: "", quantity: 1 },
+  ]);
+  const [submittingKot, setSubmittingKot] = useState(false);
+
+  // Map API orders to kitchen format
+  useEffect(() => {
+    if (apiOrders) {
+      const mapped = apiOrders
+        .map(mapApiOrderToKitchen)
+        .filter((o: KitchenOrder | null): o is KitchenOrder => o !== null);
+      if (mapped.length > 0) {
+        setOrders(mapped);
+      } else {
+        setOrders(FALLBACK_ORDERS);
+      }
+    }
+  }, [apiOrders]);
 
   // Timer effect
   useEffect(() => {
@@ -139,10 +220,146 @@ export function KitchenModule() {
     return () => clearInterval(interval);
   }, []);
 
-  const newOrders = MOCK_ORDERS.filter((o) => o.status === "new");
-  const preparingOrders = MOCK_ORDERS.filter((o) => o.status === "preparing");
-  const readyOrders = MOCK_ORDERS.filter((o) => o.status === "ready");
-  const urgentOrders = MOCK_ORDERS.filter((o) => o.priority === "urgent" && o.status !== "ready");
+  // Update elapsed times periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setOrders((prev) =>
+        prev.map((o) => ({
+          ...o,
+          elapsed: Math.max(0, Math.round((Date.now() - new Date(o.orderTime).getTime()) / 60000)),
+        }))
+      );
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const newOrders = orders.filter((o) => o.status === "new");
+  const preparingOrders = orders.filter((o) => o.status === "preparing");
+  const readyOrders = orders.filter((o) => o.status === "ready");
+  const urgentOrders = orders.filter((o) => o.priority === "urgent" && o.status !== "ready");
+
+  // ─── Status update handler (optimistic) ──────────────────────────────
+  const handleKitchenAction = useCallback(async (
+    orderId: string,
+    action: "start_preparing" | "mark_ready" | "picked_up",
+    toastLabel: string,
+  ) => {
+    const apiStatus = KITCHEN_ACTION_TO_API[action];
+
+    // Optimistic: update local state immediately
+    setOrders((prev) => {
+      if (action === "start_preparing") {
+        return prev.map((o) => (o.id === orderId ? { ...o, status: "preparing" as OrderStatus } : o));
+      } else if (action === "mark_ready") {
+        return prev.map((o) => (o.id === orderId ? { ...o, status: "ready" as OrderStatus } : o));
+      } else {
+        // picked_up → remove from kitchen display (served orders don't show)
+        return prev.filter((o) => o.id !== orderId);
+      }
+    });
+    setUpdatingIds((prev) => new Set(prev).add(orderId));
+
+    try {
+      await apiPut(`/api/pos/orders/${orderId}/status`, { status: apiStatus });
+      toast.success(toastLabel);
+      triggerRefresh();
+    } catch (e: any) {
+      // Revert on failure — reload from API
+      toast.error(e.message || "Failed to update order status");
+      reload();
+    } finally {
+      setUpdatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+    }
+  }, [triggerRefresh, reload]);
+
+  // ─── New KOT handlers ────────────────────────────────────────────────
+  const handleNewKotLine = () => {
+    setKotLines((prev) => [...prev, { itemName: "", quantity: 1 }]);
+  };
+
+  const handleRemoveKotLine = (idx: number) => {
+    setKotLines((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleKotLineChange = (idx: number, field: "itemName" | "quantity", value: string | number) => {
+    setKotLines((prev) =>
+      prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l))
+    );
+  };
+
+  const handleSubmitNewKot = async () => {
+    if (!kotForm.outletId) {
+      toast.error("Please select an outlet");
+      return;
+    }
+    const validLines = kotLines.filter((l) => l.itemName.trim());
+    if (validLines.length === 0) {
+      toast.error("Add at least one item");
+      return;
+    }
+
+    setSubmittingKot(true);
+    try {
+      // Fetch the outlet menu to match item names to IDs
+      const menuRes = await fetch(`/api/pos/outlets/${kotForm.outletId}/menu`);
+      const menuJson = await menuRes.json();
+      const menuData = menuJson.data;
+      const allMenuItems: { id: string; name: string; price: number }[] = menuData?.categories?.flatMap((c: any) => c.items) ?? [];
+
+      const lines = validLines
+        .map((l) => {
+          const match = allMenuItems.find((mi) => mi.name.toLowerCase() === l.itemName.trim().toLowerCase());
+          return match ? { itemId: match.id, quantity: l.quantity } : null;
+        })
+        .filter((l): l is { itemId: string; quantity: number } => l !== null);
+
+      if (lines.length === 0) {
+        toast.error("No matching menu items found. Please create items in Menu Builder first.");
+        setSubmittingKot(false);
+        return;
+      }
+
+      const result = await apiPost("/api/pos/orders", {
+        outletId: kotForm.outletId,
+        tableNumber: kotForm.tableNumber || undefined,
+        orderType: kotForm.orderType,
+        notes: kotForm.notes || undefined,
+        lines,
+        guestsCount: 1,
+      });
+
+      toast.success(`KOT created · #${result.kotNumber} · ${fmtINR(result.total)}`);
+      setNewKotOpen(false);
+      setKotForm({ outletId: "", tableNumber: "", orderType: "dine_in", notes: "" });
+      setKotLines([{ itemName: "", quantity: 1 }]);
+      triggerRefresh();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to create KOT");
+    } finally {
+      setSubmittingKot(false);
+    }
+  };
+
+  if (loading && !apiOrders) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-9 w-24" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -159,7 +376,9 @@ export function KitchenModule() {
             <Clock className="h-3 w-3" />
             {new Date(currentTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
           </Badge>
-          <Button className="bg-navy hover:bg-navy-light text-white h-9"><Plus className="h-4 w-4 mr-1" /> New KOT</Button>
+          <Button className="bg-navy hover:bg-navy-light text-white h-9" onClick={() => setNewKotOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> New KOT
+          </Button>
         </div>
       </div>
 
@@ -179,7 +398,7 @@ export function KitchenModule() {
         </div>
         <div className="rounded-lg border border-border p-3 bg-card">
           <p className="text-[10px] uppercase text-muted-foreground">Orders Today</p>
-          <p className="text-lg font-bold font-display mt-1">47</p>
+          <p className="text-lg font-bold font-display mt-1">{orders.length}</p>
         </div>
         <div className="rounded-lg border border-border p-3 bg-card">
           <p className="text-[10px] uppercase text-muted-foreground">Completed</p>
@@ -188,8 +407,8 @@ export function KitchenModule() {
         <div className="rounded-lg border border-border p-3 bg-card">
           <p className="text-[10px] uppercase text-muted-foreground">Kitchen Load</p>
           <div className="mt-1">
-            <div className="bg-muted rounded-full h-2"><div className="bg-[#D97706] rounded-full h-2" style={{ width: "65%" }} /></div>
-            <p className="text-[10px] text-muted-foreground mt-1">65% capacity</p>
+            <div className="bg-muted rounded-full h-2"><div className="bg-[#D97706] rounded-full h-2" style={{ width: `${Math.min(100, Math.round((newOrders.length + preparingOrders.length) / Math.max(1, orders.length) * 100))}%` }} /></div>
+            <p className="text-[10px] text-muted-foreground mt-1">{Math.min(100, Math.round((newOrders.length + preparingOrders.length) / Math.max(1, orders.length) * 100))}% capacity</p>
           </div>
         </div>
       </div>
@@ -205,7 +424,7 @@ export function KitchenModule() {
           </div>
           <div className="space-y-3">
             {newOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order.id} order={order} onAction={handleKitchenAction} updating={updatingIds.has(order.id)} />
             ))}
             {newOrders.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-xs border border-dashed border-border rounded-lg">
@@ -224,7 +443,7 @@ export function KitchenModule() {
           </div>
           <div className="space-y-3">
             {preparingOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order.id} order={order} onAction={handleKitchenAction} updating={updatingIds.has(order.id)} />
             ))}
           </div>
         </div>
@@ -238,23 +457,140 @@ export function KitchenModule() {
           </div>
           <div className="space-y-3">
             {readyOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order.id} order={order} onAction={handleKitchenAction} updating={updatingIds.has(order.id)} />
             ))}
           </div>
         </div>
       </div>
+
+      {/* New KOT Dialog */}
+      <Dialog open={newKotOpen} onOpenChange={setNewKotOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">New KOT Order</DialogTitle>
+            <DialogDescription>Create a new Kitchen Order Ticket to send to the kitchen</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="kotOutlet">Outlet</Label>
+              <Select value={kotForm.outletId} onValueChange={(v) => setKotForm((f) => ({ ...f, outletId: v }))}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue placeholder="Select outlet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(outlets ?? []).map((o: any) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="kotTable">Table #</Label>
+                <Input
+                  id="kotTable"
+                  placeholder="e.g. 5"
+                  value={kotForm.tableNumber}
+                  onChange={(e) => setKotForm((f) => ({ ...f, tableNumber: e.target.value }))}
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="kotType">Order Type</Label>
+                <Select value={kotForm.orderType} onValueChange={(v) => setKotForm((f) => ({ ...f, orderType: v }))}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dine_in">Dine-in</SelectItem>
+                    <SelectItem value="room_service">Room Service</SelectItem>
+                    <SelectItem value="takeaway">Takeaway</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Items</Label>
+              <div className="space-y-2 mt-1.5">
+                {kotLines.map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      placeholder="Item name"
+                      value={line.itemName}
+                      onChange={(e) => handleKotLineChange(idx, "itemName", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      min={1}
+                      value={line.quantity}
+                      onChange={(e) => handleKotLineChange(idx, "quantity", parseInt(e.target.value) || 1)}
+                      className="w-16"
+                    />
+                    {kotLines.length > 1 && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#DC2626]" onClick={() => handleRemoveKotLine(idx)}>
+                        ×
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={handleNewKotLine}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Item
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="kotNotes">Notes</Label>
+              <Input
+                id="kotNotes"
+                placeholder="Special instructions..."
+                value={kotForm.notes}
+                onChange={(e) => setKotForm((f) => ({ ...f, notes: e.target.value }))}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewKotOpen(false)}>Cancel</Button>
+            <Button className="bg-[#1B3A6B] hover:bg-[#1B3A6B]/90" onClick={handleSubmitNewKot} disabled={submittingKot}>
+              {submittingKot ? "Creating..." : "Send to Kitchen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 // ─── ORDER CARD SUB-COMPONENT ────────────────────────────────────────
 
-function OrderCard({ order }: { order: KitchenOrder }) {
+type KitchenAction = "start_preparing" | "mark_ready" | "picked_up";
+
+function OrderCard({ order, onAction, updating }: {
+  order: KitchenOrder;
+  onAction: (orderId: string, action: KitchenAction, toastLabel: string) => void;
+  updating: boolean;
+}) {
   const statusMeta = ORDER_STATUS_META[order.status];
   const typeMeta = ORDER_TYPE_ICON[order.orderType] ?? ORDER_TYPE_ICON["dine-in"];
   const TypeIcon = typeMeta.icon;
   const isOverdue = order.elapsed > 25 && order.status !== "ready";
   const isWarning = order.elapsed > 15 && order.elapsed <= 25 && order.status !== "ready";
+
+  const handleStartPreparing = () => {
+    if (updating) return;
+    onAction(order.id, "start_preparing", `KOT ${order.kotNumber} → Preparing`);
+  };
+
+  const handleMarkReady = () => {
+    if (updating) return;
+    onAction(order.id, "mark_ready", `KOT ${order.kotNumber} → Ready for Pickup`);
+  };
+
+  const handlePickedUp = () => {
+    if (updating) return;
+    onAction(order.id, "picked_up", `KOT ${order.kotNumber} picked up`);
+  };
 
   return (
     <Card className={cn(
@@ -306,18 +642,18 @@ function OrderCard({ order }: { order: KitchenOrder }) {
         {/* Action Button */}
         <div className="pt-2 border-t border-border">
           {order.status === "new" && (
-            <Button size="sm" className="w-full h-7 text-[10px] bg-[#D97706] hover:bg-[#D97706]/80 text-white">
-              <Flame className="h-3 w-3 mr-1" /> Start Preparing
+            <Button size="sm" className="w-full h-7 text-[10px] bg-[#D97706] hover:bg-[#D97706]/80 text-white" onClick={handleStartPreparing} disabled={updating}>
+              <Flame className="h-3 w-3 mr-1" /> {updating ? "Updating..." : "Start Preparing"}
             </Button>
           )}
           {order.status === "preparing" && (
-            <Button size="sm" className="w-full h-7 text-[10px] bg-[#16A34A] hover:bg-[#16A34A]/80 text-white">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Mark Ready
+            <Button size="sm" className="w-full h-7 text-[10px] bg-[#16A34A] hover:bg-[#16A34A]/80 text-white" onClick={handleMarkReady} disabled={updating}>
+              <CheckCircle2 className="h-3 w-3 mr-1" /> {updating ? "Updating..." : "Mark Ready"}
             </Button>
           )}
           {order.status === "ready" && (
-            <Button size="sm" variant="outline" className="w-full h-7 text-[10px]">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Picked Up
+            <Button size="sm" variant="outline" className="w-full h-7 text-[10px]" onClick={handlePickedUp} disabled={updating}>
+              <CheckCircle2 className="h-3 w-3 mr-1" /> {updating ? "Updating..." : "Picked Up"}
             </Button>
           )}
         </div>

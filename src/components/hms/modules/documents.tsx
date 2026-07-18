@@ -1,22 +1,33 @@
 // ARIA HMS — Documents Module (Grid/List view, Categories, Upload, Search)
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { KpiCard, fmtDate } from "../shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   FileText, Upload, Search, Grid, List, Folder,
   File, FileImage, FileSpreadsheet, FileClock, Download,
-  Eye, Trash2, MoreVertical, Plus, Filter, Clock,
+  Eye, Trash2, Clock,
   HardDrive, Shield, Building2, Receipt, FileQuestion,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import { apiDelete } from "@/lib/api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────
 
@@ -73,6 +84,19 @@ const DOC_STATUS_META: Record<string, { label: string; cls: string }> = {
   draft: { label: "Draft", cls: "bg-[#FEF3C7] text-[#78350F] border-[#D97706]" },
 };
 
+// ─── HELPERS ────────────────────────────────────────────────────────
+
+function sizeToBytes(size: string): number {
+  const match = size.match(/([\d.]+)\s*(KB|MB|GB)/i);
+  if (!match) return 0;
+  const val = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  if (unit === "KB") return Math.round(val * 1024);
+  if (unit === "MB") return Math.round(val * 1024 * 1024);
+  if (unit === "GB") return Math.round(val * 1024 * 1024 * 1024);
+  return 0;
+}
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────
 
 export function DocumentsModule() {
@@ -81,17 +105,140 @@ export function DocumentsModule() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
+  // Upload dialog state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadCategory, setUploadCategory] = useState<string>("general");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Preview dialog state
+  const [previewDoc, setPreviewDoc] = useState<DocItem | null>(null);
+
+  // Delete confirmation state
+  const [deleteDoc, setDeleteDoc] = useState<DocItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Local docs list (mutated on upload/delete)
+  const [docs, setDocs] = useState<DocItem[]>(MOCK_DOCS);
+
   const filteredDocs = useMemo(() => {
-    return MOCK_DOCS.filter((d) => {
+    return docs.filter((d) => {
       if (activeCategory !== "all" && d.category !== activeCategory) return false;
       if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [search, activeCategory]);
+  }, [search, activeCategory, docs]);
 
-  const totalDocs = MOCK_DOCS.length;
-  const activeDocs = MOCK_DOCS.filter((d) => d.status === "active").length;
+  const totalDocs = docs.length;
+  const activeDocs = docs.filter((d) => d.status === "active").length;
   const totalSize = "23.8 MB";
+
+  // ─── Upload handler ────────────────────────────────────────────
+  const handleUploadClick = useCallback(() => {
+    setUploadName("");
+    setUploadCategory("general");
+    setUploadFile(null);
+    setUploadOpen(true);
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+      if (!uploadName) setUploadName(file.name);
+    }
+  }, [uploadName]);
+
+  const handleUploadSubmit = useCallback(async () => {
+    if (!uploadFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadFile);
+      formData.append("name", uploadName || uploadFile.name);
+      formData.append("category", uploadCategory);
+
+      const result = await fetch("/api/documents/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!result.ok) {
+        const json = await result.json().catch(() => null);
+        throw new Error(json?.errors?.[0]?.message || "Upload failed");
+      }
+
+      const json = await result.json();
+      const newDoc: DocItem = {
+        id: json.data.id,
+        name: uploadName || uploadFile.name,
+        category: uploadCategory as DocCategory || "others",
+        type: (uploadFile.name.split(".").pop() as DocItem["type"]) || "doc",
+        size: uploadFile.size > 1024 * 1024
+          ? `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.round(uploadFile.size / 1024)} KB`,
+        uploadedBy: "You",
+        uploadedAt: new Date().toISOString().slice(0, 10),
+        status: "active",
+      };
+
+      setDocs((prev) => [newDoc, ...prev]);
+      setUploadOpen(false);
+      toast.success(`"${newDoc.name}" uploaded successfully`);
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }, [uploadFile, uploadName, uploadCategory]);
+
+  // ─── View/Preview handler ─────────────────────────────────────
+  const handleViewDoc = useCallback((doc: DocItem) => {
+    setPreviewDoc(doc);
+  }, []);
+
+  // ─── Download handler ─────────────────────────────────────────
+  const handleDownloadDoc = useCallback(async (doc: DocItem) => {
+    try {
+      const res = await fetch(`/api/documents/${doc.id}/download`);
+      if (!res.ok) throw new Error("Download failed");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = doc.type === "xlsx" ? "xlsx" : doc.type === "img" ? "png" : doc.type === "doc" ? "docx" : "pdf";
+      a.download = `${doc.name.replace(/[^a-zA-Z0-9._-]/g, "_")}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Downloading "${doc.name}"`);
+    } catch (err: any) {
+      toast.error(err.message || "Download failed");
+    }
+  }, []);
+
+  // ─── Delete handler ───────────────────────────────────────────
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteDoc) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/documents/${deleteDoc.id}`);
+      setDocs((prev) => prev.filter((d) => d.id !== deleteDoc.id));
+      toast.success(`"${deleteDoc.name}" deleted`);
+      setDeleteDoc(null);
+    } catch (err: any) {
+      toast.error(err.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteDoc]);
 
   return (
     <div className="space-y-4">
@@ -104,7 +251,9 @@ export function DocumentsModule() {
           <p className="text-sm text-muted-foreground mt-0.5">Store, organize and manage all property documents</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button className="bg-navy hover:bg-navy-light text-white h-9"><Upload className="h-4 w-4 mr-1" /> Upload Document</Button>
+          <Button className="bg-navy hover:bg-navy-light text-white h-9" onClick={handleUploadClick}>
+            <Upload className="h-4 w-4 mr-1" /> Upload Document
+          </Button>
         </div>
       </div>
 
@@ -169,9 +318,9 @@ export function DocumentsModule() {
                       <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Clock className="h-3 w-3" />{fmtDate(doc.uploadedAt)}</span>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Eye className="h-3 w-3" /></Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Download className="h-3 w-3" /></Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Trash2 className="h-3 w-3 text-[#DC2626]" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleViewDoc(doc)} title="View"><Eye className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDownloadDoc(doc)} title="Download"><Download className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setDeleteDoc(doc)} title="Delete"><Trash2 className="h-3 w-3 text-[#DC2626]" /></Button>
                     </div>
                   </div>
                 </CardContent>
@@ -221,8 +370,9 @@ export function DocumentsModule() {
                       <TableCell className="text-xs">{fmtDate(doc.uploadedAt)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Eye className="h-3 w-3" /></Button>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><Download className="h-3 w-3" /></Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleViewDoc(doc)} title="View"><Eye className="h-3 w-3" /></Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDownloadDoc(doc)} title="Download"><Download className="h-3 w-3" /></Button>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setDeleteDoc(doc)} title="Delete"><Trash2 className="h-3 w-3 text-[#DC2626]" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -233,6 +383,142 @@ export function DocumentsModule() {
           </CardContent>
         </Card>
       )}
+
+      {/* ─── Upload Dialog ────────────────────────────────────── */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>Select a file and provide details for the document.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">File</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-muted file:text-foreground file:text-sm file:font-medium file:mr-2 file:px-2 file:py-1 file:rounded-sm"
+                onChange={handleFileSelect}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Document Name</label>
+              <Input
+                placeholder="Enter document name"
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Category</label>
+              <Select value={uploadCategory} onValueChange={setUploadCategory}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="contracts">Contracts</SelectItem>
+                  <SelectItem value="invoices">Invoices</SelectItem>
+                  <SelectItem value="reports">Reports</SelectItem>
+                  <SelectItem value="policies">Policies</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={uploading}>Cancel</Button>
+            <Button className="bg-navy hover:bg-navy-light text-white" onClick={handleUploadSubmit} disabled={uploading || !uploadFile}>
+              {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+              Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Preview Dialog ───────────────────────────────────── */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewDoc && (() => {
+                const typeMeta = TYPE_ICON[previewDoc.type] ?? TYPE_ICON.pdf;
+                const TypeIcon = typeMeta.icon;
+                return <TypeIcon className="h-5 w-5" style={{ color: typeMeta.color }} />;
+              })()}
+              {previewDoc?.name}
+            </DialogTitle>
+            <DialogDescription>Document preview</DialogDescription>
+          </DialogHeader>
+          {previewDoc && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs">Category</p>
+                  <p className="font-medium capitalize">{previewDoc.category}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Type</p>
+                  <p className="font-medium uppercase">{previewDoc.type}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Size</p>
+                  <p className="font-medium">{previewDoc.size}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Status</p>
+                  <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium", DOC_STATUS_META[previewDoc.status]?.cls)}>
+                    {DOC_STATUS_META[previewDoc.status]?.label}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Uploaded By</p>
+                  <p className="font-medium">{previewDoc.uploadedBy}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Upload Date</p>
+                  <p className="font-medium">{fmtDate(previewDoc.uploadedAt)}</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                <FileText className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                <p>Preview not available for this file type.</p>
+                <p className="text-xs mt-1">Download the file to view its contents.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDoc(null)}>Close</Button>
+            {previewDoc && (
+              <Button className="bg-navy hover:bg-navy-light text-white" onClick={() => { handleDownloadDoc(previewDoc); setPreviewDoc(null); }}>
+                <Download className="h-4 w-4 mr-1" /> Download
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Delete Confirmation ──────────────────────────────── */}
+      <AlertDialog open={!!deleteDoc} onOpenChange={(open) => { if (!open) setDeleteDoc(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>&quot;{deleteDoc?.name}&quot;</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
