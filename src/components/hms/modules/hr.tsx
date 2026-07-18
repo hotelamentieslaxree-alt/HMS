@@ -1,7 +1,7 @@
 // ARIA HMS — HR Hub Module (4 tabs: Overview, Employees, Payroll, Events & Birthdays)
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useApi, apiPost, apiPut } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
@@ -147,11 +147,16 @@ const HR_TABS = [
 
 export function HRModule() {
   const { activeSubModule, setActiveSubModule } = useAppStore();
-  const [localTab, setLocalTab] = useState("overview");
-  const tab = (activeSubModule && HR_TABS.some(t => t.key === activeSubModule)) ? activeSubModule : localTab;
+
+  // Derive the active tab directly from the store's activeSubModule.
+  // Sidebar navigation sets activeSubModule → we reflect it instantly;
+  // intra-module tab clicks also write back via setActiveSubModule.
+  // No local tab state is needed, so sidebar ↔ tabs never diverge.
+  const tab = (activeSubModule && HR_TABS.some(t => t.key === activeSubModule))
+    ? activeSubModule
+    : "overview";
 
   const handleTabChange = (newTab: string) => {
-    setLocalTab(newTab);
     setActiveSubModule(newTab);
   };
 

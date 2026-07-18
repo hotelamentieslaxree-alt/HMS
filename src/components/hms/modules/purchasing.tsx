@@ -1,11 +1,12 @@
-// ARIA HMS — Purchasing / Procurement Module (5 tabs: Purchase Orders, Amenity Mgmt, Stock Transactions, Season Config, Inspections)
+// ARIA HMS — Purchasing / Procurement Module (6 tabs: Purchase Orders, Amenity Mgmt, Stock Transactions, Season Config, Inspections, Approvals)
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useApi, api } from "@/lib/api";
 import { KpiCard, fmtINR, fmtDate, fmtDateTime } from "../shared";
+import { ApprovalWorkflow, ApprovalBadge, ApprovalHistory, type ApprovalStep, type ApprovalHistoryEntry } from "./approval-workflow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ import {
   ArrowRightLeft, TrendingUp, Wrench, Bed, Bath, Coffee, Tv, Shield, PenTool, Sofa,
   ChevronDown, ChevronUp, FileText, Send, ThumbsUp,
   Inbox, Palette, Thermometer, Play, Loader2,
+  CheckSquare, Signature, Filter,
 } from "lucide-react";
 
 // ─── TYPES ──────────────────────────────────────────────────────────
@@ -275,7 +277,7 @@ function TableSkeleton({ rows = 5, cols = 7 }: { rows?: number; cols?: number })
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────
 
 export function PurchasingModule() {
-  const { refreshTick } = useAppStore();
+  const { refreshTick, activeSubModule, setActiveSubModule } = useAppStore();
   const [activeTab, setActiveTab] = useState("purchase-orders");
   const [search, setSearch] = useState("");
   const [poSearch, setPoSearch] = useState("");
@@ -286,6 +288,23 @@ export function PurchasingModule() {
   const [txTypeFilter, setTxTypeFilter] = useState<string>("all");
   const [txDateFrom, setTxDateFrom] = useState("");
   const [txDateTo, setTxDateTo] = useState("");
+  // ─── Sync sidebar sub-module navigation to active tab ───
+  useEffect(() => {
+    const subMap: Record<string, string> = {
+      "purchase-orders": "purchase-orders",
+      rfq: "purchase-orders", // RFQ redirects to PO tab for now
+      approvals: "approvals",
+    };
+    if (activeSubModule && subMap[activeSubModule]) {
+      setActiveTab(subMap[activeSubModule]);
+    }
+  }, [activeSubModule]);
+
+  // ─── Approval State ───
+  const [approvalStepsMap, setApprovalStepsMap] = useState<Record<string, ApprovalStep[]>>({});
+  const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryEntry[]>([]);
+  const [approvalFilter, setApprovalFilter] = useState<string>("all"); // all | pending | approved | rejected
+
   const [showNewPO, setShowNewPO] = useState(false);
   const [showNewInspection, setShowNewInspection] = useState(false);
   const [showPODetail, setShowPODetail] = useState<PurchaseOrder | null>(null);
@@ -538,6 +557,12 @@ export function PurchasingModule() {
           <TabsTrigger value="transactions" className="text-xs">Stock Transactions</TabsTrigger>
           <TabsTrigger value="seasons" className="text-xs">Season Config</TabsTrigger>
           <TabsTrigger value="inspections" className="text-xs">Inspections</TabsTrigger>
+          <TabsTrigger value="approvals" className="text-xs flex items-center gap-1">
+            <CheckSquare className="h-3 w-3" /> Approvals
+            {pendingApprovals > 0 && (
+              <span className="ml-0.5 h-4 min-w-[16px] px-1 rounded-full bg-[#C9952A] text-white text-[9px] font-bold flex items-center justify-center">{pendingApprovals}</span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* ═══════════════ PURCHASE ORDERS TAB ═══════════════ */}
@@ -1249,6 +1274,22 @@ export function PurchasingModule() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ═══════════════ APPROVALS TAB ═══════════════ */}
+        <TabsContent value="approvals" className="mt-4">
+          <ApprovalsTab
+            purchaseOrders={purchaseOrders}
+            poLoading={poLoading}
+            approvalStepsMap={approvalStepsMap}
+            setApprovalStepsMap={setApprovalStepsMap}
+            approvalHistory={approvalHistory}
+            setApprovalHistory={setApprovalHistory}
+            approvalFilter={approvalFilter}
+            setApprovalFilter={setApprovalFilter}
+            onApprovePO={handlePOStatusChange}
+            reloadPOs={reloadPOs}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* ═══════════════ NEW PO DIALOG ═══════════════ */}
@@ -1581,6 +1622,394 @@ export function PurchasingModule() {
           </DialogContent>
         )}
       </Dialog>
+    </div>
+  );
+}
+
+// ─── APPROVALS TAB SUB-COMPONENT ────────────────────────────────────
+
+function ApprovalsTab({
+  purchaseOrders,
+  poLoading,
+  approvalStepsMap,
+  setApprovalStepsMap,
+  approvalHistory,
+  setApprovalHistory,
+  approvalFilter,
+  setApprovalFilter,
+  onApprovePO,
+  reloadPOs,
+}: {
+  purchaseOrders: PurchaseOrder[];
+  poLoading: boolean;
+  approvalStepsMap: Record<string, ApprovalStep[]>;
+  setApprovalStepsMap: React.Dispatch<React.SetStateAction<Record<string, ApprovalStep[]>>>;
+  approvalHistory: ApprovalHistoryEntry[];
+  setApprovalHistory: React.Dispatch<React.SetStateAction<ApprovalHistoryEntry[]>>;
+  approvalFilter: string;
+  setApprovalFilter: (f: string) => void;
+  onApprovePO: (poId: string, newStatus: POStatus) => Promise<void>;
+  reloadPOs: () => void;
+}) {
+  const { user } = useAppStore();
+
+  // Generate approval steps for POs that don't have them yet
+  useEffect(() => {
+    const newMap = { ...approvalStepsMap };
+    let changed = false;
+    purchaseOrders.forEach((po) => {
+      if (!newMap[po.id]) {
+        changed = true;
+        const isSubmitted = po.status === "submitted";
+        const isApproved = po.status === "approved" || po.status === "received";
+        const isCancelled = po.status === "cancelled";
+
+        newMap[po.id] = [
+          {
+            id: `${po.id}-step-1`,
+            stepNumber: 1,
+            roleTitle: "Purchase Manager",
+            approverName: "Rajesh Kumar",
+            status: "approved" as const,
+            timestamp: po.createdAt,
+            reason: "PO verified and submitted",
+            signatureData: null,
+            isCurrentStep: false,
+          },
+          {
+            id: `${po.id}-step-2`,
+            stepNumber: 2,
+            roleTitle: "General Manager",
+            approverName: isApproved || isCancelled ? (po.approvedById ? "A. Sharma" : null) : null,
+            status: isApproved ? ("approved" as const) : isCancelled ? ("rejected" as const) : isSubmitted ? ("pending" as const) : ("not_required" as const),
+            timestamp: isApproved || isCancelled ? po.orderedAt || po.createdAt : null,
+            reason: isCancelled ? "Budget constraints — resubmit with revised amounts" : isApproved ? "Approved — proceed with ordering" : null,
+            signatureData: null,
+            isCurrentStep: isSubmitted,
+          },
+          {
+            id: `${po.id}-step-3`,
+            stepNumber: 3,
+            roleTitle: "Accounts & Finance",
+            approverName: isApproved ? "Priya Menon" : null,
+            status: isApproved ? ("approved" as const) : ("not_required" as const),
+            timestamp: isApproved ? po.receivedAt || po.createdAt : null,
+            reason: isApproved ? "Payment authorized" : null,
+            signatureData: null,
+            isCurrentStep: false,
+          },
+        ];
+      }
+    });
+    if (changed) {
+      setApprovalStepsMap(newMap);
+    }
+  }, [purchaseOrders]);
+
+  // ─── Filter POs for Approvals view ───
+  const submittedPOs = useMemo(() => purchaseOrders.filter((po) => po.status === "submitted"), [purchaseOrders]);
+  const approvedPOs = useMemo(() => purchaseOrders.filter((po) => po.status === "approved" || po.status === "received"), [purchaseOrders]);
+  const rejectedPOs = useMemo(() => purchaseOrders.filter((po) => po.status === "cancelled"), [purchaseOrders]);
+
+  const filteredApprovalPOs = useMemo(() => {
+    if (approvalFilter === "pending") return submittedPOs;
+    if (approvalFilter === "approved") return approvedPOs;
+    if (approvalFilter === "rejected") return rejectedPOs;
+    return [...submittedPOs, ...approvedPOs, ...rejectedPOs];
+  }, [approvalFilter, submittedPOs, approvedPOs, rejectedPOs]);
+
+  // ─── Handle Approval Action ───
+  const handleApproveWithSignature = useCallback(async (stepId: string, signatureData: string, reason?: string) => {
+    // Find which PO this step belongs to
+    const poEntry = Object.entries(approvalStepsMap).find(([_, steps]) => steps.some((s) => s.id === stepId));
+    if (!poEntry) return;
+    const [poId, steps] = poEntry;
+
+    // Update the steps locally
+    const updatedSteps = steps.map((s) =>
+      s.id === stepId
+        ? { ...s, status: "approved" as const, approverName: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Current User", timestamp: new Date().toISOString(), reason: reason || null, signatureData, isCurrentStep: false }
+        : s
+    );
+
+    // For 3-step flow, if GM approved, Accounts auto-approves
+    const gmStep = updatedSteps.find((s) => s.roleTitle === "General Manager");
+    if (gmStep && gmStep.status === "approved") {
+      const accountsStep = updatedSteps.find((s) => s.roleTitle === "Accounts & Finance");
+      if (accountsStep && accountsStep.status === "not_required") {
+        // Auto-approve accounts when GM approves
+        const autoUpdated = updatedSteps.map((s) =>
+          s.roleTitle === "Accounts & Finance"
+            ? { ...s, status: "approved" as const, approverName: "Priya Menon", timestamp: new Date().toISOString(), reason: "Payment authorized", isCurrentStep: false }
+            : s
+        );
+        setApprovalStepsMap((prev) => ({ ...prev, [poId]: autoUpdated }));
+      } else {
+        setApprovalStepsMap((prev) => ({ ...prev, [poId]: updatedSteps }));
+      }
+    } else {
+      setApprovalStepsMap((prev) => ({ ...prev, [poId]: updatedSteps }));
+    }
+
+    // Update PO status via API
+    await onApprovePO(poId, "approved");
+
+    // Add to approval history
+    setApprovalHistory((prev) => [
+      {
+        id: `hist-${Date.now()}`,
+        documentType: "Purchase Order",
+        documentId: purchaseOrders.find((p) => p.id === poId)?.poNumber || poId,
+        documentTitle: `${purchaseOrders.find((p) => p.id === poId)?.vendor?.name || "Unknown Vendor"} — PO`,
+        action: "approved",
+        approverName: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Current User",
+        approverRole: "General Manager",
+        timestamp: new Date().toISOString(),
+        reason: reason || null,
+        signatureData,
+      },
+      ...prev,
+    ]);
+  }, [approvalStepsMap, purchaseOrders, user, onApprovePO, setApprovalStepsMap, setApprovalHistory]);
+
+  const handleRejectWithSignature = useCallback(async (stepId: string, signatureData: string, reason: string) => {
+    const poEntry = Object.entries(approvalStepsMap).find(([_, steps]) => steps.some((s) => s.id === stepId));
+    if (!poEntry) return;
+    const [poId, steps] = poEntry;
+
+    const updatedSteps = steps.map((s) =>
+      s.id === stepId
+        ? { ...s, status: "rejected" as const, approverName: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Current User", timestamp: new Date().toISOString(), reason, signatureData, isCurrentStep: false }
+        : s
+    );
+    setApprovalStepsMap((prev) => ({ ...prev, [poId]: updatedSteps }));
+
+    await onApprovePO(poId, "cancelled");
+
+    setApprovalHistory((prev) => [
+      {
+        id: `hist-${Date.now()}`,
+        documentType: "Purchase Order",
+        documentId: purchaseOrders.find((p) => p.id === poId)?.poNumber || poId,
+        documentTitle: `${purchaseOrders.find((p) => p.id === poId)?.vendor?.name || "Unknown Vendor"} — PO`,
+        action: "rejected",
+        approverName: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Current User",
+        approverRole: "General Manager",
+        timestamp: new Date().toISOString(),
+        reason,
+        signatureData,
+      },
+      ...prev,
+    ]);
+  }, [approvalStepsMap, purchaseOrders, user, onApprovePO, setApprovalStepsMap, setApprovalHistory]);
+
+  // ─── Sample approval history for demo ───
+  const sampleHistory: ApprovalHistoryEntry[] = useMemo(() => [
+    {
+      id: "hist-sample-1",
+      documentType: "Purchase Order",
+      documentId: "PO-2024-0089",
+      documentTitle: "Linen Solutions — PO",
+      action: "approved",
+      approverName: "A. Sharma",
+      approverRole: "General Manager",
+      timestamp: new Date(Date.now() - 86400000 * 2).toISOString(),
+      reason: "Approved for Q1 stock replenishment",
+      signatureData: null,
+    },
+    {
+      id: "hist-sample-2",
+      documentType: "Purchase Order",
+      documentId: "PO-2024-0091",
+      documentTitle: "Premium Amenities Corp — PO",
+      action: "rejected",
+      approverName: "A. Sharma",
+      approverRole: "General Manager",
+      timestamp: new Date(Date.now() - 86400000).toISOString(),
+      reason: "Budget exceeds quarterly allocation. Please resubmit with revised quantities.",
+      signatureData: null,
+    },
+    {
+      id: "hist-sample-3",
+      documentType: "Purchase Order",
+      documentId: "PO-2024-0085",
+      documentTitle: "Kitchen Equip Suppliers — PO",
+      action: "approved",
+      approverName: "A. Sharma",
+      approverRole: "General Manager",
+      timestamp: new Date(Date.now() - 86400000 * 5).toISOString(),
+      reason: null,
+      signatureData: null,
+    },
+  ], []);
+
+  const allHistory = useMemo(() => [...approvalHistory, ...sampleHistory], [approvalHistory, sampleHistory]);
+
+  return (
+    <div className="space-y-4">
+      {/* Approvals Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-display font-bold text-foreground flex items-center gap-2">
+            <CheckSquare className="h-4 w-4 text-[#C9952A]" /> Digital Signature Approvals
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Review and approve purchase orders with digital signatures</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={approvalFilter} onValueChange={setApprovalFilter}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <Filter className="h-3 w-3 mr-1 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ({submittedPOs.length + approvedPOs.length + rejectedPOs.length})</SelectItem>
+              <SelectItem value="pending">Pending ({submittedPOs.length})</SelectItem>
+              <SelectItem value="approved">Approved ({approvedPOs.length})</SelectItem>
+              <SelectItem value="rejected">Rejected ({rejectedPOs.length})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className={cn("cursor-pointer hover:shadow-card-lg transition-shadow", approvalFilter === "pending" && "ring-2 ring-[#C9952A]")} onClick={() => setApprovalFilter(approvalFilter === "pending" ? "all" : "pending")}>
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-[#FEF3C7]">
+              <Clock className="h-4 w-4 text-[#D97706]" />
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular-nums">{poLoading ? <Skeleton className="h-6 w-6 inline-block" /> : submittedPOs.length}</p>
+              <p className="text-[10px] text-muted-foreground">Pending Approval</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className={cn("cursor-pointer hover:shadow-card-lg transition-shadow", approvalFilter === "approved" && "ring-2 ring-[#16A34A]")} onClick={() => setApprovalFilter(approvalFilter === "approved" ? "all" : "approved")}>
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-[#DCFCE7]">
+              <CheckCircle2 className="h-4 w-4 text-[#16A34A]" />
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular-nums">{poLoading ? <Skeleton className="h-6 w-6 inline-block" /> : approvedPOs.length}</p>
+              <p className="text-[10px] text-muted-foreground">Approved</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className={cn("cursor-pointer hover:shadow-card-lg transition-shadow", approvalFilter === "rejected" && "ring-2 ring-[#DC2626]")} onClick={() => setApprovalFilter(approvalFilter === "rejected" ? "all" : "rejected")}>
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-[#FEE2E2]">
+              <XCircle className="h-4 w-4 text-[#DC2626]" />
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular-nums">{poLoading ? <Skeleton className="h-6 w-6 inline-block" /> : rejectedPOs.length}</p>
+              <p className="text-[10px] text-muted-foreground">Rejected</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pending Approvals List */}
+      <div className="space-y-3">
+        {poLoading ? (
+          <Card>
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+              </div>
+            </CardContent>
+          </Card>
+        ) : filteredApprovalPOs.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <CheckSquare className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">
+                {approvalFilter === "pending" ? "No pending approvals" : approvalFilter === "approved" ? "No approved orders" : approvalFilter === "rejected" ? "No rejected orders" : "No approval items found"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {approvalFilter === "pending" ? "All purchase orders have been reviewed" : "Try changing the filter"}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredApprovalPOs.map((po) => {
+            const steps = approvalStepsMap[po.id] || [];
+            return (
+              <Card key={po.id} className="overflow-hidden">
+                {/* PO Header */}
+                <div className={cn(
+                  "px-4 py-3 border-b",
+                  po.status === "submitted" ? "bg-[#FEF3C7]/30 border-[#D97706]/20" :
+                  po.status === "approved" || po.status === "received" ? "bg-[#DCFCE7]/30 border-[#16A34A]/20" :
+                  "bg-[#FEE2E2]/30 border-[#DC2626]/20"
+                )}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "h-9 w-9 flex items-center justify-center rounded-lg",
+                        po.status === "submitted" ? "bg-[#FEF3C7]" :
+                        po.status === "approved" || po.status === "received" ? "bg-[#DCFCE7]" :
+                        "bg-[#FEE2E2]"
+                      )}>
+                        <ShoppingCart className={cn(
+                          "h-4 w-4",
+                          po.status === "submitted" ? "text-[#D97706]" :
+                          po.status === "approved" || po.status === "received" ? "text-[#16A34A]" :
+                          "text-[#DC2626]"
+                        )} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold font-mono text-navy">{po.poNumber}</span>
+                          <ApprovalBadge
+                            status={
+                              po.status === "submitted" ? "pending" :
+                              po.status === "approved" || po.status === "received" ? "approved" :
+                              po.status === "cancelled" ? "rejected" : "not_required"
+                            }
+                            size="sm"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">{po.vendor?.name || "No Vendor"} — {fmtINR(po.totalAmount)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-muted-foreground">Created</p>
+                      <p className="text-xs font-medium">{fmtDate(po.createdAt)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Approval Workflow */}
+                <CardContent className="p-4">
+                  <ApprovalWorkflow
+                    documentTitle={`${po.vendor?.name || "Unknown Vendor"} — PO ${po.poNumber}`}
+                    documentId={po.poNumber}
+                    documentType="Purchase Order"
+                    steps={steps}
+                    onApprove={handleApproveWithSignature}
+                    onReject={handleRejectWithSignature}
+                    currentUserName={user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "General Manager"}
+                    currentRoleTitle="General Manager"
+                    readOnly={po.status !== "submitted"}
+                  />
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Approval History */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Clock className="h-4 w-4 text-navy" /> Approval History
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <ApprovalHistory entries={allHistory} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // ARIA HMS — Finance Module (6 tabs: Overview, Invoices, Expenses, GST, Cashbook, P&L)
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { KpiCard, fmtINR, fmtDate } from "../shared";
@@ -86,9 +86,24 @@ const EXP_STATUS_META: Record<string, { label: string; cls: string }> = {
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────
 
 export function FinanceModule() {
-  const { refreshTick } = useAppStore();
+  const { refreshTick, activeSubModule } = useAppStore();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Sync sidebar sub-module navigation to active tab
+  useEffect(() => {
+    const subMap: Record<string, string> = {
+      invoices: "invoices",
+      expenses: "expenses",
+      gst: "gst",
+      cashbook: "cashbook",
+      pnl: "pnl",
+    };
+    if (activeSubModule && subMap[activeSubModule]) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external store navigation to local tab state
+      setActiveTab(subMap[activeSubModule]);
+    }
+  }, [activeSubModule]);
 
   const totalRevenue = 3476400;
   const totalExpenses = 1374000;

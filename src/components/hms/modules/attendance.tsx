@@ -169,16 +169,20 @@ const ATT_TABS = [
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────
 
+// All valid tab keys (sidebar sub-modules + component-only tabs)
+const ATT_ALL_TABS = ["overview", "calendar", "table", "manual", "upload", "reports"];
+
 export function AttendanceModule() {
   const { activeSubModule, setActiveSubModule } = useAppStore();
-  const [localTab, setLocalTab] = useState("overview");
-  const tab = (activeSubModule && ATT_TABS.some((t) => t.key === activeSubModule)) ? activeSubModule : localTab;
+
+  // Single source of truth: derive active tab from the store.
+  // Sidebar navigation sets activeSubModule → this reacts instantly.
+  // No local tab state needed — avoids stale-sync bugs and useEffect+setState lint issues.
+  const tab = ATT_ALL_TABS.includes(activeSubModule) ? activeSubModule : "overview";
 
   const handleTabChange = (newTab: string) => {
-    setLocalTab(newTab);
-    if (ATT_TABS.some((t) => t.key === newTab)) {
-      setActiveSubModule(newTab);
-    }
+    // Always sync tab selection back to the store so sidebar highlight stays in sync
+    setActiveSubModule(newTab);
   };
 
   const activeTabMeta = ATT_TABS.find((t) => t.key === tab);
