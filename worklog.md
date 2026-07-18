@@ -559,3 +559,60 @@ Stage Summary:
 - Digital signature approval workflow created and integrated into Purchasing
 - Code pushed to GitHub for Vercel deployment
 - Sandbox memory limitations prevent local browser testing (server gets OOM-killed)
+Task ID: 3-a
+Agent: Sales Prisma Migration Agent
+Task: Fix Sales module to use correct Prisma API field names instead of old mock field names
+
+Work Log:
+- **Updated `sales.tsx` interfaces**: Changed Lead interface fields from `company`/`contact`/`email`/`phone`/`assignedTo`/`lastContacted` to `companyName`/`contactName`/`contactEmail`/`contactPhone`/`assignedToId`+`assignedTo` object/`lastContactedAt`. Changed Deal interface to remove `leadCompany` and add `lead` relation object and `assignedToId`+`assignedTo` object.
+- **Added `assigneeName()` helper**: Converts `{ firstName, lastName } | null` to display string, returns "Unassigned" for null.
+- **Updated fallback data**: `FALLBACK_LEADS` and `FALLBACK_DEALS` now use new field names with `assignedTo: null`, `assignedToId: null`, `lead: { id, companyName, contactName }` etc.
+- **Updated PipelineColumn**: `lead.company` → `lead.companyName`, `lead.contact` → `lead.contactName`, `lead.lastContacted` → `lead.lastContactedAt`, `lead.assignedTo.split(" ")[0]` → `lead.assignedTo?.firstName ?? "N/A"`
+- **Updated LeadFormDialog**: Form fields renamed (`company` → `companyName`, etc.), form state uses `assignedToId`, submit sends `companyName`/`contactName`/`contactEmail`/`contactPhone`/`assignedToId`. Added `salesStaff` prop for dynamic assignee dropdown.
+- **Updated DealFormDialog**: Removed `leadCompany` from submit data, form state uses `assignedToId`, submit sends `leadId`/`title`/`value`/`stage`/`probability`/`closeDate`/`assignedToId`. Added `salesStaff` prop. Lead dropdown shows `l.companyName — l.contactName`.
+- **Updated search/filter logic**: `l.company.toLowerCase()` → `l.companyName.toLowerCase()`, `l.contact.toLowerCase()` → `l.contactName.toLowerCase()`, `l.email.toLowerCase()` → `l.contactEmail.toLowerCase()`
+- **Updated PipelineTab filter**: `l.assignedTo === filterAssignee` → `assigneeName(l.assignedTo) === filterAssignee`. Derived unique assignees from data dynamically instead of hardcoded ASSIGNEES constant.
+- **Updated DealsTab**: `deal.leadCompany` → `deal.lead?.companyName ?? "—"`, `deal.assignedTo` → `assigneeName(deal.assignedTo)`
+- **Updated AnalyticsTab**: Top performers now derive from actual data using `assigneeName()` instead of hardcoded ASSIGNEES.
+- **Removed `ASSIGNEES` constant**: Replaced with dynamic sales staff from `/api/staff` API + derived assignees from data.
+- **Added `salesStaff` fetch in SalesModule**: Fetches staff from `/api/staff`, filters by Sales department roles, passes to form dialogs.
+- **Migrated API routes to Prisma**:
+  - `/api/sales/leads/route.ts`: Full Prisma migration with `include: { assignedTo }`, proper CRUD, lazy seed function for demo data.
+  - `/api/sales/deals/route.ts`: Full Prisma migration with `include: { lead, assignedTo }`, proper CRUD.
+- **Added seed data**: Lazy seed in leads API + seed in hms.ts `seedDemoData()` for 12 leads and 8 deals with proper Prisma field names and user ID references.
+- **Lint passes clean with zero errors**.
+
+Stage Summary:
+- Sales module fully migrated from mock field names to Prisma API field names
+- API routes migrated from in-memory mock arrays to Prisma DB queries
+- All field references updated: company→companyName, contact→contactName, email→contactEmail, phone→contactPhone, lastContacted→lastContactedAt, leadCompany→lead.companyName, assignedTo string→assignedTo object with assigneeName() helper
+- Dynamic assignee lists from actual data instead of hardcoded ASSIGNEES constant
+- Demo seed data created for both new and existing databases
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Wire Inventory module to real API, Fix Dashboard live data, Fix Sales API to Prisma, Clean up dead code
+
+Work Log:
+- **Audited entire codebase** (40+ models, 32 modules, 25+ API routes) to identify all mock data usage, dead code, and field mismatches
+- **Rewrote Inventory module** (`inventory.tsx`): Replaced all 4 MOCK_* constants with real `useApi()` calls to `/api/inventory/stock`, `/api/inventory/vendors`, `/api/purchasing/orders`, `/api/purchasing/stock-transactions`. Added AddItemDialog, NewPODialog, loading skeletons, empty states, error banners with retry. Computed KPIs from live data (total items, low stock count, pending orders, total value).
+- **Migrated Sales API routes to Prisma**: `/api/sales/leads/route.ts` and `/api/sales/deals/route.ts` now use `db.lead.findMany()` and `db.deal.findMany()` with proper includes instead of in-memory MOCK_LEADS/MOCK_DEALS arrays. Added audit logging and real-time broadcast for all CRUD operations.
+- **Fixed Sales module field names** (`sales.tsx`): Updated Lead interface (company→companyName, contact→contactName, email→contactEmail, phone→contactPhone, assignedTo→object, lastContacted→lastContactedAt) and Deal interface (leadCompany→lead.companyName, assignedTo→object). Added `assigneeName()` helper. Updated all usages across PipelineColumn, LeadsTab, DealsTab, AnalyticsTab, form dialogs.
+- **Enhanced Dashboard with Live/Offline indicator**: Added `isLive` flag to `useDashboardData()` hook, created `LiveDataIndicator` component (green dot+"Live" when API succeeds, amber dot+"Offline" when using fallback). Updated all 12 role-specific dashboards with indicator + improved `ApiErrorBanner`.
+- **Deleted 5 dead files** (~1,500+ lines removed):
+  - `src/lib/init-sql.ts` — 1,292 lines of raw SQL, unused since Prisma migration
+  - `src/hooks/use-toast.ts` — 194 lines, never imported (app uses Sonner)
+  - `src/app/api/seed-db/route.ts` — debug utility for seed DB download
+  - `prisma/seed-hr.ts` — not imported anywhere
+  - `prisma/db/seed.db` — not referenced anywhere
+- **ESLint passes clean** with zero errors
+- **All APIs verified working**: Dashboard returns live KPIs/room data/revenue, Inventory Stock returns paginated real data with lowStockCount meta, Sales Leads returns Prisma data with new field names
+
+Stage Summary:
+- Inventory module fully wired to real API (was 100% mock, now 100% live)
+- Sales API routes migrated from in-memory mock arrays to Prisma DB with proper CRUD
+- Sales module field names updated to match Prisma API responses
+- Dashboard shows Live/Offline indicator and improved error handling
+- 5 dead files deleted (~1,500 lines removed)
+- Lint clean, all APIs tested and returning real data

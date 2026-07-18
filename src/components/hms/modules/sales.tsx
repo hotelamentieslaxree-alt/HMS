@@ -36,15 +36,15 @@ const SUCCESS = "#16A34A";
 
 // ─── Fallback data when API fails ────────────────────────────────
 const FALLBACK_LEADS: Lead[] = [
-  { id: "l1", company: "Tata Consulting", contact: "Arun Mehta", email: "arun@tata.com", phone: "+91-98100-11111", source: "corporate", status: "qualified", estimatedValue: 450000, probability: 75, assignedTo: "Sales Team", lastContacted: new Date(Date.now() - 86400000).toISOString(), notes: "Corporate retreat enquiry for 40 rooms" },
-  { id: "l2", company: "Infosys Ltd", contact: "Priya Iyer", email: "priya.i@infosys.com", phone: "+91-98000-22222", source: "referral", status: "proposal", estimatedValue: 280000, probability: 60, assignedTo: "Sales Team", lastContacted: new Date(Date.now() - 172800000).toISOString(), notes: "Annual conference booking" },
-  { id: "l3", company: "Wipro Technologies", contact: "Raj Malhotra", email: "raj.m@wipro.com", phone: "+91-97000-33333", source: "website", status: "new", estimatedValue: 180000, probability: 30, assignedTo: "Sales Team", lastContacted: new Date().toISOString(), notes: "Training program accomodation" },
-  { id: "l4", company: "Mahindra Group", contact: "Neha Sharma", email: "neha.s@mahindra.com", phone: "+91-96000-44444", source: "trade_show", status: "negotiation", estimatedValue: 520000, probability: 85, assignedTo: "Sales Team", lastContacted: new Date(Date.now() - 43200000).toISOString(), notes: "Board meeting + stay for 15 executives" },
+  { id: "l1", companyName: "Tata Consulting", contactName: "Arun Mehta", contactEmail: "arun@tata.com", contactPhone: "+91-98100-11111", source: "direct", status: "qualified", estimatedValue: 450000, probability: 75, assignedToId: null, assignedTo: null, lastContactedAt: new Date(Date.now() - 86400000).toISOString(), notes: "Corporate retreat enquiry for 40 rooms" },
+  { id: "l2", companyName: "Infosys Ltd", contactName: "Priya Iyer", contactEmail: "priya.i@infosys.com", contactPhone: "+91-98000-22222", source: "referral", status: "proposal", estimatedValue: 280000, probability: 60, assignedToId: null, assignedTo: null, lastContactedAt: new Date(Date.now() - 172800000).toISOString(), notes: "Annual conference booking" },
+  { id: "l3", companyName: "Wipro Technologies", contactName: "Raj Malhotra", contactEmail: "raj.m@wipro.com", contactPhone: "+91-97000-33333", source: "website", status: "new", estimatedValue: 180000, probability: 30, assignedToId: null, assignedTo: null, lastContactedAt: new Date().toISOString(), notes: "Training program accomodation" },
+  { id: "l4", companyName: "Mahindra Group", contactName: "Neha Sharma", contactEmail: "neha.s@mahindra.com", contactPhone: "+91-96000-44444", source: "referral", status: "negotiation", estimatedValue: 520000, probability: 85, assignedToId: null, assignedTo: null, lastContactedAt: new Date(Date.now() - 43200000).toISOString(), notes: "Board meeting + stay for 15 executives" },
 ];
 
 const FALLBACK_DEALS: Deal[] = [
-  { id: "d1", title: "Tata Annual Retreat 2025", leadId: "l1", leadCompany: "Tata Consulting", value: 450000, stage: "proposal", probability: 75, closeDate: new Date(Date.now() + 30*86400000).toISOString().slice(0,10), assignedTo: "Sales Team", createdAt: new Date(Date.now() - 7*86400000).toISOString() },
-  { id: "d2", title: "Infosys Conference Q2", leadId: "l2", leadCompany: "Infosys Ltd", value: 280000, stage: "negotiation", probability: 60, closeDate: new Date(Date.now() + 45*86400000).toISOString().slice(0,10), assignedTo: "Sales Team", createdAt: new Date(Date.now() - 14*86400000).toISOString() },
+  { id: "d1", title: "Tata Annual Retreat 2025", leadId: "l1", value: 450000, stage: "proposal", probability: 75, closeDate: new Date(Date.now() + 30*86400000).toISOString().slice(0,10), assignedToId: null, assignedTo: null, notes: "", createdAt: new Date(Date.now() - 7*86400000).toISOString(), lead: { id: "l1", companyName: "Tata Consulting", contactName: "Arun Mehta" } },
+  { id: "d2", title: "Infosys Conference Q2", leadId: "l2", value: 280000, stage: "negotiation", probability: 60, closeDate: new Date(Date.now() + 45*86400000).toISOString().slice(0,10), assignedToId: null, assignedTo: null, notes: "", createdAt: new Date(Date.now() - 14*86400000).toISOString(), lead: { id: "l2", companyName: "Infosys Ltd", contactName: "Priya Iyer" } },
 ];
 
 const PIPELINE_STAGES = [
@@ -78,8 +78,6 @@ const SOURCE_META: Record<string, { label: string; color: string; bg: string; ic
 
 const STATUS_FLOW = ["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"] as const;
 
-const ASSIGNEES = ["Priya Nair", "Vikram Singh", "Arjun Mehta"];
-
 const SALES_TABS = [
   { key: "pipeline", label: "Pipeline", icon: Target },
   { key: "leads", label: "Leads", icon: Users },
@@ -90,16 +88,17 @@ const SALES_TABS = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Lead {
   id: string;
-  company: string;
-  contact: string;
-  email: string;
-  phone: string;
+  companyName: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
   source: string;
   status: string;
   estimatedValue: number;
   probability: number;
-  assignedTo: string;
-  lastContacted: string;
+  assignedToId: string | null;
+  assignedTo: { id: string; firstName: string; lastName: string } | null;
+  lastContactedAt: string;
   notes: string;
 }
 
@@ -107,13 +106,20 @@ interface Deal {
   id: string;
   title: string;
   leadId: string;
-  leadCompany: string;
   value: number;
   stage: string;
   probability: number;
   closeDate: string;
-  assignedTo: string;
+  assignedToId: string | null;
+  assignedTo: { id: string; firstName: string; lastName: string } | null;
+  notes: string;
   createdAt: string;
+  lead: { id: string; companyName: string; contactName: string } | null;
+}
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+function assigneeName(a: { firstName: string; lastName: string } | null): string {
+  return a ? `${a.firstName} ${a.lastName}` : "Unassigned";
 }
 
 // ─── Custom Tooltip for Recharts ──────────────────────────────────────────────
@@ -190,9 +196,9 @@ function PipelineColumn({
               <CardContent className="p-3">
                 <div className="flex items-start justify-between gap-1 mb-1.5">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-foreground truncate">{lead.company}</p>
+                    <p className="text-xs font-bold text-foreground truncate">{lead.companyName}</p>
                     <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <UserCircle className="h-3 w-3" /> {lead.contact}
+                      <UserCircle className="h-3 w-3" /> {lead.contactName}
                     </p>
                   </div>
                   <span className="text-[10px] font-mono-num font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: stage.bg, color: stage.color }}>
@@ -206,8 +212,8 @@ function PipelineColumn({
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-2">
-                  <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{timeAgo(lead.lastContacted)}</span>
-                  <span>{lead.assignedTo.split(" ")[0]}</span>
+                  <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{timeAgo(lead.lastContactedAt)}</span>
+                  <span>{lead.assignedTo?.firstName ?? "N/A"}</span>
                 </div>
 
                 {/* Move buttons */}
@@ -269,33 +275,35 @@ function LeadFormDialog({
   onClose,
   onSave,
   initial,
+  salesStaff,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (data: any) => void;
   initial?: Lead | null;
+  salesStaff: { id: string; firstName: string; lastName: string }[];
 }) {
   const initVal = initial
-    ? { company: initial.company, contact: initial.contact, email: initial.email, phone: initial.phone, source: initial.source, status: initial.status, estimatedValue: String(initial.estimatedValue), probability: String(initial.probability), assignedTo: initial.assignedTo, notes: initial.notes }
-    : { company: "", contact: "", email: "", phone: "", source: "direct", status: "new", estimatedValue: "", probability: "10", assignedTo: "", notes: "" };
+    ? { companyName: initial.companyName, contactName: initial.contactName, contactEmail: initial.contactEmail, contactPhone: initial.contactPhone, source: initial.source, status: initial.status, estimatedValue: String(initial.estimatedValue), probability: String(initial.probability), assignedToId: initial.assignedToId ?? "", notes: initial.notes ?? "" }
+    : { companyName: "", contactName: "", contactEmail: "", contactPhone: "", source: "direct", status: "new", estimatedValue: "", probability: "10", assignedToId: "", notes: "" };
   const [form, setForm] = useState(initVal);
 
   const handleSubmit = () => {
-    if (!form.company.trim() || !form.contact.trim()) {
+    if (!form.companyName.trim() || !form.contactName.trim()) {
       toast.error("Company and Contact are required");
       return;
     }
     onSave({
       ...(initial ? { id: initial.id } : {}),
-      company: form.company,
-      contact: form.contact,
-      email: form.email,
-      phone: form.phone,
+      companyName: form.companyName,
+      contactName: form.contactName,
+      contactEmail: form.contactEmail,
+      contactPhone: form.contactPhone,
       source: form.source,
       status: form.status,
       estimatedValue: Number(form.estimatedValue) || 0,
       probability: Number(form.probability) || 10,
-      assignedTo: form.assignedTo || "Unassigned",
+      assignedToId: form.assignedToId || null,
       notes: form.notes,
     });
   };
@@ -312,21 +320,21 @@ function LeadFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Company *</Label>
-              <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Company name" />
+              <Input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} placeholder="Company name" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Contact Person *</Label>
-              <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Full name" />
+              <Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} placeholder="Full name" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@company.com" />
+              <Input type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="email@company.com" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91 98XXX XXXXX" />
+              <Input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} placeholder="+91 98XXX XXXXX" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -354,11 +362,12 @@ function LeadFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Assigned To</Label>
-              <Select value={form.assignedTo} onValueChange={(v) => setForm({ ...form, assignedTo: v })}>
+              <Select value={form.assignedToId || "unassigned"} onValueChange={(v) => setForm({ ...form, assignedToId: v === "unassigned" ? "" : v })}>
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>
-                  {ASSIGNEES.map((a) => (
-                    <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+                  <SelectItem value="unassigned" className="text-xs">Unassigned</SelectItem>
+                  {salesStaff.map((s) => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs">{s.firstName} {s.lastName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -396,15 +405,17 @@ function DealFormDialog({
   onClose,
   onSave,
   leads,
+  salesStaff,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (data: any) => void;
   leads: Lead[];
+  salesStaff: { id: string; firstName: string; lastName: string }[];
 }) {
   const [form, setForm] = useState({
     title: "", leadId: "", value: "", stage: "prospecting",
-    probability: "10", closeDate: "", assignedTo: "",
+    probability: "10", closeDate: "", assignedToId: "",
   });
 
   const selectedLead = leads.find((l) => l.id === form.leadId);
@@ -417,12 +428,11 @@ function DealFormDialog({
     onSave({
       title: form.title,
       leadId: form.leadId,
-      leadCompany: selectedLead?.company || "",
       value: Number(form.value) || 0,
       stage: form.stage,
       probability: Number(form.probability) || 10,
       closeDate: form.closeDate || new Date(Date.now() + 30 * 86400000).toISOString(),
-      assignedTo: form.assignedTo || "Unassigned",
+      assignedToId: form.assignedToId || null,
     });
   };
 
@@ -447,7 +457,7 @@ function DealFormDialog({
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select lead" /></SelectTrigger>
                 <SelectContent>
                   {leads.map((l) => (
-                    <SelectItem key={l.id} value={l.id} className="text-xs">{l.company} — {l.contact}</SelectItem>
+                    <SelectItem key={l.id} value={l.id} className="text-xs">{l.companyName} — {l.contactName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -480,11 +490,12 @@ function DealFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Assigned To</Label>
-            <Select value={form.assignedTo} onValueChange={(v) => setForm({ ...form, assignedTo: v })}>
+            <Select value={form.assignedToId || "unassigned"} onValueChange={(v) => setForm({ ...form, assignedToId: v === "unassigned" ? "" : v })}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
-                {ASSIGNEES.map((a) => (
-                  <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+                <SelectItem value="unassigned" className="text-xs">Unassigned</SelectItem>
+                {salesStaff.map((s) => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">{s.firstName} {s.lastName}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -504,10 +515,15 @@ function PipelineTab({ leads, onMoveLead }: { leads: Lead[]; onMoveLead: (id: st
   const [filterSource, setFilterSource] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
 
+  const uniqueAssignees = useMemo(() => {
+    const names = leads.map((l) => assigneeName(l.assignedTo));
+    return [...new Set(names)].filter((n) => n !== "Unassigned").sort();
+  }, [leads]);
+
   const filtered = useMemo(() => {
     let result = [...leads];
     if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
-    if (filterAssignee !== "all") result = result.filter((l) => l.assignedTo === filterAssignee);
+    if (filterAssignee !== "all") result = result.filter((l) => assigneeName(l.assignedTo) === filterAssignee);
     return result;
   }, [leads, filterSource, filterAssignee]);
 
@@ -540,7 +556,7 @@ function PipelineTab({ leads, onMoveLead }: { leads: Lead[]; onMoveLead: (id: st
           <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="Assigned To" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all" className="text-xs">All Assignees</SelectItem>
-            {ASSIGNEES.map((a) => (
+            {uniqueAssignees.map((a) => (
               <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
             ))}
           </SelectContent>
@@ -576,7 +592,7 @@ function LeadsTab({ leads, loading, onEdit, onQuickAction, onAdd }: {
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
-        (l) => l.company.toLowerCase().includes(q) || l.contact.toLowerCase().includes(q) || l.email.toLowerCase().includes(q)
+        (l) => l.companyName.toLowerCase().includes(q) || l.contactName.toLowerCase().includes(q) || l.contactEmail.toLowerCase().includes(q)
       );
     }
     if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
@@ -666,18 +682,18 @@ function LeadsTab({ leads, loading, onEdit, onQuickAction, onAdd }: {
                       <TableCell className="text-xs font-semibold whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          {lead.company}
+                          {lead.companyName}
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">{lead.contact}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{lead.contactName}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">
                         <span className="flex items-center gap-1 text-muted-foreground">
-                          <Mail className="h-3 w-3" /> {lead.email}
+                          <Mail className="h-3 w-3" /> {lead.contactEmail}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap hidden lg:table-cell">
                         <span className="flex items-center gap-1 text-muted-foreground">
-                          <Phone className="h-3 w-3" /> {lead.phone}
+                          <Phone className="h-3 w-3" /> {lead.contactPhone}
                         </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap"><SourceBadge source={lead.source} /></TableCell>
@@ -688,8 +704,8 @@ function LeadsTab({ leads, loading, onEdit, onQuickAction, onAdd }: {
                           {lead.probability}%
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap hidden xl:table-cell">{lead.assignedTo}</TableCell>
-                      <TableCell className="text-[11px] text-muted-foreground whitespace-nowrap hidden xl:table-cell">{timeAgo(lead.lastContacted)}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap hidden xl:table-cell">{assigneeName(lead.assignedTo)}</TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground whitespace-nowrap hidden xl:table-cell">{timeAgo(lead.lastContactedAt)}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           {lead.status === "new" && (
@@ -859,12 +875,12 @@ function DealsTab({ deals, loading, onAdd, onStageChange }: {
                         return (
                           <TableRow key={deal.id} className="hover:bg-muted/30">
                             <TableCell className="text-xs font-semibold whitespace-nowrap max-w-[200px] truncate">{deal.title}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">{deal.leadCompany}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">{deal.lead?.companyName ?? "—"}</TableCell>
                             <TableCell className="text-xs font-mono-num font-bold text-right whitespace-nowrap">{fmtINR(deal.value)}</TableCell>
                             <TableCell className="whitespace-nowrap">{stageBadge(deal.stage)}</TableCell>
                             <TableCell className="text-xs font-mono-num text-center whitespace-nowrap text-muted-foreground">{fmtINR(Math.round(deal.value * deal.probability / 100))}</TableCell>
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden lg:table-cell">{fmtDate(deal.closeDate)}</TableCell>
-                            <TableCell className="text-xs whitespace-nowrap hidden xl:table-cell">{deal.assignedTo}</TableCell>
+                            <TableCell className="text-xs whitespace-nowrap hidden xl:table-cell">{assigneeName(deal.assignedTo)}</TableCell>
                             <TableCell className="whitespace-nowrap">
                               <div className="flex items-center justify-center gap-1">
                                 {canMoveBack && (
@@ -956,9 +972,10 @@ function AnalyticsTab({ leads, deals }: { leads: Lead[]; deals: Deal[] }) {
 
   // ─── Top Performers
   const topPerformers = useMemo(() => {
-    return ASSIGNEES.map((name) => {
-      const wonLeads = leads.filter((l) => l.assignedTo === name && l.status === "won");
-      const activeLeads = leads.filter((l) => l.assignedTo === name && !["won", "lost"].includes(l.status));
+    const assigneeNames = [...new Set(leads.map((l) => assigneeName(l.assignedTo)))].filter((n) => n !== "Unassigned");
+    return assigneeNames.map((name) => {
+      const wonLeads = leads.filter((l) => assigneeName(l.assignedTo) === name && l.status === "won");
+      const activeLeads = leads.filter((l) => assigneeName(l.assignedTo) === name && !["won", "lost"].includes(l.status));
       const totalWonValue = wonLeads.reduce((s, l) => s + l.estimatedValue, 0);
       const totalActiveValue = activeLeads.reduce((s, l) => s + l.estimatedValue, 0);
       return { name, wonLeads: wonLeads.length, activeLeads: activeLeads.length, totalWonValue, totalActiveValue };
@@ -1157,6 +1174,12 @@ export function SalesModule() {
 
   const { data: leadsData, loading: leadsLoading, reload: reloadLeads, error: leadsError } = useApi<Lead[]>("/api/sales/leads", [refreshTick]);
   const { data: dealsData, loading: dealsLoading, reload: reloadDeals, error: dealsError } = useApi<Deal[]>("/api/sales/deals", [refreshTick]);
+  const { data: staffData } = useApi<{ id: string; firstName: string; lastName: string; role: string; department: string | null }[]>("/api/staff", [refreshTick]);
+
+  const salesStaff = useMemo(() => {
+    if (!staffData) return [];
+    return staffData.filter((u) => u.role === "sales_mgr" || u.role === "sales_exec" || u.department === "Sales");
+  }, [staffData]);
 
   const leads = leadsData ?? FALLBACK_LEADS;
   const deals = dealsData ?? FALLBACK_DEALS;
@@ -1305,6 +1328,7 @@ export function SalesModule() {
         onClose={() => setLeadDialog({ open: false, lead: null })}
         onSave={handleSaveLead}
         initial={leadDialog.lead}
+        salesStaff={salesStaff}
       />
       <DealFormDialog
         key={dealDialog ? "open" : "closed"}
@@ -1312,6 +1336,7 @@ export function SalesModule() {
         onClose={() => setDealDialog(false)}
         onSave={handleSaveDeal}
         leads={leads}
+        salesStaff={salesStaff}
       />
     </div>
   );
