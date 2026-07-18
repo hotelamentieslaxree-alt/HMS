@@ -7,10 +7,8 @@ const globalForPrisma = globalThis as unknown as {
 
 // ─── PrismaClient factory ───────────────────────────────────────────────────
 function createPrismaClient(): PrismaClient {
-  const datasourceUrl = process.env.DATABASE_URL || undefined
   return new PrismaClient({
     log: ['error', 'warn'],
-    ...(datasourceUrl ? { datasourceUrl } : {}),
   })
 }
 
@@ -46,7 +44,7 @@ export const db: PrismaClient = new Proxy({} as PrismaClient, {
   },
 })
 
-// ─── ensureDbReady — now just creates client (PostgreSQL on Vercel needs no file setup) ──
+// ─── ensureDbReady ──────────────────────────────────────────────────────────
 export async function ensureDbReady() {
   if (globalForPrisma._dbInitialized) return
   getOrCreateClient()
