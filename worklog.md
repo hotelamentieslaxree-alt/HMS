@@ -982,3 +982,32 @@ Stage Summary:
 - 4 Hospital dead buttons fixed (New Patient, Call, New Appointment, Admit)
 - All mutations now persist to database via Prisma API routes
 - All buttons have proper loading states, error handling, and success toasts
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix Prisma DATABASE_URL and all broken click handlers
+
+Work Log:
+- Fixed DATABASE_URL in .env from `file:../db/custom.db` to `file:./db/custom.db` (was resolving incorrectly when passed as datasourceUrl to PrismaClient)
+- Ran prisma generate and db push to sync schema
+- Fixed dashboard empty onClick handlers for Sales/Marketing QuickAction buttons → now navigate via setActiveModule
+- Launched 5 parallel subagents to fix broken handlers across all modules:
+  - Agent 2b: Documents, Properties, Reports modules
+  - Agent 2c: Accounting, Finance modules
+  - Agent 2d: Marketing module
+  - Agent 2e: Kitchen, POS modules
+  - Agent 2f: Housekeeping, CRM, Hospital modules
+- Manually fixed remaining modules: Vendors export, Inventory export, HR print button
+- Discovered Automation, Settings, Integrations modules were already properly wired (initial audit was incorrect)
+- All lint checks pass clean with zero errors
+- Committed and pushed to GitHub
+
+Stage Summary:
+- Fixed Prisma DATABASE_URL issue (live data now loads correctly)
+- Fixed 80+ broken click handlers across 17+ modules
+- Created 25+ new API routes for document management, CRM, hospital, housekeeping inspections, marketing campaigns/social, POS menu management, automation workflows, integration config, settings
+- Added CSV export functionality to: Finance (invoices, GSTR, P&L), Marketing (ROI, social, attribution), Reports (all types), Vendors, Inventory
+- New Prisma models: IpdAdmission, CorporateAccount
+- Schema changes: Added inspectionRating, inspectorName to HousekeepingTask
+- 52 files changed, 5198 insertions, 390 deletions
