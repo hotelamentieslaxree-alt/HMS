@@ -7,7 +7,11 @@ const globalForPrisma = globalThis as unknown as {
 
 // ─── PrismaClient factory ───────────────────────────────────────────────────
 function createPrismaClient(): PrismaClient {
-  return new PrismaClient({ log: ['error', 'warn'] })
+  const datasourceUrl = process.env.DATABASE_URL || undefined
+  return new PrismaClient({
+    log: ['error', 'warn'],
+    ...(datasourceUrl ? { datasourceUrl } : {}),
+  })
 }
 
 // ─── Invalidate stale cached client ─────────────────────────────────────────
