@@ -21,11 +21,6 @@ const CONTEXT_SUGGESTIONS: Record<string, string[]> = {
     "Show out-of-order rooms",
     "What's the average room rate today?",
   ],
-  hospital: [
-    "How many patients are currently admitted?",
-    "Show today's appointment schedule",
-    "Which doctors are on duty?",
-  ],
   inventory: [
     "Which items are running low on stock?",
     "Show pending purchase orders",
@@ -118,10 +113,6 @@ function generateFallbackResponse(message: string, context: string): string {
     return "You can manage all reservations in the Reservations module. Use filters to find specific bookings by date, status, or guest name.";
   }
 
-  if (lower.includes("patient") || lower.includes("doctor") || lower.includes("appointment")) {
-    return "The Hospital module provides full patient, doctor, and appointment management. Check the appointments view for today's schedule.";
-  }
-
   if (lower.includes("stock") || lower.includes("inventory") || lower.includes("supplier")) {
     return "The Inventory module tracks stock levels, vendor management, and purchase orders. Check the low-stock alerts for items that need reordering.";
   }
@@ -135,7 +126,7 @@ function generateFallbackResponse(message: string, context: string): string {
   }
 
   if (lower.includes("help") || lower.includes("what can")) {
-    return "I'm ARIA AI, your hospitality operations assistant. I can help you navigate the system, understand modules like Reservations, Front Office, Housekeeping, POS, Hospital, Inventory, Finance, and more. Just ask about any area of operations!";
+    return "I'm ARIA AI, your hospitality operations assistant. I can help you navigate the system, understand modules like Reservations, Front Office, Housekeeping, POS, Inventory, Finance, and more. Just ask about any area of operations!";
   }
 
   return `I understand you're asking about "${message.substring(0, 50)}${message.length > 50 ? "..." : ""}". While I'm currently in limited mode, I recommend exploring the ${context !== "default" ? context : "Dashboard"} module for the most up-to-date information. Feel free to ask about specific modules or operations!`;

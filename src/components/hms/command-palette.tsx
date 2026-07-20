@@ -34,7 +34,6 @@ import {
   Building2,
   IndianRupee,
   PieChart,
-  Heart,
   Package,
   Landmark,
   Handshake,
@@ -67,7 +66,6 @@ import {
 // ─── Extended module list (current + planned) ─────────────────────────
 type ExtendedModuleKey =
   | ModuleKey
-  | "hospital"
   | "inventory"
   | "finance"
   | "crm"
@@ -266,13 +264,6 @@ const NAV_ENTRIES: NavEntry[] = [
   },
   // ── Planned / Future modules ──
   {
-    key: "hospital",
-    label: "Hospital",
-    icon: Heart,
-    group: "Extensions",
-    keywords: ["hospital", "patient", "doctor", "opd", "ipd", "emergency", "pharmacy"],
-  },
-  {
     key: "inventory",
     label: "Inventory",
     icon: Package,
@@ -396,7 +387,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, CalendarCheck, DoorOpen, Sparkles, Users, UtensilsCrossed,
   Receipt, TrendingUp, Megaphone, UserCog, Clock, Award, BarChart3, MoonStar,
   ShieldCheck, UserCheck, Wrench, Hotel, Building2, IndianRupee, PieChart,
-  Heart, Package, Landmark, Handshake, CheckSquare, FileText, Brain, Zap,
+  Package, Landmark, Handshake, CheckSquare, FileText, Brain, Zap,
   Plug, Settings, ChefHat,
 };
 

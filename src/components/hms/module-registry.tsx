@@ -17,7 +17,6 @@ const registry: Record<string, () => Promise<ModuleComponent>> = {
   pos: () => import("./modules/pos").then(m => m.PosModule),
   kitchen: () => import("./modules/kitchen").then(m => m.KitchenModule),
   folios: () => import("./modules/folios").then(m => m.FoliosModule),
-  hospital: () => import("./modules/hospital").then(m => m.HospitalModule),
   inventory: () => import("./modules/inventory").then(m => m.InventoryModule),
   finance: () => import("./modules/finance").then(m => m.FinanceModule),
   hr: () => import("./modules/hr").then(m => m.HRModule),

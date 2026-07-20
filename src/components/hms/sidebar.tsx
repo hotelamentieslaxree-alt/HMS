@@ -9,7 +9,7 @@ import {
   TrendingUp, Megaphone, UserCheck, Award, Clock, ChevronDown,
   IndianRupee, Cake, Share2, Activity, Target, Briefcase,
   Building2, PieChart, Calendar, FileText, ClipboardList, BarChart3,
-  Heart, Package, Landmark, Handshake, CheckSquare, Brain, Zap,
+  Package, Landmark, Handshake, CheckSquare, Brain, Zap,
   Plug, Settings, ChefHat, Globe, Cpu,
   ShoppingCart, Calculator, BookOpen, Scale,
 } from "lucide-react";
@@ -58,17 +58,6 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       ]},
       { key: "kitchen", label: "Kitchen Display", icon: ChefHat },
       { key: "folios", label: "Folios & Billing", icon: Receipt },
-    ],
-  },
-  {
-    title: "Hospital & Clinic",
-    items: [
-      { key: "hospital", label: "Hospital", icon: Heart, children: [
-        { key: "patients", label: "Patients", icon: Users },
-        { key: "doctors", label: "Doctors", icon: UserCog },
-        { key: "appointments", label: "Appointments", icon: Calendar },
-        { key: "emergency", label: "Emergency", icon: Activity },
-      ]},
     ],
   },
   {

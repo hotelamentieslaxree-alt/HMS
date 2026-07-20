@@ -21,7 +21,6 @@ export type ModuleKey =
   | "staff"
   | "maintenance"
   | "audit"
-  | "hospital"
   | "inventory"
   | "finance"
   | "crm"
@@ -93,10 +92,6 @@ export const MODULE_GROUPS: Record<string, { label: string; modules: ModuleKey[]
     label: "Restaurant & Kitchen",
     modules: ["pos", "kitchen", "folios"],
   },
-  hospitality: {
-    label: "Hospital & Clinic",
-    modules: ["hospital"],
-  },
   inventory: {
     label: "Inventory & Procurement",
     modules: ["inventory", "purchasing", "vendors"],
@@ -142,8 +137,6 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
   { key: "pos", label: "Restaurant / POS", group: "commerce", enabled: true },
   { key: "kitchen", label: "Kitchen Display", group: "commerce", enabled: true },
   { key: "folios", label: "Folios & Billing", group: "commerce", enabled: true },
-  // Hospital
-  { key: "hospital", label: "Hospital", group: "hospitality", enabled: true },
   { key: "inventory", label: "Inventory", group: "inventory", enabled: true },
   { key: "purchasing", label: "Purchasing", group: "inventory", enabled: true },
   { key: "vendors", label: "Vendors", group: "inventory", enabled: true },
@@ -178,8 +171,8 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
 
 // Which modules each role can access (among enabled modules)
 export const ROLE_MODULES: Record<string, ModuleKey[]> = {
-  owner: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
-  gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "hospital", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
+  owner: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
+  gm: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "pos", "kitchen", "folios", "inventory", "finance", "accounting", "purchasing", "vendors", "hr", "attendance", "scorecard", "sales", "marketing", "crm", "tasks", "documents", "reports", "night-audit", "audit", "ai-center", "automation", "staff", "maintenance", "properties", "settings", "integrations"],
   fom: ["dashboard", "reservations", "rooms", "housekeeping", "guests", "folios", "reports", "night-audit", "staff", "scorecard", "tasks"],
   receptionist: ["dashboard", "reservations", "rooms", "guests", "folios", "staff", "tasks"],
   hk_mgr: ["dashboard", "housekeeping", "rooms", "staff", "maintenance", "scorecard", "tasks", "laundry", "inventory", "purchasing", "vendors"],

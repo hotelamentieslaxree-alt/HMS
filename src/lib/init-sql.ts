@@ -736,69 +736,6 @@ CREATE TABLE "LoginHistory" (
 );
 
 -- CreateTable
-CREATE TABLE "Patient" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "propertyId" TEXT NOT NULL,
-    "patientId" TEXT NOT NULL,
-    "firstName" TEXT NOT NULL,
-    "lastName" TEXT NOT NULL,
-    "age" INTEGER,
-    "gender" TEXT,
-    "phone" TEXT,
-    "email" TEXT,
-    "address" TEXT,
-    "bloodGroup" TEXT,
-    "allergies" TEXT NOT NULL DEFAULT '[]',
-    "medicalHistory" TEXT NOT NULL DEFAULT '{}',
-    "emergencyContact" TEXT,
-    "insuranceProvider" TEXT,
-    "insurancePolicy" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'active',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Patient_propertyId_fkey" FOREIGN KEY ("propertyId") REFERENCES "Property" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "Doctor" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "propertyId" TEXT NOT NULL,
-    "firstName" TEXT NOT NULL,
-    "lastName" TEXT NOT NULL,
-    "specialization" TEXT,
-    "qualification" TEXT,
-    "phone" TEXT,
-    "email" TEXT,
-    "department" TEXT,
-    "consultationFee" REAL NOT NULL DEFAULT 0,
-    "availableDays" TEXT NOT NULL DEFAULT '[]',
-    "availableFrom" TEXT,
-    "availableTo" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'active',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Doctor_propertyId_fkey" FOREIGN KEY ("propertyId") REFERENCES "Property" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "Appointment" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "propertyId" TEXT NOT NULL,
-    "patientId" TEXT NOT NULL,
-    "doctorId" TEXT NOT NULL,
-    "appointmentDate" DATETIME NOT NULL,
-    "timeSlot" TEXT,
-    "type" TEXT NOT NULL DEFAULT 'opd',
-    "status" TEXT NOT NULL DEFAULT 'scheduled',
-    "notes" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Appointment_propertyId_fkey" FOREIGN KEY ("propertyId") REFERENCES "Property" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Appointment_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Appointment_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES "Doctor" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
 CREATE TABLE "StockItem" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "propertyId" TEXT NOT NULL,
@@ -1188,30 +1125,6 @@ CREATE INDEX "LoginHistory_email_idx" ON "LoginHistory"("email");
 
 -- CreateIndex
 CREATE INDEX "LoginHistory_createdAt_idx" ON "LoginHistory"("createdAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Patient_patientId_key" ON "Patient"("patientId");
-
--- CreateIndex
-CREATE INDEX "Patient_propertyId_idx" ON "Patient"("propertyId");
-
--- CreateIndex
-CREATE INDEX "Patient_patientId_idx" ON "Patient"("patientId");
-
--- CreateIndex
-CREATE INDEX "Doctor_propertyId_idx" ON "Doctor"("propertyId");
-
--- CreateIndex
-CREATE INDEX "Doctor_specialization_idx" ON "Doctor"("specialization");
-
--- CreateIndex
-CREATE INDEX "Appointment_propertyId_appointmentDate_idx" ON "Appointment"("propertyId", "appointmentDate");
-
--- CreateIndex
-CREATE INDEX "Appointment_doctorId_appointmentDate_idx" ON "Appointment"("doctorId", "appointmentDate");
-
--- CreateIndex
-CREATE INDEX "Appointment_patientId_idx" ON "Appointment"("patientId");
 
 -- CreateIndex
 CREATE INDEX "StockItem_propertyId_category_idx" ON "StockItem"("propertyId", "category");

@@ -1,5 +1,5 @@
 // ARIA HMS — Hospitality Operating System
-// Prisma schema (PostgreSQL — works on Vercel + local)
+// Prisma schema (PostgreSQL — production/Vercel)
 
 generator client {
   provider = "prisma-client-js"
@@ -55,9 +55,7 @@ model Property {
   socialAccounts           SocialAccount[]
   // Enterprise v2 relations
   moduleConfigs            ModuleConfig[]
-  patients                 Patient[]
-  doctors                  Doctor[]
-  appointments             Appointment[]
+
   stockItems               StockItem[]
   vendors                  Vendor[]
   purchaseOrders           PurchaseOrder[]
@@ -77,9 +75,8 @@ model Property {
   journalEntries           JournalEntry[]
   billingVerifications     BillingVerification[]
   budgetEntries            BudgetEntry[]
-  // CRM & Hospital extended relations
+  // CRM extended relations
   corporateAccounts        CorporateAccount[]
-  ipdAdmissions            IpdAdmission[]
 }
 
 model Department {
@@ -985,108 +982,6 @@ model LoginHistory {
   @@index([userId, createdAt])
   @@index([email])
   @@index([createdAt])
-}
-
-// ════════════════════════════════════════════════════════════════
-// HOSPITAL MODULE — Patients, Doctors, Appointments
-// ════════════════════════════════════════════════════════════════
-
-model Patient {
-  id                String   @id @default(cuid())
-  propertyId        String
-  patientId         String   @unique // auto-generated e.g. PAT-001
-  firstName         String
-  lastName          String
-  age               Int?
-  gender            String?
-  phone             String?
-  email             String?
-  address           String?
-  bloodGroup        String?
-  allergies         String   @default("[]")
-  medicalHistory    String   @default("{}")
-  emergencyContact  String?
-  insuranceProvider String?
-  insurancePolicy   String?
-  status            String   @default("active") // active | discharged | deceased
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  appointments  Appointment[]
-  ipdAdmissions IpdAdmission[]
-
-  @@index([propertyId])
-  @@index([patientId])
-}
-
-model Doctor {
-  id              String   @id @default(cuid())
-  propertyId      String
-  firstName       String
-  lastName        String
-  specialization  String?
-  qualification   String?
-  phone           String?
-  email           String?
-  department      String?
-  consultationFee Float    @default(0)
-  availableDays   String   @default("[]")
-  availableFrom   String? // e.g. "09:00"
-  availableTo     String? // e.g. "17:00"
-  status          String   @default("active") // active | on_leave | inactive
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-
-  @@index([propertyId])
-  @@index([specialization])
-}
-
-model Appointment {
-  id              String   @id @default(cuid())
-  propertyId      String
-  patientId       String
-  doctorId        String
-  appointmentDate DateTime
-  timeSlot        String? // e.g. "09:00-09:30"
-  type            String   @default("opd") // opd | ipd | emergency | follow_up
-  status          String   @default("scheduled") // scheduled | in_progress | completed | cancelled | no_show
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId, appointmentDate])
-  @@index([doctorId, appointmentDate])
-  @@index([patientId])
-}
-
-model IpdAdmission {
-  id              String   @id @default(cuid())
-  propertyId      String
-  patientId       String
-  bedNumber       String?  // e.g. "Ward-A-12", "ICU-3"
-  ward            String?  // e.g. "Ward-A", "ICU", "Ward-B"
-  admissionDate   DateTime @default(now())
-  dischargeDate   DateTime?
-  admittingDoctor String?
-  diagnosis       String?
-  status          String   @default("admitted") // admitted | discharged | critical | transfer
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId, status])
-  @@index([patientId])
 }
 
 model CorporateAccount {

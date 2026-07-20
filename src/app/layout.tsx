@@ -11,8 +11,8 @@ const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["lati
 
 export const metadata: Metadata = {
   title: "ARIA HMS — Hospitality Operating System",
-  description: "Enterprise-grade Hospitality Operating System · Hotels, Restaurants, Hospitals, Clinics, Resorts, Co-working Spaces · AI-Powered · Real-time",
-  keywords: ["HMS", "PMS", "Hospitality OS", "Hotel Management", "Hospital Management", "Restaurant POS", "Reservations", "Night Audit", "AI"],
+  description: "Enterprise-grade Hospitality Operating System · Hotels, Restaurants, Resorts, Co-working Spaces · AI-Powered · Real-time",
+  keywords: ["HMS", "PMS", "Hospitality OS", "Hotel Management", "Restaurant POS", "Reservations", "Night Audit", "AI"],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

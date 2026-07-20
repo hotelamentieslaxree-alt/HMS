@@ -19,7 +19,6 @@ const MODULE_TITLES: Record<ModuleKey, { title: string; subtitle: string }> = {
   pos: { title: "Restaurant / POS", subtitle: "Outlets · Tables · Kitchen orders" },
   kitchen: { title: "Kitchen Display", subtitle: "Real-time order tracking" },
   folios: { title: "Folios & Billing", subtitle: "Charges · Payments · Invoices" },
-  hospital: { title: "Hospital & Clinic", subtitle: "Patients · Doctors · Appointments" },
   inventory: { title: "Inventory & Procurement", subtitle: "Stock · Vendors · Purchase Orders" },
   finance: { title: "Finance & Accounting", subtitle: "Invoices · GST · P&L · Cashbook" },
   hr: { title: "HR Hub", subtitle: "Employees · Payroll · Events" },
